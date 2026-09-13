@@ -143,6 +143,8 @@ export function createApp() {
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:8081',
+      'https://deadsmile.vercel.app',
+      'https://deadsmilegames.vercel.app'
     ];
 
     app.use(
