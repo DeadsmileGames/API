@@ -34,6 +34,7 @@ import { libraryRouter } from "./routes/library.routes.js";
 const PgSession = connectPgSimple(session);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const CSP_DIRECTIVES = {
     defaultSrc: ["'self'"],
     imgSrc: ["'self'", "data:", "blob:", "https:"],
@@ -42,17 +43,27 @@ const CSP_DIRECTIVES = {
         "'unsafe-inline'",
         "'unsafe-eval'",
         "https://cdn.jsdelivr.net",
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
     ],
-
     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-
     fontSrc: [
         "'self'",
         "https://fonts.gstatic.com",
         "https://fonts.scalar.com",
     ],
-
-    connectSrc: ["'self'", "https://api.scalar.com", env.frontendUrl],
+    connectSrc: [
+        "'self'",
+        "https://api.scalar.com",
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
+        env.frontendUrl,
+    ],
+    frameSrc: [
+        "'self'",
+        "https://www.google.com/recaptcha/",
+        "https://recaptcha.google.com/",
+    ],
     mediaSrc: ["'self'", "blob:", "https:"],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
@@ -87,54 +98,43 @@ export function createApp() {
             contentSecurityPolicy: {
                 directives: CSP_DIRECTIVES,
             },
-
             crossOriginEmbedderPolicy: true,
-
             crossOriginOpenerPolicy: {
-                policy: "same-origin",
+                policy: "same-origin-allow-popups",
             },
-
             crossOriginResourcePolicy: {
-                policy: "same-origin",
+                policy: "cross-origin",
             },
-
             referrerPolicy: {
                 policy: "strict-origin-when-cross-origin",
             },
-
             hsts: env.isProduction
                 ? {
-                      maxAge: 31_536_000,
-                      includeSubDomains: true,
-                      preload: true,
-                  }
+                    maxAge: 31_536_000,
+                    includeSubDomains: true,
+                    preload: true,
+                }
                 : false,
-
             permittedCrossDomainPolicies: {
                 permittedPolicies: "none",
             },
-
             dnsPrefetchControl: {
                 allow: false,
             },
-
             frameguard: {
                 action: "deny",
             },
-
             noSniff: true,
-
             xssFilter: true,
-
             originAgentCluster: true,
         }),
     );
+
     app.use((_req, res, next) => {
         res.setHeader(
             "Permissions-Policy",
             "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
         );
-
         next();
     });
 
@@ -145,16 +145,24 @@ export function createApp() {
       'http://localhost:8081',
       'https://deadsmile.vercel.app',
       'https://deadsmilegames.vercel.app'
-    ];
+    ].filter(Boolean);
 
     app.use(
       cors({
-        origin: allowedOrigins,
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          if (allowedOrigins.indexOf(origin) !== -1 || !env.isProduction) {
+            callback(null, true);
+          } else {
+            callback(new Error('Bloqueado pelo CORS'));
+          }
+        },
         credentials: true,
         methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "X-CSRF-Token"],
       })
     );
+
     app.use(hpp());
 
     app.use(
@@ -181,8 +189,8 @@ export function createApp() {
             cookie: SESSION_COOKIE_OPTIONS,
         }),
     );
-    app.get("/api/csrf", csrfToken);
 
+    app.get("/api/csrf", csrfToken);
     app.use("/api", verifyCsrf);
 
     app.get("/api/health", (_req, res) => {
@@ -213,6 +221,6 @@ export function createApp() {
 
     return app;
 }
-const app = createApp();
 
+const app = createApp();
 export default app;
