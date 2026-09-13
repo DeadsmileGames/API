@@ -20,14 +20,14 @@ const callbackPage = `
     font-style: normal;
     font-weight: 100 900;
     font-display: swap;
-    src: url("/fonts/IV.ttf") format("truetype");
+    src: url("https://deadsmilegames.vercel.app/assets/fonts/IV.ttf") format("truetype");
   }
   @font-face {
     font-family: "Space Grotesk";
     font-style: normal;
     font-weight: 300 700;
     font-display: swap;
-    src: url("/assets/fonts/SPV.ttf") format("truetype");
+    src: url("https://deadsmilegames.vercel.app/assets/fonts/SPV.ttf") format("truetype");
   }
 
   :root {
@@ -155,6 +155,7 @@ const callbackPage = `
     font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.08em;
+    display: none;
     margin-bottom: 2px;
   }
 
