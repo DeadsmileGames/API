@@ -50,6 +50,8 @@ const CSP_DIRECTIVES = {
         "'self'",
         "https://fonts.gstatic.com",
         "https://fonts.scalar.com",
+        "https://deadsmilegames.vercel.app",
+        "https://deadsmile.vercel.app",
     ],
 
     connectSrc: ["'self'", "https://api.scalar.com", env.frontendUrl],
