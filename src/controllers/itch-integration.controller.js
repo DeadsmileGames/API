@@ -71,8 +71,6 @@ const callbackPage = `
     content: "";
     position: absolute;
     inset: 0;
-    background:
-      radial-gradient(circle at 50% 35%, #171922 0%, #0c0d12 70%);
     pointer-events: none;
   }
   .callback-card {
@@ -81,7 +79,6 @@ const callbackPage = `
     padding: 34px;
     border-radius: 28px;
     background: var(--card);
-    border: 1px solid var(--border);
     display: grid;
     justify-items: center;
     text-align: center;
