@@ -236,8 +236,6 @@ const callbackPage = `
     </div>
   </main>
 
-  <div class="callback-version">v1.0.0</div>
-
 <script>
 const copy = {
   en: {
