@@ -149,16 +149,6 @@ const callbackPage = `
     letter-spacing: -0.6px;
   }
 
-  .eyebrow {
-    color: #7c808a;
-    text-transform: uppercase;
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    display: none;
-    margin-bottom: 2px;
-  }
-
   .callback-card p {
     color: #9497a1;
     font-size: 12px;
@@ -241,8 +231,6 @@ const callbackPage = `
         </svg>
       </div>
     </div>
-
-    <small class="eyebrow" id="eyebrow">Deadsmile Games</small>
     <h1 id="title"></h1>
     <p id="message"></p>
 
@@ -256,7 +244,6 @@ const callbackPage = `
 <script>
 const copy = {
   en: {
-    eyebrow: "Deadsmile Games",
     working: "Connecting your itch.io account…",
     done: "Account connected",
     doneText: "You can return to Deadsmile Games.",
@@ -264,7 +251,6 @@ const copy = {
     errorText: "Return to Deadsmile Games and try again."
   },
   "pt-BR": {
-    eyebrow: "Deadsmile Games",
     working: "Conectando sua conta itch.io…",
     done: "Conta conectada",
     doneText: "Você já pode voltar para a Deadsmile Games.",
@@ -272,7 +258,6 @@ const copy = {
     errorText: "Volte para a Deadsmile Games e tente novamente."
   },
   es: {
-    eyebrow: "Deadsmile Games",
     working: "Conectando tu cuenta de itch.io…",
     done: "Cuenta conectada",
     doneText: "Ya puedes volver a Deadsmile Games.",
@@ -285,7 +270,6 @@ const card         = document.getElementById("card");
 const mark         = document.getElementById("mark");
 const iconCheck    = document.getElementById("icon-check");
 const iconCross    = document.getElementById("icon-cross");
-const eyebrow      = document.getElementById("eyebrow");
 const title        = document.getElementById("title");
 const message      = document.getElementById("message");
 const progressWrap = document.getElementById("progressWrap");
@@ -297,8 +281,6 @@ function applyState(state, strings) {
   iconCheck.hidden = state !== "done";
   iconCross.hidden = state !== "error";
   progressWrap.hidden = state !== "loading";
-
-  eyebrow.textContent = strings.eyebrow;
   title.textContent   = state === "done"  ? strings.done
                       : state === "error" ? strings.error
                       : strings.working;
