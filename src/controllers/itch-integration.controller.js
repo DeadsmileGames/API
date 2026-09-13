@@ -140,6 +140,7 @@ const callbackPage = `
   }
 
   .card-mark .badge svg { display: block; }
+  .card-mark .badge svg[hidden] { display: none; }
   .callback-card h1 {
     font: 700 26px/1.15 "Space Grotesk", sans-serif;
     margin: 0;
