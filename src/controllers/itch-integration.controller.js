@@ -269,7 +269,6 @@ const copy = {
 const card         = document.getElementById("card");
 const mark         = document.getElementById("mark");
 const iconCheck    = document.getElementById("icon-check");
-const iconCross    = document.getElementById("icon-cross");
 const title        = document.getElementById("title");
 const message      = document.getElementById("message");
 const progressWrap = document.getElementById("progressWrap");
@@ -279,7 +278,6 @@ function applyState(state, strings) {
   mark.dataset.state = state;
 
   iconCheck.hidden = state !== "done";
-  iconCross.hidden = state !== "error";
   progressWrap.hidden = state !== "loading";
   title.textContent   = state === "done"  ? strings.done
                       : state === "error" ? strings.error
