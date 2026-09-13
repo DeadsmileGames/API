@@ -230,5 +230,5 @@ export async function getDownloadAuthorization(userId, gameId) {
   url.pathname = url.pathname.replace(/\/purchase\/?$/i, '');
   url.search = '';
   url.hash = '';
-  return { itchGameUrl: url.toString().replace(/\/$/, ''), accessToken: decryptToken(account.access_token_encrypted) };
+  return { itchGameUrl: url.toString().replace(/\/$/, ''), accessToken: env.itchApiKey,  };
 }
