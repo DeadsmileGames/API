@@ -226,6 +226,11 @@ const callbackPage = `
              stroke-linecap="round" stroke-linejoin="round" hidden>
           <path d="M20 6 9 17l-5-5"/>
         </svg>
+        <svg id="icon-cross" width="34" height="34" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.6"
+             stroke-linecap="round" stroke-linejoin="round" hidden>
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
       </div>
     </div>
     <h1 id="title"></h1>
@@ -264,6 +269,7 @@ const copy = {
 const card         = document.getElementById("card");
 const mark         = document.getElementById("mark");
 const iconCheck    = document.getElementById("icon-check");
+const iconCross    = document.getElementById("icon-cross");
 const title        = document.getElementById("title");
 const message      = document.getElementById("message");
 const progressWrap = document.getElementById("progressWrap");
@@ -273,7 +279,9 @@ function applyState(state, strings) {
   mark.dataset.state = state;
 
   iconCheck.hidden = state !== "done";
+  iconCross.hidden = state !== "error";
   progressWrap.hidden = state !== "loading";
+
   title.textContent   = state === "done"  ? strings.done
                       : state === "error" ? strings.error
                       : strings.working;
