@@ -18,8 +18,6 @@ function sha256(value) {
 }
 export async function requestPasswordReset(email) {
   const user = await findUserByEmail(email);
-
-  // Do not reveal whether the account exists.
   if (!user) {
     await new Promise((resolve) =>
       setTimeout(resolve, 250)
