@@ -279,8 +279,8 @@ function applyState(state, strings) {
   card.dataset.state = state;
   mark.dataset.state = state;
 
-  iconCheck.hidden = state !== "done";
-  iconCross.hidden = state !== "error";
+  iconCheck.toggleAttribute("hidden", state !== "done");
+  iconCross.toggleAttribute("hidden", state !== "error");
   progressWrap.hidden = state !== "loading";
 
   title.textContent   = state === "done"  ? strings.done
