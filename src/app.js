@@ -147,6 +147,22 @@ export function createApp() {
       'https://deadsmilegames.vercel.app'
     ].filter(Boolean);
 
+    // Middleware manual para garantir os headers de CORS explicitamente em QUALQUER resposta (inclusive erros como 401)
+    app.use((req, res, next) => {
+        const origin = req.headers.origin;
+        if (allowedOrigins.includes(origin)) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+        }
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token");
+
+        if (req.method === "OPTIONS") {
+            return res.sendStatus(200);
+        }
+        next();
+    });
+
     app.use(
       cors({
         origin: (origin, callback) => {
