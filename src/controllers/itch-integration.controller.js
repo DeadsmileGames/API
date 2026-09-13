@@ -236,6 +236,8 @@ const callbackPage = `
         </svg>
       </div>
     </div>
+
+    <small class="eyebrow" id="eyebrow">Deadsmile Games</small>
     <h1 id="title"></h1>
     <p id="message"></p>
 
@@ -243,6 +245,8 @@ const callbackPage = `
       <div class="loading-bar"><i></i></div>
     </div>
   </main>
+
+  <div class="callback-version">v1.0.0</div>
 
 <script>
 const copy = {
