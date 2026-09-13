@@ -149,6 +149,15 @@ const callbackPage = `
     letter-spacing: -0.6px;
   }
 
+  .eyebrow {
+    color: #7c808a;
+    text-transform: uppercase;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 2px;
+  }
+
   .callback-card p {
     color: #9497a1;
     font-size: 12px;
