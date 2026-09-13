@@ -95,7 +95,7 @@ export function createApp() {
             },
 
             crossOriginResourcePolicy: {
-                policy: "same-origin",
+                policy: "cross-origin",
             },
 
             referrerPolicy: {
@@ -143,6 +143,11 @@ export function createApp() {
       'http://localhost:5173',
       'http://localhost:8081',
     ];
+
+    app.options("*", cors({
+        origin: allowedOrigins,
+        credentials: true,
+        }));
 
     app.use(
       cors({
