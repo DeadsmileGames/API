@@ -24,6 +24,8 @@ import { adminRouter } from './routes/admin.routes.js';
 import { itchIntegrationRouter } from './routes/itch-integration.routes.js';
 import { libraryRouter } from './routes/library.routes.js';
 import { platformRouter } from './routes/platform.routes.js';
+import { createServer } from 'node:http';
+import { attachRealtimeServer } from './realtime/hub.js';
 
 const PgSession = connectPgSimple(session);
 const __filename = fileURLToPath(import.meta.url);
@@ -153,4 +155,12 @@ export function createApp() {
 
 const app = createApp();
 
-export default app;
+const server = createServer(app);
+
+attachRealtimeServer(server);
+
+if (!process.env.VERCEL) {
+  server.listen(env.port);
+}
+
+export default server;
