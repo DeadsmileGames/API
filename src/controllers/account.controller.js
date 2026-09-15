@@ -1,5 +1,6 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/apiResponse.js';
+import { env } from '../config/env.js';
 import {
   getAccount,
   updateAccount,
@@ -27,6 +28,12 @@ export const remove = asyncHandler(async (req, res) => {
   await new Promise((resolve, reject) =>
     req.session.destroy((err) => (err ? reject(err) : resolve()))
   );
-  res.clearCookie('deadsmile.sid');
+  res.clearCookie('deadsmile.sid', {
+    httpOnly: true,
+    secure: env.isProduction,
+    sameSite: env.cookieSameSite,
+    path: '/',
+    partitioned: env.isProduction && env.cookieSameSite === 'none',
+  });
   sendSuccess(res, { deleted: true });
 });

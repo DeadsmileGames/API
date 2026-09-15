@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(254),
-  recaptchaToken: z.string().trim().min(1, 'reCAPTCHA verification is required.'),
+  recaptchaToken: z.string().trim().min(1, 'reCAPTCHA verification is required.').max(10_000, 'reCAPTCHA token is too long.'),
 }).strict();
 
 export const resetPasswordSchema = z.object({

@@ -87,6 +87,24 @@ export async function findItchGame(gameId) {
   return rows[0] || null;
 }
 
+export async function findPreferredItchChannel(userId, gameId) {
+  const { rows } = await query(
+    `SELECT b.itch_channel
+     FROM game_builds b
+     JOIN release_channels c ON c.id = b.channel_id
+     LEFT JOIN beta_access ba
+       ON ba.user_id = $1 AND ba.game_id = b.game_id AND ba.channel_id = c.id
+       AND (ba.expires_at IS NULL OR ba.expires_at > now())
+     WHERE b.game_id = $2 AND b.platform = 'windows' AND b.status = 'published'
+       AND b.itch_channel IS NOT NULL
+       AND ((c.name = 'stable' AND c.public) OR ba.user_id IS NOT NULL)
+     ORDER BY (ba.user_id IS NOT NULL) DESC, b.published_at DESC NULLS LAST, b.created_at DESC
+     LIMIT 1`,
+    [userId, gameId]
+  );
+  return rows[0]?.itch_channel || null;
+}
+
 export async function grantEntitlement({ userId, gameId, externalReference, acquiredAt }) {
   await query(
     `INSERT INTO user_game_entitlements
@@ -116,6 +134,7 @@ export async function listEntitlements(userId) {
        e.acquired_at, e.last_verified_at,
        g.id, g.title, g.slug, g.short_description, g.status, g.release_date,
        g.hero_image, g.cover_image, g.trailer_url, g.purchase_url, g.download_url,
+       g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled, g.itch_game_id,
        COALESCE(genre_agg.genres, '{}') AS genres,
        COALESCE(platform_agg.platforms, '{}') AS platforms
      FROM user_game_entitlements e

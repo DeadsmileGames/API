@@ -1,6 +1,13 @@
-import { createApp } from './app.js';
+import { createServer } from 'node:http';
+import app from './app.js';
 import { env } from './config/env.js';
+import { attachRealtimeServer } from './realtime/hub.js';
 
-const app = createApp();
+const server = createServer(app);
+attachRealtimeServer(server);
 
-app.listen(env.port);
+if (!process.env.VERCEL) {
+  server.listen(env.port);
+}
+
+export default server;

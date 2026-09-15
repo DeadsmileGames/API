@@ -12,7 +12,7 @@ export const listGamesSchema = z.object({
   genre:    z.string().trim().max(40).optional(),
   platform: z.string().trim().max(40).optional(),
   status:   z.enum(['announced', 'in_development', 'released']).optional(),
-});
+}).strict();
 
 export const gameSlugSchema = z.object({
   slug: z
@@ -21,4 +21,4 @@ export const gameSlugSchema = z.object({
     .min(1)
     .max(120)
     .regex(/^[a-z0-9-]+$/, 'Invalid game identifier.'),
-});
+}).strict();

@@ -19,4 +19,4 @@ export const completeItchSchema = z.object({
 
 export const libraryGameSchema = z.object({
   gameId: z.string().uuid(),
-});
+}).strict();

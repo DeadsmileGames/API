@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
-import { loginLimiter, registerLimiter, twoFactorLimiter, forgotPasswordLimiter } from '../middleware/rateLimiters.js';
+import { loginLimiter, registerLimiter, twoFactorLimiter, forgotPasswordLimiter, resetPasswordLimiter } from '../middleware/rateLimiters.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { totpTokenSchema } from '../validators/totp.validators.js';
 import {
@@ -55,6 +55,7 @@ authRouter.post(
 
 authRouter.post(
   '/reset-password',
+  resetPasswordLimiter,
   validate(resetPasswordSchema),
   resetPasswordHandler,
 );

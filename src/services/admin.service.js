@@ -8,13 +8,18 @@ import {
   deleteGame,
 } from '../repositories/admin.repository.js';
 import { findGameBySlug } from '../repositories/games.repository.js';
+import { publishContentEvent } from './notification.service.js';
 
 export async function publishNewsletter(payload) {
-  return createNewsletter(payload);
+  const item = await createNewsletter(payload);
+  await publishContentEvent('news', item);
+  return item;
 }
 
 export async function publishVideo(payload) {
-  return createVideo(payload);
+  const item = await createVideo(payload);
+  await publishContentEvent('video', item);
+  return item;
 }
 
 export async function publishGame(payload) {
@@ -27,7 +32,9 @@ export async function publishGame(payload) {
       'That game slug is already in use.'
     );
   }
-  return createGame(payload);
+  const item = await createGame(payload);
+  await publishContentEvent('game', item);
+  return item;
 }
 
 async function remove(fn, id, label) {

@@ -5,6 +5,7 @@ const GAME_SUMMARY_SELECT = `
     g.id, g.title, g.slug, g.short_description,
     g.status, g.release_date, g.hero_image, g.cover_image,
     g.trailer_url, g.featured, g.purchase_url, g.download_url, g.itch_game_id,
+    g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled,
     COALESCE(genre_agg.genres,    '{}') AS genres,
     COALESCE(platform_agg.platforms, '{}') AS platforms
   FROM games g
@@ -121,4 +122,35 @@ export async function findRelatedGames(gameId, genreNames, limit = 4) {
   );
 
   return rows;
+}
+
+export async function findGameContent(gameId, gameTitle) {
+  const [videos, news, recommended] = await Promise.all([
+    query(
+      `SELECT id, title, category, thumbnail, video_url, duration_seconds, published_at
+       FROM videos
+       WHERE game_id = $1 OR (game_id IS NULL AND strpos(lower(title), lower($2)) > 0)
+       ORDER BY published_at DESC`,
+      [gameId, gameTitle]
+    ),
+    query(
+      `SELECT id, slug, title, category, excerpt, image, published_at
+       FROM news
+       WHERE game_id = $1 OR (game_id IS NULL AND strpos(lower(title), lower($2)) > 0)
+       ORDER BY published_at DESC LIMIT 8`,
+      [gameId, gameTitle]
+    ),
+    query(
+      `${GAME_SUMMARY_SELECT}
+       WHERE g.id <> $1
+       ORDER BY random()
+       LIMIT 1`,
+      [gameId]
+    ),
+  ]);
+  return {
+    videos: videos.rows,
+    news: news.rows,
+    recommended: recommended.rows[0] || null,
+  };
 }

@@ -32,7 +32,13 @@ export const registerSchema = z.object({
     .max(254),
 
   password: passwordSchema,
-});
+
+  recaptchaToken: z
+    .string()
+    .trim()
+    .min(1, 'reCAPTCHA verification is required.')
+    .max(10_000, 'reCAPTCHA token is too long.'),
+}).strict();
 
 export const mobileLoginSchema = z.object({
   email: z
@@ -46,7 +52,7 @@ export const mobileLoginSchema = z.object({
     .string()
     .min(1, 'Password is required.')
     .max(128),
-});
+}).strict();
 
 export const loginSchema = z.object({
   email: z
@@ -64,8 +70,9 @@ export const loginSchema = z.object({
   recaptchaToken: z
     .string()
     .trim()
-    .min(1, 'reCAPTCHA verification is required.'),
-});
+    .min(1, 'reCAPTCHA verification is required.')
+    .max(10_000, 'reCAPTCHA token is too long.'),
+}).strict();
 
 export const mobileRegisterSchema = z.object({
   username: z
@@ -86,4 +93,4 @@ export const mobileRegisterSchema = z.object({
     .max(254),
 
   password: passwordSchema,
-});
+}).strict();

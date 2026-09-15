@@ -1,12 +1,13 @@
 import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
-import { decryptToken, encryptToken } from '../utils/tokenCipher.js';
+import { encryptToken } from '../utils/tokenCipher.js';
 import {
   consumeOAuthState,
   createOAuthState,
   findItchAccount,
   findItchGame,
+  findPreferredItchChannel,
   grantEntitlement,
   listEntitlements,
   listItchGames,
@@ -33,27 +34,100 @@ function stateHash(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-async function itchRequest(path, token, params) {
+async function itchRequest(path, token, params, { allowApiErrors = false, method = 'GET' } = {}) {
   const url = new URL(`${API_ROOT}${path}`);
-  for (const [key, value] of Object.entries(params || {})) url.searchParams.set(key, String(value));
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (method === 'GET') url.searchParams.set(key, String(value));
+    else body.set(key, String(value));
+  }
   let response;
   try {
     response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' }),
+      },
+      ...(method === 'GET' ? {} : { body }),
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
     throw new AppError(503, 'ITCH_UNAVAILABLE', 'itch.io could not be reached. Try again shortly.');
   }
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data) {
+  if (!data || (!response.ok && !allowApiErrors)) {
     throw new AppError(503, 'ITCH_UNAVAILABLE', 'itch.io could not complete the request. Try again shortly.');
   }
   return data;
 }
 
+function newestUpload(uploads, preferredChannel) {
+  const available = Array.isArray(uploads) ? uploads.filter((upload) => upload?.id) : [];
+  const channel = String(preferredChannel || '').trim().toLowerCase();
+  const candidates = channel
+    ? available.filter((upload) => String(upload.channel_name || '').trim().toLowerCase() === channel)
+    : available;
+  return candidates.sort((a, b) => {
+    const aBuild = Number(a.build?.id || 0);
+    const bBuild = Number(b.build?.id || 0);
+    if (aBuild !== bBuild) return bBuild - aBuild;
+    return Date.parse(b.updated_at || b.created_at || 0) - Date.parse(a.updated_at || a.created_at || 0);
+  })[0] || null;
+}
+
+function safeDownloadRedirect(value, base) {
+  let url;
+  try {
+    url = new URL(value, base);
+  } catch {
+    throw new AppError(503, 'ITCH_DOWNLOAD_UNAVAILABLE', 'The game download is temporarily unavailable.');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new AppError(503, 'ITCH_DOWNLOAD_UNAVAILABLE', 'The game download is temporarily unavailable.');
+  }
+  return url.toString();
+}
+
+async function itchDownloadRedirect({ gameId, downloadKeyId, upload }) {
+  const session = await itchRequest(
+    `/games/${gameId}/download-sessions`,
+    env.itchApiKey,
+    { download_key_id: downloadKeyId },
+    { method: 'POST' },
+  );
+  if (!session?.uuid) {
+    throw new AppError(503, 'ITCH_DOWNLOAD_UNAVAILABLE', 'The game download is temporarily unavailable.');
+  }
+  const buildId = Number(upload.build?.id || 0);
+  const path = buildId > 0
+    ? `/builds/${buildId}/download/archive/default`
+    : `/uploads/${Number(upload.id)}/download`;
+  const url = new URL(`${API_ROOT}${path}`);
+  url.searchParams.set('api_key', env.itchApiKey);
+  url.searchParams.set('download_key_id', String(downloadKeyId));
+  url.searchParams.set('uuid', String(session.uuid));
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: { Accept: 'application/octet-stream' },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new AppError(503, 'ITCH_DOWNLOAD_UNAVAILABLE', 'The game download is temporarily unavailable.');
+  }
+  const location = response.headers.get('location');
+  if (![301, 302, 303, 307, 308].includes(response.status) || !location) {
+    throw new AppError(503, 'ITCH_DOWNLOAD_UNAVAILABLE', 'The game download is temporarily unavailable.');
+  }
+  return safeDownloadRedirect(location, url);
+}
+
 async function ownershipFor(game, itchUserId) {
-  const data = await itchRequest(`/games/${game.itch_game_id}/download_keys`, env.itchApiKey, { user_id: itchUserId });
+  const data = await itchRequest(`/games/${game.itch_game_id}/download_keys`, env.itchApiKey, { user_id: itchUserId }, { allowApiErrors: true });
   if (data.download_key) {
     return {
       owned: true,
@@ -92,6 +166,11 @@ function clientGame(row) {
     trailerUrl: row.trailer_url,
     purchaseUrl: row.purchase_url,
     downloadUrl: row.download_url,
+    itchGameId: row.itch_game_id ? Number(row.itch_game_id) : null,
+    engine: row.engine || 'native',
+    savePathTemplate: row.save_path_template || null,
+    cloudSavesEnabled: Boolean(row.cloud_saves_enabled),
+    telemetryEnabled: row.telemetry_enabled !== false,
     genres: row.genres || [],
     platforms: row.platforms || [],
     acquiredAt: row.acquired_at,
@@ -116,7 +195,7 @@ export async function beginItchConnection(userId, { client, locale, returnPath }
   });
   const url = new URL('https://itch.io/user/oauth');
   url.searchParams.set('client_id', env.itchClientId);
-  url.searchParams.set('scope', 'profile:me profile:owned');
+  url.searchParams.set('scope', 'profile:me');
   url.searchParams.set('redirect_uri', env.itchRedirectUri);
   url.searchParams.set('response_type', 'token');
   url.searchParams.set('state', state);
@@ -133,7 +212,7 @@ export async function completeItchConnection({ state, accessToken }) {
   ]);
   const scopes = new Set(credentials.scopes || []);
   const hasProfile = scopes.has('profile');
-  if ((!hasProfile && !scopes.has('profile:me')) || (!hasProfile && !scopes.has('profile:owned'))) {
+  if (!hasProfile && !scopes.has('profile:me')) {
     throw new AppError(400, 'ITCH_SCOPE_MISSING', 'Required itch.io access was not granted.');
   }
   const itchUser = profile.user;
@@ -150,7 +229,7 @@ export async function completeItchConnection({ state, accessToken }) {
     });
   } catch (error) {
     if (error?.code === '23505') {
-      throw new AppError(409, 'ITCH_ACCOUNT_IN_USE', 'This itch.io account is already connected to another Deadsmile account.');
+      throw new AppError(409, 'ITCH_ACCOUNT_IN_USE', 'This itch.io account is already connected to another Deadsmile Games account.');
     }
     throw error;
   }
@@ -191,7 +270,12 @@ export async function verifyGameOwnership(userId, gameId) {
     await revokeEntitlement(userId, game.id);
   }
   await touchItchAccount(userId);
-  return { owned: result.owned, gameId: game.id, purchaseUrl: game.purchase_url };
+  return {
+    owned: result.owned,
+    status: result.owned ? 'owned' : 'not_owned',
+    gameId: game.id,
+    purchaseUrl: game.purchase_url,
+  };
 }
 
 export async function syncItchLibrary(userId) {
@@ -223,12 +307,55 @@ export async function getLibrary(userId) {
 }
 
 export async function getDownloadAuthorization(userId, gameId) {
-  const verification = await verifyGameOwnership(userId, gameId);
-  if (!verification.owned) throw new AppError(403, 'GAME_NOT_OWNED', 'This game is not available in your library.');
-  const [account, game] = await Promise.all([findItchAccount(userId), findItchGame(gameId)]);
-  const url = new URL(game.purchase_url);
-  url.pathname = url.pathname.replace(/\/purchase\/?$/i, '');
-  url.search = '';
-  url.hash = '';
-  return { itchGameUrl: url.toString().replace(/\/$/, ''), accessToken: env.itchApiKey,  };
+  requireConfigured();
+  const [account, game, preferredItchChannel] = await Promise.all([
+    findItchAccount(userId),
+    findItchGame(gameId),
+    findPreferredItchChannel(userId, gameId),
+  ]);
+  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED', 'Connect your itch.io account to continue.');
+  if (!game) throw new AppError(404, 'GAME_NOT_FOUND', 'That game could not be found.');
+  if (!game.itch_game_id || !game.purchase_url) {
+    throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED', 'This game is not ready for itch.io downloads yet.');
+  }
+  const ownership = await ownershipFor(game, account.itch_user_id);
+  if (!ownership.owned) {
+    await revokeEntitlement(userId, game.id);
+    throw new AppError(403, 'GAME_NOT_OWNED', 'This game is not available in your library.');
+  }
+  await grantEntitlement({
+    userId,
+    gameId: game.id,
+    externalReference: ownership.reference,
+    acquiredAt: ownership.acquiredAt,
+  });
+  await touchItchAccount(userId);
+  const uploads = await itchRequest(
+    `/games/${game.itch_game_id}/uploads`,
+    env.itchApiKey,
+    { download_key_id: ownership.reference },
+  );
+  const upload = newestUpload(uploads.uploads, preferredItchChannel);
+  if (!upload) {
+    throw new AppError(
+      409,
+      preferredItchChannel ? 'ITCH_CHANNEL_UNAVAILABLE' : 'WINDOWS_BUILD_UNAVAILABLE',
+      'A compatible game build is not available yet.',
+    );
+  }
+  const downloadUrl = await itchDownloadRedirect({
+    gameId: Number(game.itch_game_id),
+    downloadKeyId: ownership.reference,
+    upload,
+  });
+  return {
+    itchGameId: Number(game.itch_game_id),
+    preferredItchChannel,
+    downloadUrl,
+    uploadId: Number(upload.id),
+    buildId: upload.build?.id ? Number(upload.build.id) : null,
+    filename: upload.filename || `${game.slug || game.id}.zip`,
+    sizeBytes: Number(upload.size || 0),
+    version: upload.build?.user_version || upload.build?.userVersion || null,
+  };
 }
