@@ -88,7 +88,8 @@ export function createApp() {
   app.use(express.static(path.join(__dirname, '../public'), { index: false }));
 
   const allowedOrigins = env.isProduction
-    [env.frontendUrl, 'http://localhost:5173', 'http://localhost:8081', 'http://127.0.0.1:5173'];
+    ? [env.frontendUrl]
+    : [env.frontendUrl, 'http://localhost:5173', 'http://localhost:8081'];
   const corsOptions = {
     origin: allowedOrigins,
     credentials: true,
