@@ -54,7 +54,9 @@ export const env = {
   brevoSenderName: process.env.BREVO_SENDER_NAME || 'Deadsmile Games',
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN || '',
   itchClientId: process.env.ITCH_CLIENT_ID || '',
-  itchApiKey: process.env.ITCH_API_KEY || '',
+  itchLauncherClientId: process.env.ITCH_LAUNCHER_CLIENT_ID || '',
   itchTokenEncryptionKey: process.env.ITCH_TOKEN_ENCRYPTION_KEY || '',
   itchRedirectUri: process.env.ITCH_REDIRECT_URI || '',
+  githubGameRepository: process.env.GITHUB_GAMES_REPO || '',
+  githubGameToken: process.env.GITHUB_GAMES_TOKEN || '',
 };

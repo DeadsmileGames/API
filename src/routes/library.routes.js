@@ -11,4 +11,4 @@ libraryRouter.use(requireAuth);
 libraryRouter.get('/', controller.list);
 libraryRouter.post('/sync', integrationLimiter, controller.sync);
 libraryRouter.post('/:gameId/verify', integrationLimiter, validate(libraryGameSchema, 'params'), controller.verify);
-libraryRouter.post('/:gameId/download-authorization', integrationLimiter, validate(libraryGameSchema, 'params'), controller.downloadAuthorization);
+libraryRouter.post('/:gameId/install-metadata', integrationLimiter, validate(libraryGameSchema, 'params'), controller.installMetadata);

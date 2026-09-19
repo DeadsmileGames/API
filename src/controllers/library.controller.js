@@ -1,7 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import {
-  getDownloadAuthorization,
+  getInstallMetadata,
   getLibrary,
   syncItchLibrary,
   verifyGameOwnership,
@@ -19,7 +19,7 @@ export const verify = asyncHandler(async (req, res) => {
   sendSuccess(res, await verifyGameOwnership(req.session.userId, req.params.gameId));
 });
 
-export const downloadAuthorization = asyncHandler(async (req, res) => {
+export const installMetadata = asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  sendSuccess(res, await getDownloadAuthorization(req.session.userId, req.params.gameId));
+  sendSuccess(res, await getInstallMetadata(req.session.userId, req.params.gameId));
 });
