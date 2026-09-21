@@ -32,7 +32,7 @@ export async function updateAccount(userId, payload) {
   }
 
   const updated = await updateProfile(userId, {
-    username:   payload.username   || current.username,
+    username:   payload.username.toLowerCase()   || current.username,
     email:      payload.email      || current.email,
     bio:        payload.bio        ?? current.bio,
     websiteUrl: payload.websiteUrl ?? current.website_url,
@@ -54,7 +54,7 @@ export async function getPublicProfile(username) {
 
   return {
     id:         user.id,
-    username:   user.username,
+    username:   user.username.toLowerCase(),
     avatarUrl:  user.avatar_url  || null,
     bio:        user.bio         || '',
     websiteUrl: user.website_url || null,
