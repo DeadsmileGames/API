@@ -41,6 +41,7 @@ export const saveParamsSchema = z.object({
 export const saveBodySchema = z.object({
   payload: z.string().min(1).max(350_000),
   revision: z.coerce.number().int().positive().optional().nullable(),
+  expectedUserId: uuid.optional(),
 }).strict();
 
 export const consentSchema = z.object({ enabled: z.boolean() }).strict();

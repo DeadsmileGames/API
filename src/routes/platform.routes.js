@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { expectedAccount } from '../middleware/expectedAccount.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { integrationLimiter } from '../middleware/rateLimiters.js';
 import { validate } from '../middleware/validate.js';
@@ -28,9 +29,9 @@ platformRouter.delete('/push-subscriptions', integrationLimiter, validate(pushSu
 platformRouter.post('/sessions', integrationLimiter, validate(sessionStartSchema), controller.startSession);
 platformRouter.post('/sessions/:sessionId/end', integrationLimiter, validate(sessionIdSchema, 'params'), validate(sessionEndSchema), controller.endSession);
 platformRouter.get('/achievements/:gameId', validate(gameIdSchema, 'params'), controller.achievements);
-platformRouter.post('/achievements/:gameId/:key/unlock', integrationLimiter, validate(achievementSchema, 'params'), controller.unlock);
+platformRouter.post('/achievements/:gameId/:key/unlock', integrationLimiter, validate(achievementSchema, 'params'), expectedAccount, controller.unlock);
 platformRouter.get('/saves/:gameId/:slot', integrationLimiter, validate(saveParamsSchema, 'params'), controller.downloadSave);
-platformRouter.put('/saves/:gameId/:slot', integrationLimiter, validate(saveParamsSchema, 'params'), validate(saveBodySchema), controller.uploadSave);
+platformRouter.put('/saves/:gameId/:slot', integrationLimiter, validate(saveParamsSchema, 'params'), validate(saveBodySchema), expectedAccount, controller.uploadSave);
 platformRouter.patch('/telemetry-consent', validate(consentSchema), controller.consent);
 platformRouter.post('/telemetry', integrationLimiter, validate(telemetrySchema), controller.telemetry);
 platformRouter.get('/saves/:gameId', integrationLimiter, validate(gameIdSchema, 'params'), controller.saves);

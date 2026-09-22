@@ -140,6 +140,27 @@ export async function findCloudSave(userId, gameId, slot) {
 }
 
 export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, revision }) {
+  if (revision != null) {
+    // Updating an existing save must never recreate a deleted slot or replace
+    // a revision that was modified by another client in the meantime.
+    const { rows } = await query(
+      `UPDATE cloud_saves SET payload = $4, sha256 = $5,
+         revision = revision + 1, updated_at = now()
+       WHERE user_id = $1 AND game_id = $2 AND slot = $3 AND revision = $6::bigint
+         AND EXISTS (
+           SELECT 1 FROM games g WHERE g.id = $2 AND g.cloud_saves_enabled
+             AND (g.purchase_url IS NULL OR EXISTS (
+               SELECT 1 FROM user_game_entitlements e
+               WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL
+             ))
+         )
+       RETURNING slot, revision, sha256, updated_at`,
+      [userId, gameId, slot, payload, sha256, revision]
+    );
+    return rows[0] || null;
+  }
+
+  // A missing revision means "create only", never "overwrite any version".
   const { rows } = await query(
     `INSERT INTO cloud_saves (user_id, game_id, slot, payload, sha256)
      SELECT $1, g.id, $3, $4, $5 FROM games g
@@ -150,14 +171,9 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
            WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL
          )
        )
-     ON CONFLICT (user_id, game_id, slot) DO UPDATE SET
-       payload = EXCLUDED.payload,
-       sha256 = EXCLUDED.sha256,
-       revision = cloud_saves.revision + 1,
-       updated_at = now()
-     WHERE $6::bigint IS NULL OR cloud_saves.revision = $6
+     ON CONFLICT (user_id, game_id, slot) DO NOTHING
      RETURNING slot, revision, sha256, updated_at`,
-    [userId, gameId, slot, payload, sha256, revision ?? null]
+    [userId, gameId, slot, payload, sha256]
   );
   return rows[0] || null;
 }
