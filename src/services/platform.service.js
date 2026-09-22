@@ -5,7 +5,45 @@ import * as engagement from '../repositories/engagement.repository.js';
 import { createLiveTicket } from '../realtime/hub.js';
 import { Expo } from 'expo-server-sdk';
 
-const MAX_SAVE_BYTES = 256 * 1024;
+const MAX_SAVE_BYTES = 1024;
+
+
+function validarSavePico8(filename, bytes) {
+    if (
+        typeof filename !== "string" ||
+        !/^[a-z0-9_-]{1,64}\.p8d\.txt$/i.test(filename)
+    ) {
+        throw new AppError(
+            400,
+            "SAVE_INVALID",
+            "Only PICO-8 .p8d.txt files are allowed."
+        );
+    }
+
+    if (!bytes.length || bytes.length > MAX_SAVE_BYTES) {
+        throw new AppError(
+            400,
+            "SAVE_INVALID",
+            "The PICO-8 save file has an invalid size."
+        );
+    }
+
+    const content = bytes
+        .toString("latin1")
+        .replace(/\r\n/g, "\n")
+        .replace(/\n$/, "");
+
+    if (!/^(?:[0-9a-fA-F]{64}\n){7}[0-9a-fA-F]{64}$/.test(content)) {
+        throw new AppError(
+            400,
+            "SAVE_INVALID",
+            "The file does not have a valid PICO-8 save format."
+        );
+    }
+
+    return true;
+}
+
 
 export async function startSession(userId, payload) {
   const access = await repository.gameAccess(userId, payload.gameId);
@@ -71,10 +109,14 @@ export async function uploadSave(userId, gameId, slot, body) {
   if (!bytes.length || bytes.toString('base64').replace(/=+$/, '') !== encoded.replace(/=+$/, '')) {
     throw new AppError(400, 'SAVE_INVALID', 'The save file could not be read.');
   }
-  if (bytes.length > MAX_SAVE_BYTES) {
-    throw new AppError(413, 'SAVE_TOO_LARGE', 'This save is too large to sync.');
-  }
-  const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+
+  validarSavePico8(body.filename, bytes);
+
+  const sha256 = crypto
+      .createHash("sha256")
+      .update(bytes)
+      .digest("hex");
+
   const item = await repository.upsertCloudSave({ userId, gameId, slot, payload: body.payload, sha256, revision: body.revision });
   if (!item) throw new AppError(409, 'SAVE_CONFLICT', 'A newer cloud save is available. Review it before replacing your save.');
   return item;

@@ -38,11 +38,24 @@ export const saveParamsSchema = z.object({
   slot: z.string().trim().regex(/^[a-z0-9_-]{1,40}$/),
 }).strict();
 
+
 export const saveBodySchema = z.object({
-  payload: z.string().min(1).max(350_000),
-  revision: z.coerce.number().int().positive().optional().nullable(),
-  expectedUserId: uuid.optional(),
+    filename: z.string()
+        .regex(/^[a-z0-9_-]{1,64}\.p8d\.txt$/i),
+
+    payload: z.string()
+        .min(1)
+        .max(1368),
+
+    revision: z.coerce.number()
+        .int()
+        .positive()
+        .optional()
+        .nullable(),
+
+    expectedUserId: uuid.optional(),
 }).strict();
+
 
 export const consentSchema = z.object({ enabled: z.boolean() }).strict();
 
