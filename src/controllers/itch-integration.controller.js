@@ -14,7 +14,7 @@ const callbackPage = `
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Deadsmile Games</title>
-<link rel="stylesheet" href="/itch-callback.css">
+<link rel="stylesheet" href="/website.css">
 </head>
 <body>
   <main class="callback-card" data-state="loading" id="card">
