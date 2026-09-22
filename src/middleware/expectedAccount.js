@@ -1,8 +1,4 @@
 import { sendError } from '../utils/apiResponse.js';
-
-// The optional owner ID protects work originating from an earlier game session
-// when the desktop launcher has since switched to another authenticated user.
-// Other clients that do not send this field keep the existing API contract.
 export function expectedAccount(req, res, next) {
   const expected = req.body?.expectedUserId;
   if (expected != null && expected !== req.auth?.userId) {

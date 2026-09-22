@@ -141,8 +141,6 @@ export async function findCloudSave(userId, gameId, slot) {
 
 export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, revision }) {
   if (revision != null) {
-    // Updating an existing save must never recreate a deleted slot or replace
-    // a revision that was modified by another client in the meantime.
     const { rows } = await query(
       `UPDATE cloud_saves SET payload = $4, sha256 = $5,
          revision = revision + 1, updated_at = now()
@@ -159,8 +157,6 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
     );
     return rows[0] || null;
   }
-
-  // A missing revision means "create only", never "overwrite any version".
   const { rows } = await query(
     `INSERT INTO cloud_saves (user_id, game_id, slot, payload, sha256)
      SELECT $1, g.id, $3, $4, $5 FROM games g
