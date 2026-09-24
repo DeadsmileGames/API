@@ -55,7 +55,10 @@ export async function consumeResetToken({ tokenHash, passwordHash }) {
       return null;
     }
 
-    await client.query('UPDATE password_resets SET used_at = NOW() WHERE id = $1', [record.id]);
+    await client.query(
+      'DELETE FROM account_email_tokens WHERE user_id = $1',
+      [record.user_id],
+    );
     await client.query(`DELETE FROM user_sessions WHERE sess->>'userId' = $1`, [String(record.user_id)]);
     await client.query('COMMIT');
     return { userId: record.user_id };

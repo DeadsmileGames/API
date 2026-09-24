@@ -57,13 +57,51 @@ export async function finishSession({ userId, sessionId }) {
       return null;
     }
     await client.query(
-      `INSERT INTO game_activity (user_id, game_id, total_ms, sessions, last_played_at)
-       VALUES ($1, $2, $3, 1, $4)
-       ON CONFLICT (user_id, game_id) DO UPDATE SET
-         total_ms = game_activity.total_ms + EXCLUDED.total_ms,
-         sessions = game_activity.sessions + 1,
-         last_played_at = GREATEST(game_activity.last_played_at, EXCLUDED.last_played_at)`,
-      [userId, session.game_id, session.duration_ms, session.ended_at]
+      `INSERT INTO game_activity (
+        user_id,
+        game_id,
+        total_ms,
+        sessions,
+        last_played_at,
+        public
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        1,
+        $4,
+        COALESCE(
+          (
+            SELECT share_game_activity
+            FROM users
+            WHERE id = $1
+          ),
+          false
+        )
+      )
+
+      ON CONFLICT (user_id, game_id)
+      DO UPDATE SET
+        total_ms =
+          game_activity.total_ms + EXCLUDED.total_ms,
+
+        sessions =
+          game_activity.sessions + 1,
+
+        last_played_at =
+          GREATEST(
+            game_activity.last_played_at,
+            EXCLUDED.last_played_at
+          ),
+
+        public = EXCLUDED.public`,
+      [
+        userId,
+        session.game_id,
+        session.duration_ms,
+        session.ended_at,
+      ],
     );
     await client.query('COMMIT');
     return session;
@@ -242,7 +280,14 @@ export async function publicActivity(userId) {
      FROM game_activity a
      JOIN games g ON g.id = a.game_id
      LEFT JOIN game_screenshots s ON s.game_id = g.id
-     WHERE a.user_id = $1 AND a.public
+     WHERE a.user_id = $1
+      AND a.public
+      AND EXISTS (
+        SELECT 1
+        FROM users u
+        WHERE u.id = $1
+          AND u.share_game_activity
+      )
      GROUP BY a.user_id, a.total_ms, a.sessions, a.last_played_at,
               g.id, g.title, g.slug, g.cover_image, g.hero_image, g.purchase_url
      ORDER BY a.last_played_at DESC LIMIT 8`,
@@ -259,6 +304,12 @@ export async function publicAchievements(userId) {
      JOIN achievements a ON a.id = ua.achievement_id
      JOIN games g ON g.id = a.game_id
      WHERE ua.user_id = $1
+      AND EXISTS (
+        SELECT 1
+        FROM users u
+        WHERE u.id = $1
+          AND u.share_achievements
+      )
      ORDER BY ua.unlocked_at DESC LIMIT 12`,
     [userId]
   );

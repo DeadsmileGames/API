@@ -2,12 +2,16 @@ import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { updateAccountSchema, deleteAccountSchema, publicProfileSchema } from '../validators/account.validators.js';
-import { show, update, remove, publicProfile } from '../controllers/account.controller.js';
+import { show, update, remove, publicProfile, privacy, changePrivacy } from '../controllers/account.controller.js';
 import * as totpController from '../controllers/totp.controller.js';
 import { totpTokenSchema } from '../validators/totp.validators.js';
 import { env } from '../config/env.js';
 import { sendError } from '../utils/apiResponse.js';
-import { twoFactorLimiter } from '../middleware/rateLimiters.js';
+import { twoFactorLimiter, publicEmailLimiter } from '../middleware/rateLimiters.js';
+import {
+  changeEmailSchema,
+  privacySchema,
+} from '../validators/account-email.validators.js';
 
 function trustedFrontendOrigin(req, res, next) {
   const origin = req.get('origin');
@@ -26,6 +30,25 @@ function trustedFrontendOrigin(req, res, next) {
 
 export const accountRouter = Router();
 
+accountRouter.post(
+  '/email/change',
+  requireAuth,
+  publicEmailLimiter,
+  validate(changeEmailSchema),
+  changeEmail,
+);
+accountRouter.get(
+  '/privacy',
+  requireAuth,
+  privacy,
+);
+
+accountRouter.put(
+  '/privacy',
+  requireAuth,
+  validate(privacySchema),
+  changePrivacy,
+);
 accountRouter.get('/profile/:username', validate(publicProfileSchema, 'params'), publicProfile);
 accountRouter.get('/',                  requireAuth,                           show);
 accountRouter.patch('/',                requireAuth, validate(updateAccountSchema), update);

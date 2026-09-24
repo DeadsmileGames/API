@@ -2,10 +2,18 @@ import { query } from '../config/database.js';
 
 export async function findPublicProfile(username) {
   const { rows } = await query(
-    `SELECT id, username, avatar_url, bio, website_url, location, created_at
-     FROM users
-     WHERE LOWER(username) = LOWER($1)
-     LIMIT 1`,
+   `SELECT
+    id,
+    username,
+    avatar_url,
+    bio,
+    website_url,
+    location,
+    created_at,
+    share_playtime
+  FROM users
+  WHERE LOWER(username) = LOWER($1)
+  LIMIT 1`
     [username]
   );
 

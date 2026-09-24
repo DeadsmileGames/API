@@ -9,11 +9,26 @@ export async function requireAuth(req, res, next) {
   }
 
   try {
-    const { rows } = await query('SELECT id, role FROM users WHERE id = $1', [userId]);
+    const { rows } = await query(
+      `SELECT id, role, email_verified_at
+      FROM users
+      WHERE id = $1`,
+      [userId],
+    );
     const user = rows[0];
     if (!user) {
       req.session.destroy(() => {});
       return sendError(res, 401, 'UNAUTHENTICATED', 'You must be signed in to do that.');
+    }
+    if (!user.email_verified_at) {
+      req.session.destroy(() => {});
+
+      return sendError(
+        res,
+        403,
+        'EMAIL_NOT_VERIFIED',
+        'Confirm your email before accessing your account.',
+      );
     }
     req.auth = { userId: user.id, role: user.role };
     if (req.session.role && req.session.role !== user.role) {

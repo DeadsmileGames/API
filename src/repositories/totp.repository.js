@@ -2,9 +2,18 @@ import { query } from '../config/database.js';
 
 export async function findTotpByUserId(userId) {
   const { rows } = await query(
-    'SELECT user_id, secret, enabled, created_at, updated_at FROM user_totp WHERE user_id = $1',
+    `SELECT
+       user_id,
+       secret,
+       enabled,
+       last_used_step,
+       created_at,
+       updated_at
+     FROM user_totp
+     WHERE user_id = $1`,
     [userId],
   );
+
   return rows[0] || null;
 }
 
@@ -12,7 +21,11 @@ export async function upsertTotpSecret(userId, secret) {
   const { rows } = await query(
     `INSERT INTO user_totp (user_id, secret, enabled)
      VALUES ($1, $2, FALSE)
-     ON CONFLICT (user_id) DO UPDATE SET secret = EXCLUDED.secret, enabled = FALSE, updated_at = NOW()
+     ON CONFLICT (user_id) DO UPDATE SET
+      secret = EXCLUDED.secret,
+      enabled = FALSE,
+      last_used_step = NULL,
+      updated_at = NOW()
      RETURNING user_id, enabled, created_at, updated_at`,
     [userId, secret],
   );
@@ -27,12 +40,39 @@ export async function replaceTotpSecret(userId, expectedSecret, encryptedSecret)
   );
 }
 
-export async function enableTotp(userId) {
+export async function enableTotp(userId, step) {
   const { rows } = await query(
-    `UPDATE user_totp SET enabled = TRUE, updated_at = NOW() WHERE user_id = $1 RETURNING user_id, enabled, updated_at`,
-    [userId],
+    `UPDATE user_totp
+     SET enabled = TRUE,
+         last_used_step = $2,
+         updated_at = NOW()
+     WHERE user_id = $1
+       AND enabled = FALSE
+       AND (
+         last_used_step IS NULL
+         OR last_used_step < $2
+       )
+     RETURNING user_id, enabled, updated_at`,
+    [userId, step],
   );
+
   return rows[0];
+}
+
+export async function consumeTotpStep(userId, step) {
+  const { rowCount } = await query(
+    `UPDATE user_totp
+     SET last_used_step = $2
+     WHERE user_id = $1
+       AND enabled = TRUE
+       AND (
+         last_used_step IS NULL
+         OR last_used_step < $2
+       )`,
+    [userId, step],
+  );
+
+  return rowCount === 1;
 }
 
 export async function disableTotp(userId) {

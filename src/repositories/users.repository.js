@@ -3,7 +3,11 @@ import { query } from '../config/database.js';
 const USER_FIELDS = `
   id, email, username, role,
   avatar_url, bio, website_url, location,
-  created_at, updated_at, last_login_at
+  created_at, updated_at, last_login_at,
+  email_verified_at,
+  share_game_activity,
+  share_playtime,
+  share_achievements
 `;
 
 export async function findUserByEmail(email) {

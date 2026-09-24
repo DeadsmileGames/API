@@ -1,19 +1,26 @@
-import { Router } from 'express';
-import { validate } from '../middleware/validate.js';
-import { loginLimiter, registerLimiter, twoFactorLimiter, forgotPasswordLimiter, resetPasswordLimiter } from '../middleware/rateLimiters.js';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { totpTokenSchema } from '../validators/totp.validators.js';
+import { Router } from "express";
+import { validate } from "../middleware/validate.js";
+import {
+  loginLimiter,
+  registerLimiter,
+  twoFactorLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+  publicEmailLimiter,
+} from "../middleware/rateLimiters.js";
+import { requireAuth } from "../middleware/requireAuth.js";
+import { totpTokenSchema } from "../validators/totp.validators.js";
 import {
   registerSchema,
   loginSchema,
   mobileLoginSchema,
   mobileRegisterSchema,
-} from '../validators/auth.validators.js';
+} from "../validators/auth.validators.js";
 
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
-} from '../validators/password-reset.validators.js';
+} from "../validators/password-reset.validators.js";
 
 import {
   register,
@@ -24,37 +31,67 @@ import {
   mobileRegister,
   verifyTwoFactor,
   forgotPassword,
+  confirmEmail,
+  resendEmail,
   resetPasswordHandler,
-} from '../controllers/auth.controller.js';
+} from "../controllers/auth.controller.js";
+
+import {
+  emailTokenSchema,
+  resendEmailSchema,
+} from "../validators/account-email.validators.js";
 
 export const authRouter = Router();
-
-authRouter.post('/register', registerLimiter, validate(registerSchema), register);
-authRouter.post('/login', loginLimiter, validate(loginSchema), login);
-authRouter.post('/logout', requireAuth, logout);
-authRouter.get('/me', requireAuth, me);
-authRouter.post('/verify-2fa', twoFactorLimiter, validate(totpTokenSchema), verifyTwoFactor);
 authRouter.post(
-  '/mobile-login',
+  "/confirm-email",
+  publicEmailLimiter,
+  validate(emailTokenSchema),
+  confirmEmail,
+);
+
+authRouter.post(
+  "/resend-email",
+  publicEmailLimiter,
+  validate(resendEmailSchema),
+  resendEmail,
+);
+
+authRouter.post(
+  "/register",
+  registerLimiter,
+  validate(registerSchema),
+  register,
+);
+authRouter.post("/login", loginLimiter, validate(loginSchema), login);
+authRouter.post("/logout", requireAuth, logout);
+authRouter.get("/me", requireAuth, me);
+authRouter.post(
+  "/verify-2fa",
+  twoFactorLimiter,
+  validate(totpTokenSchema),
+  verifyTwoFactor,
+);
+authRouter.post(
+  "/mobile-login",
   loginLimiter,
   validate(mobileLoginSchema),
-  mobileLogin
+  mobileLogin,
 );
 authRouter.post(
-  '/mobile-register',
+  "/mobile-register",
   registerLimiter,
   validate(mobileRegisterSchema),
-  mobileRegister
+  mobileRegister,
 );
 authRouter.post(
-  '/forgot-password',
+  "/forgot-password",
   forgotPasswordLimiter,
   validate(forgotPasswordSchema),
   forgotPassword,
 );
 
 authRouter.post(
-  '/reset-password',
+  "/reset-password",
   resetPasswordLimiter,
   validate(resetPasswordSchema),
   resetPasswordHandler,

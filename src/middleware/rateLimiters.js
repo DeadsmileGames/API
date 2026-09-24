@@ -24,6 +24,7 @@ function keyHash(req) {
   return crypto.createHmac('sha256', env.sessionSecret).update(requestIp(req)).digest('hex');
 }
 
+
 function databaseLimiter({ scope, windowMs, limit }) {
   return async function persistentRateLimiter(req, res, next) {
     const now = Date.now();
@@ -67,6 +68,11 @@ export const publicWriteLimiter = databaseLimiter({ scope: 'public-write', windo
 export const integrationLimiter = databaseLimiter({ scope: 'integration', windowMs: 60_000, limit: 20 });
 export const forgotPasswordLimiter = databaseLimiter({ scope: 'forgot-password', windowMs: 15 * 60_000, limit: 5 });
 export const resetPasswordLimiter = databaseLimiter({ scope: 'reset-password', windowMs: 15 * 60_000, limit: 5 });
+export const publicEmailLimiter = databaseLimiter({
+  scope: 'account-email',
+  windowMs: 15 * 60_000,
+  limit: 6,
+});
 
 export const searchLimiter = rateLimit({
   windowMs: 60_000,

@@ -6,7 +6,12 @@ import {
   updateAccount,
   deleteAccount,
   getPublicProfile,
+  getPrivacy,
+  setPrivacy,
 } from '../services/account.service.js';
+import {
+  requestEmailChange,
+} from '../services/account-email.service.js';
 
 export const publicProfile = asyncHandler(async (req, res) => {
   const profile = await getPublicProfile(req.params.username);
@@ -37,3 +42,33 @@ export const remove = asyncHandler(async (req, res) => {
   });
   sendSuccess(res, { deleted: true });
 });
+export const changeEmail = asyncHandler(
+  async (req, res) => {
+    const result = await requestEmailChange(
+      req.session.userId,
+      req.body,
+    );
+
+    sendSuccess(res, result);
+  },
+);
+export const privacy = asyncHandler(
+  async (req, res) => {
+    const result = await getPrivacy(
+      req.session.userId,
+    );
+
+    sendSuccess(res, result);
+  },
+);
+
+export const changePrivacy = asyncHandler(
+  async (req, res) => {
+    const result = await setPrivacy(
+      req.session.userId,
+      req.body,
+    );
+
+    sendSuccess(res, result);
+  },
+);

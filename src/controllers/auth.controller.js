@@ -5,6 +5,10 @@ import {
   authenticateUser,
   completeTwoFactorLogin,
 } from "../services/auth.service.js";
+import {
+  confirmAccountEmail,
+  resendRegistrationEmail,
+} from '../services/account-email.service.js';
 
 import {
   requestPasswordReset,
@@ -87,14 +91,12 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
 
 export const register = asyncHandler(async (req, res) => {
   const { recaptchaToken, ...account } = req.body;
+
   await verifyRecaptcha(recaptchaToken, req.ip);
-  const user = await registerUser(account);
-  await regenerateSession(req);
 
-  req.session.userId = user.id;
-  req.session.role = user.role;
+  const result = await registerUser(account);
 
-  return sendSuccess(res, user, 201);
+  return sendSuccess(res, result, 201);
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -182,13 +184,13 @@ export const mobileLogin = asyncHandler(async (req, res) => {
   });
 });
 
-export const mobileRegister = asyncHandler(async (req, res) => {
-  const user = await registerUser(req.body);
-  await regenerateSession(req);
-  req.session.userId = user.id;
-  req.session.role = user.role;
-  return sendSuccess(res, user, 201);
-});
+export const mobileRegister = asyncHandler(
+  async (req, res) => {
+    const result = await registerUser(req.body);
+
+    return sendSuccess(res, result, 201);
+  },
+);
 
 export const me = asyncHandler(async (req, res) => {
   const user = await getAccount(req.session.userId);
@@ -208,3 +210,23 @@ export const resetPasswordHandler = asyncHandler(async (req, res) => {
   const result = await resetPassword({ token, password });
   return sendSuccess(res, result);
 });
+
+export const confirmEmail = asyncHandler(
+  async (req, res) => {
+    const result = await confirmAccountEmail(
+      req.body.token,
+    );
+
+    return sendSuccess(res, result);
+  },
+);
+
+export const resendEmail = asyncHandler(
+  async (req, res) => {
+    const result = await resendRegistrationEmail(
+      req.body,
+    );
+
+    return sendSuccess(res, result);
+  },
+);
