@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { updateAccountSchema, deleteAccountSchema, publicProfileSchema } from '../validators/account.validators.js';
-import { show, update, remove, publicProfile, privacy, changePrivacy } from '../controllers/account.controller.js';
+import { show, update, remove, publicProfile, privacy, changePrivacy, changeEmail } from '../controllers/account.controller.js';
 import * as totpController from '../controllers/totp.controller.js';
 import { totpTokenSchema } from '../validators/totp.validators.js';
 import { env } from '../config/env.js';
