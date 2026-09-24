@@ -39,6 +39,9 @@ export function errorHandler(err, req, res, _next) {
   } else {
     console.error('Unhandled API error', {
       code: err?.code || null,
+      name: err?.name || null,
+      message: err?.message || null,
+      stack: err?.stack || null,
       path: req.originalUrl,
       method: req.method,
     });
