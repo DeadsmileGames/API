@@ -16,6 +16,26 @@ adminRouter.post('/game',              validate(gamePostSchema),       controlle
 adminRouter.delete('/newsletter/:id', validate(adminIdSchema, 'params'), controller.deleteNewsletter);
 adminRouter.delete('/video/:id', validate(adminIdSchema, 'params'), controller.deleteVideo);
 adminRouter.delete('/game/:id', validate(adminIdSchema, 'params'), controller.deleteGame);
+adminRouter.put(
+    "/newsletter/:id",
+    validate(adminIdSchema, "params"),
+    validate(newsletterPostSchema),
+    controller.updateNewsletter
+);
+
+adminRouter.put(
+    "/video/:id",
+    validate(adminIdSchema, "params"),
+    validate(videoPostSchema),
+    controller.updateVideo
+);
+
+adminRouter.put(
+    "/game/:id",
+    validate(adminIdSchema, "params"),
+    validate(gamePostSchema),
+    controller.updateGame
+);
 adminRouter.get('/platform', platformController.overview);
 adminRouter.post('/platform/channels', validate(channelSchema), platformController.channel);
 adminRouter.post('/platform/builds', validate(buildSchema), platformController.build);

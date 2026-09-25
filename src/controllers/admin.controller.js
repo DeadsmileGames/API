@@ -17,6 +17,42 @@ export const game = asyncHandler(async (req, res) => {
   sendSuccess(res, result, 201);
 });
 
+export const updateNewsletter = asyncHandler(
+    async (req, res) => {
+        sendSuccess(
+            res,
+            await service.editNewsletter(
+                req.params.id,
+                req.body
+            )
+        );
+    }
+);
+
+export const updateVideo = asyncHandler(
+    async (req, res) => {
+        sendSuccess(
+            res,
+            await service.editVideo(
+                req.params.id,
+                req.body
+            )
+        );
+    }
+);
+
+export const updateGame = asyncHandler(
+    async (req, res) => {
+        sendSuccess(
+            res,
+            await service.editGame(
+                req.params.id,
+                req.body
+            )
+        );
+    }
+);
+
 export const deleteNewsletter = asyncHandler(async (req, res) => {
   const result = await service.removeNewsletter(req.params.id);
   sendSuccess(res, result);
