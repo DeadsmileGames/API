@@ -20,10 +20,7 @@ export function attachDeviceSession(req) {
         "deadsmile-app://launcher";
 
     req.session.device = {
-        // Identificador público, diferente do ID secreto da sessão.
         id: randomUUID(),
-
-        // Usado apenas para exibição na interface.
         client: isLauncher ? "launcher" : "browser",
 
         platform: detectPlatform(userAgent),

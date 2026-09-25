@@ -124,8 +124,6 @@ export async function confirmEmailToken(hash) {
          WHERE id = $1`,
         [user.id, token.target_email],
       );
-
-      // Invalida links de recuperacao de senha anteriores.
       await client.query(
         `UPDATE password_resets
          SET used_at = now()
@@ -133,16 +131,12 @@ export async function confirmEmailToken(hash) {
            AND used_at IS NULL`,
         [user.id],
       );
-
-      // Encerra as sessoes HTTP existentes.
       await client.query(
         `DELETE FROM user_sessions
          WHERE sess->>'userId' = $1`,
         [String(user.id)],
       );
     }
-
-    // O link nao podera ser utilizado novamente.
     await client.query(
       `DELETE FROM account_email_tokens
        WHERE user_id = $1`,

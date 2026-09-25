@@ -21,8 +21,6 @@ import { escapeHtml } from '../utils/html.js';
 
 const sha256 = (value) =>
   crypto.createHash('sha256').update(value).digest('hex');
-
-// Envia o link de confirmacao para o endereco informado.
 async function deliverConfirmation({
   userId,
   purpose,
@@ -106,8 +104,6 @@ async function deliverConfirmation({
     throw error;
   }
 }
-
-// Cadastro: envia a confirmacao inicial.
 export async function sendRegistrationEmail(user) {
   await deliverConfirmation({
     userId: user.id,
@@ -115,8 +111,6 @@ export async function sendRegistrationEmail(user) {
     email: user.email,
   });
 }
-
-// Reenvio: exige que o usuario informe e-mail e senha.
 export async function resendRegistrationEmail({
   email,
   password,
@@ -140,8 +134,6 @@ export async function resendRegistrationEmail({
 
   return { sent: true };
 }
-
-// Account: solicita a troca de endereco.
 export async function requestEmailChange(
   userId,
   { email, password },
@@ -171,8 +163,6 @@ export async function requestEmailChange(
       'Enter a different email address.',
     );
   }
-
-  // Confirma a senha atual da conta.
   const { rows } = await query(
     'SELECT password_hash FROM users WHERE id = $1',
     [userId],
@@ -198,15 +188,11 @@ export async function requestEmailChange(
       'That email is already registered.',
     );
   }
-
-  // O link vai para o NOVO endereco.
   await deliverConfirmation({
     userId,
     purpose: 'change',
     email,
   });
-
-  // O endereco ANTIGO recebe um aviso de seguranca.
   await sendTransactionalEmail({
     to: user.email,
     subject: 'Email change requested — Deadsmile Games',
@@ -242,8 +228,6 @@ export async function requestEmailChange(
 
   return { pending: true };
 }
-
-// Confirma cadastro ou conclui a troca de endereco.
 export async function confirmAccountEmail(rawToken) {
   const result = await confirmEmailToken(sha256(rawToken));
 
