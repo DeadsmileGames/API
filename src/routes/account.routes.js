@@ -12,6 +12,10 @@ import {
   changeEmailSchema,
   privacySchema,
 } from '../validators/account-email.validators.js';
+import {
+    listSessions,
+    revokeSession,
+} from "../controllers/sessions.controller.js";
 
 function trustedFrontendOrigin(req, res, next) {
   const origin = req.get('origin');
@@ -48,6 +52,17 @@ accountRouter.put(
   requireAuth,
   validate(privacySchema),
   changePrivacy,
+);
+accountRouter.get(
+    "/sessions",
+    requireAuth,
+    listSessions
+);
+
+accountRouter.delete(
+    "/sessions/:deviceId",
+    requireAuth,
+    revokeSession
 );
 accountRouter.get('/profile/:username', validate(publicProfileSchema, 'params'), publicProfile);
 accountRouter.get('/',                  requireAuth,                           show);

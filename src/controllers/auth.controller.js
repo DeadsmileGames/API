@@ -8,13 +8,13 @@ import {
 import {
   confirmAccountEmail,
   resendRegistrationEmail,
-} from '../services/account-email.service.js';
+} from "../services/account-email.service.js";
 
 import {
   requestPasswordReset,
   resetPassword,
 } from "../services/password-reset.service.js";
-
+import { attachDeviceSession } from "../utils/device-session.js";
 import { verifyRecaptcha } from "../services/recaptcha.service.js";
 
 import { getAccount } from "../services/account.service.js";
@@ -71,12 +71,17 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
   const valid = await verifyTotpLogin(pendingUserId, token);
 
   if (!valid) {
-    req.session.pendingTwoFactorAttempts = Number(req.session.pendingTwoFactorAttempts || 0) + 1;
+    req.session.pendingTwoFactorAttempts =
+      Number(req.session.pendingTwoFactorAttempts || 0) + 1;
     if (req.session.pendingTwoFactorAttempts >= TWO_FACTOR_MAX_ATTEMPTS) {
       delete req.session.pendingTwoFactorUserId;
       delete req.session.pendingTwoFactorExpiresAt;
       delete req.session.pendingTwoFactorAttempts;
-      throw new AppError(401, "TWO_FACTOR_CHALLENGE_EXPIRED", "Too many invalid 2FA codes. Please sign in again.");
+      throw new AppError(
+        401,
+        "TWO_FACTOR_CHALLENGE_EXPIRED",
+        "Too many invalid 2FA codes. Please sign in again.",
+      );
     }
     throw new AppError(400, "INVALID_TOTP", "Invalid 2FA code.");
   }
@@ -85,6 +90,7 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
 
   req.session.userId = account.id;
   req.session.role = account.role;
+  attachDeviceSession(req);
 
   return sendSuccess(res, account);
 });
@@ -124,6 +130,7 @@ export const login = asyncHandler(async (req, res) => {
 
   req.session.userId = result.id;
   req.session.role = result.role;
+  attachDeviceSession(req);
 
   return sendSuccess(res, result);
 });
@@ -136,7 +143,7 @@ export const logout = asyncHandler(async (req, res) => {
     secure: env.isProduction,
     sameSite: env.cookieSameSite,
     path: "/",
-    partitioned: env.isProduction && env.cookieSameSite === 'none',
+    partitioned: env.isProduction && env.cookieSameSite === "none",
   });
 
   return sendSuccess(res, {
@@ -174,6 +181,7 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 
   req.session.userId = result.id;
   req.session.role = result.role;
+  attachDeviceSession(req);
 
   return sendSuccess(res, result);
 }
@@ -184,13 +192,11 @@ export const mobileLogin = asyncHandler(async (req, res) => {
   });
 });
 
-export const mobileRegister = asyncHandler(
-  async (req, res) => {
-    const result = await registerUser(req.body);
+export const mobileRegister = asyncHandler(async (req, res) => {
+  const result = await registerUser(req.body);
 
-    return sendSuccess(res, result, 201);
-  },
-);
+  return sendSuccess(res, result, 201);
+});
 
 export const me = asyncHandler(async (req, res) => {
   const user = await getAccount(req.session.userId);
@@ -211,22 +217,14 @@ export const resetPasswordHandler = asyncHandler(async (req, res) => {
   return sendSuccess(res, result);
 });
 
-export const confirmEmail = asyncHandler(
-  async (req, res) => {
-    const result = await confirmAccountEmail(
-      req.body.token,
-    );
+export const confirmEmail = asyncHandler(async (req, res) => {
+  const result = await confirmAccountEmail(req.body.token);
 
-    return sendSuccess(res, result);
-  },
-);
+  return sendSuccess(res, result);
+});
 
-export const resendEmail = asyncHandler(
-  async (req, res) => {
-    const result = await resendRegistrationEmail(
-      req.body,
-    );
+export const resendEmail = asyncHandler(async (req, res) => {
+  const result = await resendRegistrationEmail(req.body);
 
-    return sendSuccess(res, result);
-  },
-);
+  return sendSuccess(res, result);
+});

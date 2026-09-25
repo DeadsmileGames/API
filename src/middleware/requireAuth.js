@@ -32,17 +32,27 @@ export async function requireAuth(req, res, next) {
     }
     req.auth = { userId: user.id, role: user.role };
     if (req.session.role && req.session.role !== user.role) {
+      const previousDevice = req.session.device;
+
       await new Promise((resolve, reject) => {
-        req.session.regenerate((error) => {
-          if (error) reject(error);
-          else resolve();
-        });
+          req.session.regenerate((error) => {
+              if (error) {
+                  reject(error);
+              } else {
+                  resolve();
+              }
+          });
       });
+
       req.session.userId = user.id;
       req.session.role = user.role;
-    } else if (req.session.role !== user.role) {
+
+      if (previousDevice) {
+          req.session.device = previousDevice;
+      }
+  } else if (req.session.role !== user.role) {
       req.session.role = user.role;
-    }
+  }
     return next();
   } catch (error) {
     return next(error);
