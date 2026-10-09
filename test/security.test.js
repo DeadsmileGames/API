@@ -7,7 +7,7 @@ import { gamePostSchema } from '../src/validators/admin.validators.js';
 
 const badge = '<a href="https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge" target="_self" aria-label="Get it from Microsoft Store"><img src="https://get.microsoft.com/images/en-us%20light.svg" width="200" alt="Get it from Microsoft Store" loading="lazy"></a>';
 test('Microsoft badge is reduced to safe official data', () => {
- assert.deepEqual(parseStoreBadge(badge), { productId:'9P6P8284V337', href:'https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge', imageUrl:'https://get.microsoft.com/images/en-us%20light.svg' });
+ assert.deepEqual(parseStoreBadge(badge), { productId:'9P6P8284V337', href:'https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge', imageUrl:'https://get.microsoft.com/images/en-us%20dark.svg' });
  assert.equal(parseStoreBadge(null), null);
  const safe = parseStoreBadge(badge.replace('width="200"','onerror="alert(document.cookie)" width="200"'));
  assert.equal(Object.keys(safe).length,3);

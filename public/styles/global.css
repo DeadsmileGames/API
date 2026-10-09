@@ -816,12 +816,6 @@ fieldset {
   background: #202020;
   border-radius: 10px;
 }
-.game-meta__row,
-.game-meta__item {
-  padding: 14px 0;
-  border-radius: 10px;
-  border-bottom: 1px solid #444;
-}
 .game-meta dt {
   color: #aaa;
   font-size: 13px;

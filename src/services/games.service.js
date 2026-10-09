@@ -3,7 +3,7 @@ import { listGames, findGameBySlug, findRelatedGames, findGameContent } from '..
 
 import { toClientGame } from '../utils/clientGame.js';
 import { getMicrosoftProduct } from './microsoft-store.service.js';
-import { verifyGameOwnership } from './itch-integration.service.js';
+import { verifyGameOwnership, addGameToLibrary } from './itch-integration.service.js';
 import { isHttpsUrl } from '../utils/url.js';
 import { getItchPrice, gameOffers } from './game-commerce.service.js';
 
@@ -61,5 +61,6 @@ export async function getGameDownload(slug, userId) {
     if (!(await verifyGameOwnership(userId, game.id)).owned) throw new AppError(403, 'GAME_NOT_OWNED');
   }
   if (!isHttpsUrl(game.download_url)) throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
+  if (userId && game.access_type === 'free') await addGameToLibrary(userId, game.id);
   return { downloadUrl: game.download_url };
 }

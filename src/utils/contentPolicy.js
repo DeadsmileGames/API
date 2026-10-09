@@ -6,7 +6,8 @@ export function microsoftBadgeLink(value) {
   return match ? `https://get.microsoft.com/installer/download/${match[1].toUpperCase()}?referrer=appbadge` : null;
 }
 
-export function microsoftBadgeImage(value) {
+export function microsoftBadgeImage(value, language) {
   const match = typeof value === 'string' && value.match(/^https:\/\/get\.microsoft\.com\/images\/([a-z]{2}-[a-z]{2})(?:%20| )(light|dark)\.svg$/i);
-  return match ? `https://get.microsoft.com/images/${match[1].toLowerCase()}%20${match[2].toLowerCase()}.svg` : null;
+  const locale = language ? ({ 'pt-BR': 'pt-br', en: 'en-us', es: 'es-es' }[language] || 'en-us') : match?.[1].toLowerCase();
+  return match ? `https://get.microsoft.com/images/${locale}%20dark.svg` : null;
 }

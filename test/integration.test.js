@@ -76,6 +76,30 @@ const player=client(),other=client(),admin=client(),guest=client();
 await player.login('player');await other.login('other');await admin.login('admin');
 test.after(async()=>{globalThis.fetch=originalFetch;await new Promise(r=>server.close(r));unusedServer.close();await pool.end();await socket.stop();await db.close();});
 
+test('catalog exposes paid games without granting ownership and free additions are explicit and scoped', async () => {
+ const initial = await other.request('/library/catalog');
+ assert.equal(initial.status, 200); assert.equal(initial.headers.get('cache-control'), 'no-store');
+ const paid = initial.body.data.items.find((game) => game.id === paidId);
+ assert.equal(paid.accessType, 'paid'); assert.equal(paid.owned, false); assert.equal(paid.inLibrary, false);
+ const free = initial.body.data.items.find((game) => game.id === msId);
+ assert.equal(free.accessType, 'free'); assert.equal(free.owned, true); assert.equal(free.inLibrary, false);
+ assert.equal((await guest.request('/library/catalog')).status, 401);
+ assert.equal((await guest.request(`/library/${msId}`, { method: 'POST' })).status, 401);
+ const count = calls.length;
+ for (let index = 0; index < 2; index++) {
+  const added = await other.request(`/library/${msId}`, { method: 'POST', body: { userId, owned: true } });
+  assert.equal(added.status, 200); assert.equal(added.body.data.inLibrary, true);
+ }
+ assert.equal(calls.length, count);
+ const rows = await pool.query('SELECT user_id,source,revoked_at FROM user_game_entitlements WHERE game_id=$1', [msId]);
+ assert.equal(rows.rows.length, 1); assert.equal(rows.rows[0].user_id, otherId); assert.equal(rows.rows[0].source, 'free'); assert.equal(rows.rows[0].revoked_at, null);
+ assert((await other.request('/library')).body.data.items.some((game) => game.id === msId));
+ assert(!(await player.request('/library')).body.data.items.some((game) => game.id === msId));
+ const forged = await other.request(`/library/${paidId}`, { method: 'POST', body: { userId, owned: true, accessType: 'free' } });
+ assert.equal(forged.status, 409); assert.equal(forged.body.error.code, 'ITCH_NOT_CONNECTED');
+ assert(!(await other.request('/library')).body.data.items.some((game) => game.id === paidId));
+});
+
 test('launcher metadata uses locale-specific persistent caching and game details share the Store model', async () => {
  const first = await guest.request('/launcher', { language: 'pt-BR' });
  assert.equal(first.status, 200); assert.equal(first.body.data.locale, 'pt-BR'); assert.equal(first.body.data.market, 'BR');
@@ -95,7 +119,7 @@ test('launcher refuses Store or itch-only installation without the game database
   assert.equal(install.status, 409); assert.equal(install.body.error.code, 'GAME_RELEASE_NOT_CONFIGURED');
  }
  const result=await player.request(`/library/${freeId}/verify`,{method:'POST'});assert.equal(result.status,200);assert.equal(result.body.data.owned,true);
- const library=await player.request('/library');assert(library.body.data.items.some((item)=>item.id===freeId));assert(library.body.data.items.some((item)=>item.id===msId));
+ const library=await player.request('/library');assert(!library.body.data.items.some((item)=>item.id===freeId));assert(!library.body.data.items.some((item)=>item.id===msId));
  assert(library.body.data.items.every((item)=>item.downloadUrl===null));
 });
 
@@ -194,7 +218,7 @@ test('newsletter Store badge survives creation, persistence, editing and public 
  assert.equal(result.status, 201, JSON.stringify(result.body));
  const news = result.body.data;
  const stored = await pool.query('SELECT body FROM news WHERE id=$1', [news.id]);
- assert.match(stored.rows[0].body, /<img src="https:\/\/get\.microsoft\.com\/images\/en-us%20light\.svg"/);
+ assert.match(stored.rows[0].body, /<img src="https:\/\/get\.microsoft\.com\/images\/en-us%20dark\.svg"/);
  assert.doesNotMatch(stored.rows[0].body, /onerror|script|steal/);
  let detail = await guest.request(`/newswire/${news.slug}`);
  assert.equal(detail.status, 200);
@@ -217,6 +241,7 @@ test('privacy defaults hide activity and telemetry consent rejects collection',a
  assert.equal((await pool.query('SELECT telemetry_consent,share_game_activity FROM users WHERE id=$1',[userId])).rows[0].telemetry_consent,false);
 });
 test('changing a free game to paid invalidates old free entitlements',async()=>{
+ const added=await player.request(`/library/${freeId}`,{method:'POST'});assert.equal(added.status,200);
  await pool.query("UPDATE games SET access_type='paid',purchase_url='https://studio.itch.io/free/purchase' WHERE id=$1",[freeId]);
  const library=await player.request('/library');assert(!library.body.data.items.some(x=>x.id===freeId));
  const access=await pool.query('SELECT revoked_at FROM user_game_entitlements WHERE user_id=$1 AND game_id=$2',[userId,freeId]);assert(access.rows[0].revoked_at);
@@ -281,4 +306,27 @@ test('Store outages return labelled stale metadata and never create a launcher d
  const expired = await guest.request('/launcher', { language: 'pt-BR' });
  assert.equal(expired.status, 502); assert(!JSON.stringify(expired.body).includes('provider unavailable'));
  storeOffline = false;
+});
+
+
+test('free website download registers library membership and disconnecting itch preserves it', async () => {
+ await pool.query("DELETE FROM api_rate_limits WHERE scope='integration'");
+ await pool.query('UPDATE games SET download_url=$2 WHERE id=$1', [msId, 'https://downloads.example.test/free.zip']);
+ try {
+  const response = await player.request('/games/store/download');
+  assert.equal(response.status, 200); assert.equal(response.body.data.downloadUrl, 'https://downloads.example.test/free.zip');
+  const free = (await player.request('/library')).body.data.items.find((game) => game.id === msId);
+  assert.equal(free.isFree, true); assert.equal(free.accessType, 'free'); assert.equal(free.inLibrary, true);
+  assert.equal((await player.request('/library/sync', { method: 'POST' })).status, 200);
+  assert.equal((await player.request(`/library/${paidId}`, { method: 'POST' })).status, 200);
+  assert((await player.request('/library')).body.data.items.some((game) => game.id === paidId));
+  const disconnected = await player.request('/integrations/itch', { method: 'DELETE' }); assert.equal(disconnected.status, 200);
+  assert.equal((await pool.query('SELECT user_id FROM user_itch_accounts WHERE user_id=$1', [userId])).rows.length, 0);
+  const catalog = (await player.request('/library/catalog')).body.data.items;
+  assert.equal(catalog.find((game) => game.id === paidId).owned, false);
+  assert.equal(catalog.find((game) => game.id === paidId).inLibrary, false);
+  const library = (await player.request('/library')).body.data.items;
+  assert(!library.some((game) => game.id === paidId)); assert(library.some((game) => game.id === msId));
+  assert((await other.request('/library')).body.data.items.some((game) => game.id === msId));
+ } finally { await pool.query('UPDATE games SET download_url=null WHERE id=$1', [msId]); }
 });

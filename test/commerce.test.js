@@ -16,7 +16,7 @@ test('free and paid offers use only their configured stores and never expose a p
   assert.deepEqual(paid.map((offer) => offer.provider), ['itch', 'microsoft']);
   assert.equal(paid[0].href, game.purchase_url);
   assert(!JSON.stringify(paid).includes(game.download_url));
-  assert.deepEqual(await gameOffers({ ...game, access_type: 'paid', purchase_url: null, itch_url: null }, null), [{ provider: 'microsoft', href: 'https://apps.microsoft.com/detail/9P6P8284V337', badgeImage: game.microsoft_badge_image, price: null }]);
+  assert.deepEqual(await gameOffers({ ...game, access_type: 'paid', purchase_url: null, itch_url: null }, null), [{ provider: 'microsoft', href: 'https://apps.microsoft.com/detail/9P6P8284V337', badgeImage: game.microsoft_badge_image.replace('light.svg', 'dark.svg'), price: null }]);
 });
 
 test('itch prices are bounded, cached and matched to the configured game', async (context) => {

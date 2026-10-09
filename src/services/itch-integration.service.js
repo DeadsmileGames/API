@@ -191,7 +191,6 @@ export async function verifyGameOwnership(userId, gameId) {
   if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
   if (game.status !== 'released') throw new AppError(409, 'GAME_NOT_RELEASED');
   if (game.access_type === 'free') {
-    await grantEntitlement({ userId, gameId, source: 'free' });
     return { owned: true, status: 'owned', accessType: 'free', gameId };
   }
   requireConfigured();
@@ -230,16 +229,30 @@ export async function syncItchLibrary(userId) {
   return { results, syncedAt: new Date().toISOString() };
 }
 
+function libraryGame(row) {
+  return { ...toClientGame(row), owned: row.owned === true, inLibrary: row.in_library === true, acquiredAt: row.acquired_at, lastVerifiedAt: row.last_verified_at };
+}
+
 export async function getLibrary(userId) {
-  return { items: (await listEntitlements(userId)).map((row) => ({ ...toClientGame(row), acquiredAt: row.acquired_at, lastVerifiedAt: row.last_verified_at })) };
+  return { items: (await listEntitlements(userId)).map(libraryGame) };
+}
+
+export async function getLauncherCatalog(userId) {
+  return { items: (await listEntitlements(userId, true)).map(libraryGame) };
+}
+
+export async function addGameToLibrary(userId, gameId) {
+  const ownership = await verifyGameOwnership(userId, gameId);
+  if (!ownership.owned) throw new AppError(403, 'GAME_NOT_OWNED');
+  if (ownership.accessType === 'free') await grantEntitlement({ userId, gameId, source: 'free' });
+  return { gameId, owned: true, inLibrary: true };
 }
 
 export async function getInstallMetadata(userId, gameId) {
   const game = await findItchGame(gameId);
   if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
   if (!game.download_url) throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
-  const ownership = await verifyGameOwnership(userId, gameId);
-  if (!ownership.owned) throw new AppError(403, 'GAME_NOT_OWNED');
+  await addGameToLibrary(userId, gameId);
   const build = await findInstallBuild(userId, gameId);
   if (build?.download_url) {
     return { delivery: 'archive', downloadUrl: build.download_url, filename: new URL(build.download_url).pathname.split('/').pop(),

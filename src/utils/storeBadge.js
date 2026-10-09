@@ -33,7 +33,7 @@ export function parseStoreBadge(value) {
     return {
       productId: product[1].toUpperCase(),
       href: `https://get.microsoft.com/installer/download/${product[1].toUpperCase()}?referrer=appbadge`,
-      imageUrl: `https://get.microsoft.com/images/${badge[1].toLowerCase()}%20${badge[2].toLowerCase()}.svg`
+      imageUrl: `https://get.microsoft.com/images/${badge[1].toLowerCase()}%20dark.svg`
     };
   } catch {
     throw new AppError(400, 'INVALID_STORE_BADGE');
@@ -44,5 +44,5 @@ export function storeBadgeFromRow(row) {
   if (!/^[A-Z0-9]{12}$/.test(row.microsoft_product_id || '')) return null;
   const imageUrl = row.microsoft_badge_image;
   if (!/^https:\/\/get\.microsoft\.com\/images\/[a-z]{2}-[a-z]{2}%20(?:light|dark)\.svg$/.test(imageUrl || '')) return null;
-  return { productId: row.microsoft_product_id, href: `https://get.microsoft.com/installer/download/${row.microsoft_product_id}?referrer=appbadge`, imageUrl };
+  return { productId: row.microsoft_product_id, href: `https://get.microsoft.com/installer/download/${row.microsoft_product_id}?referrer=appbadge`, imageUrl: imageUrl.replace(/%20(?:light|dark)\.svg$/, '%20dark.svg') };
 }

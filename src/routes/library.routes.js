@@ -9,6 +9,8 @@ export const libraryRouter = Router();
 
 libraryRouter.use(requireAuth);
 libraryRouter.get('/', controller.list);
+libraryRouter.get('/catalog', controller.catalog);
 libraryRouter.post('/sync', integrationLimiter, controller.sync);
+libraryRouter.post('/:gameId', integrationLimiter, validate(libraryGameSchema, 'params'), controller.add);
 libraryRouter.post('/:gameId/verify', integrationLimiter, validate(libraryGameSchema, 'params'), controller.verify);
 libraryRouter.post('/:gameId/install-metadata', integrationLimiter, validate(libraryGameSchema, 'params'), controller.installMetadata);
