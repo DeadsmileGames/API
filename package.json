@@ -1,7 +1,7 @@
 {
   "name": "deadsmile-games-backend",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.2",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/app.js",
@@ -12,7 +12,8 @@
     "test": "node --test test/*.test.js",
     "errors:sync": "node scripts/sync-error-catalog.js",
     "db:bootstrap": "node scripts/bootstrap.js",
-    "db:encrypt": "node scripts/encrypt-data.js"
+    "db:encrypt": "node scripts/encrypt-data.js",
+    "content:sync": "node scripts/sync-content-policy.js"
   },
   "dependencies": {
     "@getbrevo/brevo": "^6.0.3",

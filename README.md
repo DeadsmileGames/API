@@ -22,6 +22,8 @@ Jogos gratuitos podem usar builds publicados com URL, tamanho e SHA-256, o repos
 
 Cole o badge HTML oficial da Microsoft no cadastro. Ele é convertido em ID e URLs permitidas; nenhum HTML arbitrário é executado. Microsoft Store usa o instalador oficial e gerencia sua instalação e atualizações. Isso não registra um executável local nem comprova compra de jogo pago.
 
+Na API 1.2.2, esse campo aceita o HTML formatado com quebras de linha e indentação entre as tags. Continuam proibidos tags extras, múltiplos badges nesse campo e destinos diferentes dos oficiais. A correção é compatível com website e launcher 1.2.1 e não exige migração.
+
 A migração `009_microsoft_store_cache.sql` cria o cache persistente de metadados da Store. `GET /api/launcher` consulta o produto `9P6P8284V337`; `GET /api/games/:slug` inclui `microsoftStore` para jogos com badge. Os dois endpoints usam o mesmo serviço, filtram texto/URLs, limitam respostas a 2 MiB e recusam redirecionamentos. Não repassam payloads internos do provedor.
 
 `Accept-Language` seleciona pt-BR/BR, en-US/US ou es-ES/ES. O catálogo é revalidado na próxima consulta depois de uma hora. Uma falha temporária permite mostrar o último resultado por até sete dias com `stale: true`. A instalação gratuita Microsoft exige consulta nova e preço zero do produto completo disponível; não usa cache antigo, trial ou campo gratuito do banco como prova de preço. Falhas e mudança de preço retornam os códigos localizados do catálogo mestre.
@@ -37,6 +39,8 @@ URLs temporárias de download saem apenas do endpoint autenticado `/api/library/
 Execute `npm run errors:sync` com os diretórios irmãos `api`, `website` e `launcher` para atualizar os fallbacks offline dos clientes. Esses arquivos são gerados pela API e não devem ser editados nos clientes.
 
 A newswire usa `/api/newswire`; `/api/news` continua compatível com clientes antigos. Publicações aceitam `gameId` opcional. Corpo HTML usa uma lista restrita de tags. Exclusão do jogo remove a referência sem excluir a notícia.
+
+O body também aceita um ou mais badges oficiais Microsoft Store misturados ao texto. O link deve usar `https://get.microsoft.com/installer/download/ID?referrer=appbadge`, e a imagem `https://get.microsoft.com/images/en-us%20light.svg` ou sua variante oficial de idioma/tema. A API preserva somente esse par validado, normaliza largura, descrição e carregamento e remove scripts, handlers, estilos e outras imagens. Execute `npm run content:sync` na API para sincronizar essa política com site e launcher. Posts cujo badge foi removido pela versão anterior precisam recebê-lo novamente e ser salvos; o HTML descartado não está no banco. Esta correção não acrescenta migração.
 
 Diagnóstico exige consentimento de conta. Revogação apaga eventos anteriores e bloqueia gravações concorrentes. Payload permite apenas código de erro e plataforma. Saves usam AES-256-GCM associado a usuário, jogo e slot. Preserve as chaves utilizadas para conseguir ler os dados; a versão anterior de segredos continua compatível.
 

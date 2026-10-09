@@ -26,7 +26,7 @@ export function parseStoreBadge(value) {
     const src = new URL(image);
     const product = href.pathname.match(/^\/installer\/download\/([A-Z0-9]{12})$/i);
     const badge = decodeURIComponent(src.pathname).match(/^\/images\/([a-z]{2}-[a-z]{2}) (light|dark)\.svg$/i);
-    if (invalid || anchors !== 1 || images !== 1 || !/^<a href="[^"]+"><img src="[^"]+" \/><\/a>$/.test(cleaned.trim()) ||
+    if (invalid || anchors !== 1 || images !== 1 || !/^<a href="[^"]+">\s*<img src="[^"]+" \/>\s*<\/a>$/.test(cleaned.trim()) ||
     href.origin !== 'https://get.microsoft.com' || src.origin !== href.origin ||
     href.username || href.password || href.port || href.hash || src.search || src.hash ||
     !product || !badge || href.search !== '?referrer=appbadge') throw new Error();

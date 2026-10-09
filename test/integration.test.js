@@ -136,6 +136,25 @@ test('newsletter links a game, sanitizes HTML and uses canonical newswire routes
  const result=await admin.request('/admin/newsletter',{method:'POST',body:{title:'New story',body:'<p onclick="evil()">Story</p><script>evil()</script>',gameId:freeId}});assert.equal(result.status,201,JSON.stringify(result.body));
  const detail=await guest.request(`/newswire/${result.body.data.slug}`);assert.equal(detail.status,200);assert.equal(detail.body.data.game_slug,'free');assert.doesNotMatch(detail.body.data.body,/onclick|script|evil/);
 });
+test('newsletter Store badge survives creation, persistence, editing and public reads', async () => {
+ const badge = '<a href="https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge" target="_self" aria-label="Get it from Microsoft Store"><img src="https://get.microsoft.com/images/en-us%20light.svg" width="200" alt="Get it from Microsoft Store" loading="lazy" onerror="steal()"></a>';
+ const result = await admin.request('/admin/newsletter', { method: 'POST', body: { title: 'Store release', body: `<p>Download here</p>${badge}<script>steal()</script>`, gameId: freeId } });
+ assert.equal(result.status, 201, JSON.stringify(result.body));
+ const news = result.body.data;
+ const stored = await pool.query('SELECT body FROM news WHERE id=$1', [news.id]);
+ assert.match(stored.rows[0].body, /<img src="https:\/\/get\.microsoft\.com\/images\/en-us%20light\.svg"/);
+ assert.doesNotMatch(stored.rows[0].body, /onerror|script|steal/);
+ let detail = await guest.request(`/newswire/${news.slug}`);
+ assert.equal(detail.status, 200);
+ assert.equal(detail.body.data.body, stored.rows[0].body);
+ const update = await admin.request(`/admin/newsletter/${news.id}`, { method: 'PUT', body: { title: 'Store release', body: `<h2>Updated</h2>${badge.replace('en-us%20light.svg', 'pt-br%20dark.svg')}`, gameId: freeId } });
+ assert.equal(update.status, 200, JSON.stringify(update.body));
+ detail = await guest.request(`/newswire/${news.slug}`);
+ assert.equal(detail.status, 200);
+ assert.match(detail.body.data.body, /<h2>Updated<\/h2>/);
+ assert.match(detail.body.data.body, /pt-br%20dark\.svg/);
+ assert.doesNotMatch(detail.body.data.body, /onerror|steal/);
+});
 test('privacy defaults hide activity and telemetry consent rejects collection',async()=>{
  let result=await player.request('/platform/telemetry',{method:'POST',body:{eventType:'install_failed',gameId:freeId,payload:{code:'GAME_DOWNLOAD_FAILED'}}});assert.equal(result.status,202);assert.equal(result.body.data.accepted,false);
  result=await player.request('/platform/telemetry',{method:'POST',body:{eventType:'install_failed',payload:{password:'secret'}}});assert.equal(result.status,400);
@@ -152,14 +171,14 @@ test('changing a free game to paid invalidates old free entitlements',async()=>{
 });
 
 test('admin game create/edit preserves storefront data and public responses never expose download configuration', async () => {
- const badge='<a href="https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge"><img src="https://get.microsoft.com/images/en-us%20light.svg"></a>';
+ const badge='<a href="https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge">\n  <img src="https://get.microsoft.com/images/en-us%20light.svg">\n</a>';
  const body={title:'Admin game',slug:'admin-game',shortDescription:'Created by admin',accessType:'free',status:'released',itchGameId:3000,itchUrl:'https://studio.itch.io/free',downloadUrl:'https://github.com/studio/games/releases/download/v1/game.zip',genres:['Adventure'],platforms:['Windows'],microsoftStoreBadge:badge};
  let result=await admin.request('/admin/game',{method:'POST',body});assert.equal(result.status,201,JSON.stringify(result.body));const id=result.body.data.id;
  assert.equal((await pool.query('SELECT name,public FROM release_channels WHERE game_id=$1',[id])).rows[0].public,true);
  result=await admin.request(`/admin/game/${id}`);assert.equal(result.body.data.downloadUrl,body.downloadUrl);assert.equal(result.body.data.itchUrl,body.itchUrl);assert(result.body.data.microsoftStoreBadgeHtml);
  result=await guest.request('/games/admin-game');assert.equal(result.status,200);assert.equal(result.body.data.downloadUrl,null);assert.equal(result.body.data.accessType,'free');assert.equal(result.body.data.microsoftStoreBadge.productId,'9P6P8284V337');
  result=await player.request(`/admin/game/${id}`);assert.equal(result.status,403);
- result=await admin.request(`/admin/game/${id}`,{method:'PUT',body:{...body,title:'Edited',genres:['Puzzle']}});assert.equal(result.status,200);
+ result=await admin.request(`/admin/game/${id}`,{method:'PUT',body:{...body,title:'Edited',genres:['Puzzle'],microsoftStoreBadge:badge.replaceAll('\n','\r\n\t')}});assert.equal(result.status,200);
  result=await guest.request('/games/admin-game');assert.deepEqual(result.body.data.genres,['Puzzle']);
  const news=await admin.request('/admin/newsletter',{method:'POST',body:{title:'Linked',body:'Body',gameId:id}});assert.equal(news.status,201);
  result=await admin.request(`/admin/game/${id}`,{method:'DELETE'});assert.equal(result.status,200);
