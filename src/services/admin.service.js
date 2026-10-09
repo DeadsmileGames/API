@@ -11,7 +11,7 @@ import {
   updateGame } from
 '../repositories/admin.repository.js';
 import { findGameBySlug } from '../repositories/games.repository.js';
-import { publishContentEvent } from './notification.service.js';
+import { publishContentEvent, publishContentChange } from './notification.service.js';
 
 export async function publishNewsletter(payload) {
   const item = await createNewsletter(payload);
@@ -51,6 +51,7 @@ async function updateOr404(fn, id, payload, label) {
     );
   }
 
+  await publishContentChange(label === 'newsletter' ? 'news' : label, 'updated', item);
   return item;
 }
 
@@ -92,6 +93,7 @@ export async function editGame(id, payload) {
 async function remove(fn, id, label) {
   const removed = await fn(id);
   if (!removed) throw new AppError(404, `${label.toUpperCase()}_NOT_FOUND`);
+  await publishContentChange(label === 'newsletter' ? 'news' : label, 'deleted', { id });
   return { deleted: true, id };
 }
 

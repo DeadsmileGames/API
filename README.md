@@ -51,3 +51,7 @@ Configure URLs HTTPS reais, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, `DATA
 Aplique as migrações antes de disponibilizar a nova API. Publique API, site e launcher da mesma entrega. Em outro domínio, ajuste CORS, `VITE_API_URL`, CSP do site e `API_URL`/origens permitidas do launcher em conjunto. Não coloque `.env`, backups, logs ou builds com credenciais no repositório público.
 
 Os testes não substituem o teste de OAuth, entrega de e-mail, ZIP real e pacote assinado de Windows com suas credenciais de produção.
+
+## Sincronização de conteúdo — versão 1.3.0
+
+Execute `npm run db:migrate` antes de publicar. A migração `010_content_change_events.sql` amplia a restrição dos eventos para edição e exclusão de jogos, newswire e vídeos. O CRUD emite esses eventos para atualizar site e launcher; somente novas publicações enviam avisos de publicação. As migrações históricas continuam intactas. A classificação principal da Store é selecionada pelo mercado solicitado: DJCTQ/BR, ESRB/US ou PEGI/ES; sem correspondência, retorna `null`.

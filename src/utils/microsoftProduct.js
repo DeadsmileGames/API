@@ -86,7 +86,7 @@ export function normalizeMicrosoftProduct(productId, edge, catalog, { market, lo
     categories: strings(source.Categories?.map((item) => typeof item === 'string' ? item : item.Name)),
     images, screenshots: images.filter((item) => /screenshot/i.test(item.purpose)),
     trailers: list(source.Trailers?.length ? source.Trailers : localized.Videos).map((item) => ({ title: text(item.Title, 500), url: storeUrl(item.Url || item.Uri), thumbnail: storeUrl(item.Image?.Url || item.PreviewImageUri, true), purpose: text(item.VideoPurpose, 100) })).filter((item) => item.url),
-    ratings: [...localRatings, ...otherRatings], primaryRating: localRatings[0] || otherRatings.find((item) => item.system === ({ BR: 'DJCTQ', US: 'ESRB', ES: 'PEGI' })[market]) || otherRatings[0] || null,
+    ratings: [...localRatings, ...otherRatings], primaryRating: [...localRatings, ...otherRatings].find((item) => item.system === ({ BR: 'DJCTQ', US: 'ESRB', ES: 'PEGI' })[market] || item.id.startsWith(`${({ BR: 'DJCTQ', US: 'ESRB', ES: 'PEGI' })[market]}:`)) || null,
     price, currency, displayPrice: text(source.DisplayPrice, 100), isFree: price === null ? null : price === 0,
     releaseDate: date(source.ReleaseDateUtc || marketData.OriginalReleaseDate),
     updatedAt: date(source.LastUpdateDateUtc || sku.Sku?.Properties?.LastUpdateDate), listingModifiedAt: date(base.LastModifiedDate),

@@ -91,3 +91,9 @@ export async function publishWishlistEvent(userId, gameId, inWishlist) {
   await signalRealtimeEvent(event);
   return event;
 }
+
+export async function publishContentChange(type, action, item) {
+  const event = await repository.createEvent({ eventType: `${type}.${action}`, entityId: item.id, payload: { id: item.id, slug: item.slug || null } });
+  await signalRealtimeEvent(event);
+  return event;
+}

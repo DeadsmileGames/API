@@ -183,6 +183,22 @@ test('admin game create/edit preserves storefront data and public responses neve
  const news=await admin.request('/admin/newsletter',{method:'POST',body:{title:'Linked',body:'Body',gameId:id}});assert.equal(news.status,201);
  result=await admin.request(`/admin/game/${id}`,{method:'DELETE'});assert.equal(result.status,200);
  result=await guest.request(`/newswire/${news.body.data.slug}`);assert.equal(result.status,200);assert.equal(result.body.data.game_id,null);
+ const events=await pool.query('SELECT event_type FROM content_events WHERE entity_id=$1 ORDER BY id',[id]);
+ assert.deepEqual(events.rows.map((event)=>event.event_type),['game.published','game.updated','game.deleted']);
+});
+
+test('editing and deleting news and videos publish public content events', async () => {
+ for (const [endpoint, type, initial, change] of [
+  ['newsletter','news',{title:'Live news',body:'Original text'},{title:'Live news edited',body:'Updated text'}],
+  ['video','video',{title:'Live video',category:'Trailer',videoUrl:'https://youtu.be/abcdefghijk'},{title:'Live video edited',category:'Trailer',videoUrl:'https://youtu.be/abcdefghijk'}],
+ ]) {
+  const created=await admin.request(`/admin/${endpoint}`,{method:'POST',body:initial});assert.equal(created.status,201);
+  const id=created.body.data.id;
+  const edited=await admin.request(`/admin/${endpoint}/${id}`,{method:'PUT',body:change});assert.equal(edited.status,200);
+  const removed=await admin.request(`/admin/${endpoint}/${id}`,{method:'DELETE'});assert.equal(removed.status,200);
+  const events=await pool.query('SELECT event_type FROM content_events WHERE entity_id=$1 ORDER BY id',[id]);
+  assert.deepEqual(events.rows.map((event)=>event.event_type),[`${type}.published`,`${type}.updated`,`${type}.deleted`]);
+ }
 });
 
 test('unverified accounts do not reveal their verification state to a wrong password', async () => {

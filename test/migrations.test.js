@@ -10,6 +10,7 @@ test('existing database migrates without changing historical checksums or losing
   const db = await PGlite.create({ extensions: { pg_trgm } });
   const schema = await readFile(new URL('../src/database/schema.sql', import.meta.url), 'utf8');
   await db.exec(schema.split('ALTER TABLE games ADD COLUMN access_type text;')[0]);
+  await db.exec("ALTER TABLE content_events DROP CONSTRAINT content_events_event_type_check; ALTER TABLE content_events ADD CONSTRAINT content_events_event_type_check CHECK (event_type IN ('news.published','game.published','video.published','wishlist.updated'));");
   const files = (await readdir(new URL('../src/database/migrations/', import.meta.url))).filter(name => name.endsWith('.sql') && name < '008_').sort();
   for (const name of files) {
     const sql = await readFile(new URL(`../src/database/migrations/${name}`, import.meta.url), 'utf8');
@@ -33,6 +34,8 @@ test('existing database migrates without changing historical checksums or losing
     assert.match(saved.payload, /^enc\.v2\./);
     const { decryptSecret } = await import('../src/utils/secretCipher.js');
     assert.equal(decryptSecret(saved.payload, 'save:00000000-0000-4000-8000-000000000001:00000000-0000-4000-8000-000000000002:default'), 'original-save');
-    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 9);
+    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 10);
+    await db.query("INSERT INTO content_events(event_type,entity_id) VALUES('game.updated','test'),('news.deleted','test'),('video.updated','test')");
+    await assert.rejects(db.query("INSERT INTO content_events(event_type,entity_id) VALUES('unrecognized.event','test')"));
   } finally { await socket.stop(); await db.close(); }
 });

@@ -61,7 +61,7 @@ CREATE TABLE "content_events" (
 	"entity_id" text NOT NULL,
 	"payload" jsonb DEFAULT '{}' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "content_events_event_type_check" CHECK ((event_type = ANY (ARRAY['news.published'::text, 'game.published'::text, 'video.published'::text, 'wishlist.updated'::text])))
+	CONSTRAINT "content_events_event_type_check" CHECK ((event_type = ANY (ARRAY['news.published'::text, 'game.published'::text, 'video.published'::text, 'news.updated'::text, 'game.updated'::text, 'video.updated'::text, 'news.deleted'::text, 'game.deleted'::text, 'video.deleted'::text, 'wishlist.updated'::text])))
 );
 CREATE TABLE "downloads" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

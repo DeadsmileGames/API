@@ -8,6 +8,15 @@ const catalog = JSON.parse(await readFile(new URL('./fixtures/store-catalog.json
 const region = { market: 'BR', locale: 'pt-BR' };
 const id = '9P6P8284V337';
 
+test('primary age rating follows the requested market and never substitutes a foreign system', () => {
+ const mixed=structuredClone(edge);
+ mixed.Payload.ProductRatings.unshift({RatingSystemShortName:'ESRB',RatingId:'ESRB:E',RatingValue:'Everyone'});
+ assert.equal(normalizeMicrosoftProduct(id,mixed,catalog,region).primaryRating.system,'DJCTQ');
+ assert.equal(normalizeMicrosoftProduct(id,mixed,catalog,{market:'US',locale:'en-US'}).primaryRating.system,'ESRB');
+ const brazilOnly=structuredClone(edge);
+ assert.equal(normalizeMicrosoftProduct(id,brazilOnly,null,{market:'ES',locale:'es-ES'}).primaryRating,null);
+});
+
 test('real Store payload extracts localized ratings, screenshots and exact package version without inventing downloads', () => {
   const product = normalizeMicrosoftProduct(id, edge, catalog, region);
   assert.equal(product.title, 'Deadsmile Games Launcher');
