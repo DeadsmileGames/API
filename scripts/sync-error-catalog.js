@@ -6,3 +6,4 @@ for (const target of ['../../website/src/generated/errors.json', '../../launcher
   await writeFile(url, catalog);
 }
 await writeFile(new URL('../public/error-catalog.js', import.meta.url), `window.deadsmileErrors = ${catalog.toString().trim()};\n`);
+await writeFile(new URL('../../launcher/public/error-catalog.js', import.meta.url), `window.deadsmileErrors = ${catalog.toString().trim()};\n`);

@@ -34,7 +34,9 @@ test('existing database migrates without changing historical checksums or losing
     assert.match(saved.payload, /^enc\.v2\./);
     const { decryptSecret } = await import('../src/utils/secretCipher.js');
     assert.equal(decryptSecret(saved.payload, 'save:00000000-0000-4000-8000-000000000001:00000000-0000-4000-8000-000000000002:default'), 'original-save');
-    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 12);
+    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 13);
+    await db.query("UPDATE games SET download_url='https://downloads.example.test/' || repeat('x', 300) || '.zip' WHERE slug='free'");
+    assert((await db.query("SELECT length(download_url) AS size FROM games WHERE slug='free'")).rows[0].size > 255);
     await db.query("INSERT INTO content_events(event_type,entity_id) VALUES('game.updated','test'),('news.deleted','test'),('video.updated','test')");
     await assert.rejects(db.query("INSERT INTO content_events(event_type,entity_id) VALUES('unrecognized.event','test')"));
     assert.equal((await db.query("SELECT to_regclass('public.news_translations') AS name")).rows[0].name, null);

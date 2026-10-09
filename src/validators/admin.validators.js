@@ -59,10 +59,10 @@ export const gamePostSchema = z.object({
   itchGameId: z.coerce.number().int().positive().safe().optional().nullable(),
   downloadUrl: httpsUrl,
 }).strict().superRefine((data, ctx) => {
-  if (data.accessType === 'paid' && (!data.purchaseUrl || !data.itchGameId)) {
+  if (data.accessType === 'paid' && data.downloadUrl && (!data.purchaseUrl || !data.itchGameId)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['purchaseUrl'], message: 'Paid games require itch.io purchase URL and game ID.' });
   }
-  if (data.itchUrl && !data.itchGameId) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['itchGameId'], message: 'An itch.io URL requires a game ID.' });
+  if (data.accessType === 'paid' && !data.purchaseUrl && !data.microsoftStoreBadge) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['purchaseUrl'], message: 'Paid games require a store.' });
   }
 });

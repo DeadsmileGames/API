@@ -57,7 +57,6 @@ export const env = {
   brevoSenderEmail: process.env.BREVO_SENDER_EMAIL,
   brevoSenderName: process.env.BREVO_SENDER_NAME || 'Deadsmile Games',
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN || '',
-  itchDownloadApiKey: process.env.ITCH_DOWNLOAD_API_KEY || '',
   itchClientId: process.env.ITCH_CLIENT_ID || '',
   itchLauncherClientId: process.env.ITCH_LAUNCHER_CLIENT_ID || '',
   itchTokenEncryptionKey: process.env.ITCH_TOKEN_ENCRYPTION_KEY || '',

@@ -136,12 +136,11 @@ export async function listEntitlements(userId) {
        g.id, g.title, g.slug, g.short_description, g.status, g.release_date,
        g.hero_image, g.cover_image, g.trailer_url, g.purchase_url, g.download_url,
        g.access_type, g.itch_url, g.microsoft_product_id, g.microsoft_badge_image,
-       EXISTS (SELECT 1 FROM game_builds b WHERE b.game_id = g.id AND b.status = 'published') AS has_build,
        g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled, g.itch_game_id,
        COALESCE(genre_agg.genres, '{}') AS genres,
        COALESCE(platform_agg.platforms, '{}') AS platforms
-     FROM user_game_entitlements e
-     JOIN games g ON g.id = e.game_id
+     FROM games g
+     LEFT JOIN user_game_entitlements e ON g.id = e.game_id AND e.user_id = $1 AND e.revoked_at IS NULL
      LEFT JOIN (
        SELECT gg.game_id, array_agg(gn.name ORDER BY gn.name) AS genres
        FROM game_genres gg JOIN genres gn ON gn.id = gg.genre_id GROUP BY gg.game_id
@@ -150,8 +149,8 @@ export async function listEntitlements(userId) {
        SELECT gp.game_id, array_agg(pl.name ORDER BY pl.name) AS platforms
        FROM game_platforms gp JOIN platforms pl ON pl.id = gp.platform_id GROUP BY gp.game_id
      ) platform_agg ON platform_agg.game_id = g.id
-     WHERE e.user_id = $1 AND e.revoked_at IS NULL AND (g.access_type = 'free' OR e.source = 'itch')
-     ORDER BY e.acquired_at DESC`,
+     WHERE (g.access_type = 'free' AND g.status = 'released') OR (e.user_id = $1 AND (g.access_type = 'free' OR e.source = 'itch'))
+     ORDER BY e.acquired_at DESC NULLS LAST, g.title`,
     [userId]
   );
   return rows;

@@ -2548,13 +2548,13 @@ input[type="file"]::file-selector-button {
 
 [hidden] { display: none !important; }
 
-.launcher-page .rs-hero {
+:is(.launcher-page, .game-product-page) .rs-hero {
   min-height: 560px;
   overflow: hidden;
   isolation: isolate;
   background-color: #111;
 }
-.launcher-page .launcher-page__background {
+:is(.launcher-page, .game-product-page) .launcher-page__background {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2562,16 +2562,16 @@ input[type="file"]::file-selector-button {
   transition: opacity 800ms ease-in-out;
   pointer-events: none;
 }
-.launcher-page .launcher-page__background.is-active { opacity: 1; }
-.launcher-page .rs-hero__overlay { background: linear-gradient(90deg, #000d, #0009); }
-.launcher-page .rs-hero__identity {
+:is(.launcher-page, .game-product-page) .launcher-page__background.is-active { opacity: 1; }
+:is(.launcher-page, .game-product-page) .rs-hero__overlay { background: linear-gradient(90deg, #000d, #0009); }
+:is(.launcher-page, .game-product-page) .rs-hero__identity {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px;
   gap: 40px;
   align-items: center;
 }
-.launcher-page .rs-hero__text-col { display: grid; gap: 24px; justify-items: start; }
-.launcher-page .rs-hero__title {
+:is(.launcher-page, .game-product-page) .rs-hero__text-col { display: grid; gap: 24px; justify-items: start; }
+:is(.launcher-page, .game-product-page) .rs-hero__title {
   width: 100%;
   max-width: 18ch;
   min-height: 2.2em;
@@ -2580,7 +2580,7 @@ input[type="file"]::file-selector-button {
   font-family: var(--font-display);
   font-weight: 700;
 }
-.launcher-page .rs-hero__logo {
+:is(.launcher-page, .game-product-page) .rs-hero__logo {
   width: 180px;
   height: 180px;
   min-height: 0;
@@ -2588,11 +2588,11 @@ input[type="file"]::file-selector-button {
   max-height: none;
   border-radius: 24px;
 }
-.launcher-page .rs-hero__actions { align-items: center; flex-wrap: wrap; }
-.launcher-page .launcher-page__badge { display: block; width: 200px; height: 60px; min-height: 0; max-width: 100%; object-fit: contain; }
-.launcher-page .launcher-page__pause { width: 48px; height: 48px; min-height: 48px; padding: 0; gap: 10px; }
-.launcher-page .game-details__screenshots { margin-top: 0; }
-.launcher-page .launcher-page__section-title {
+:is(.launcher-page, .game-product-page) .rs-hero__actions { align-items: center; flex-wrap: wrap; }
+:is(.launcher-page, .game-product-page) .launcher-page__badge { display: block; width: 200px; height: 60px; min-height: 0; max-width: 100%; object-fit: contain; }
+:is(.launcher-page, .game-product-page) .launcher-page__pause { width: 48px; height: 48px; min-height: 48px; padding: 0; gap: 10px; }
+:is(.launcher-page, .game-product-page) .game-details__screenshots { margin-top: 0; }
+:is(.launcher-page, .game-product-page) .launcher-page__section-title {
   min-height: 1.15em;
   margin: 0 0 22px;
   font-family: var(--font-display);
@@ -2600,13 +2600,22 @@ input[type="file"]::file-selector-button {
   font-weight: 700;
   line-height: 1.15;
 }
-.launcher-page .game-details__screenshots-title { margin: 0; }
+:is(.launcher-page, .game-product-page) .game-details__screenshots-title { margin: 0; }
 .launcher-page__about { margin-top: 45px; }
 @media (max-width: 760px) {
-  .launcher-page .rs-hero__identity { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .launcher-page .rs-hero__logo { grid-row: 1; width: 110px; height: 110px; border-radius: 18px; }
-  .launcher-page .rs-hero__content { padding-top: 110px; padding-bottom: 45px; }
+  :is(.launcher-page, .game-product-page) .rs-hero__identity { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  :is(.launcher-page, .game-product-page) .rs-hero__logo { grid-row: 1; width: 110px; height: 110px; border-radius: 18px; }
+  :is(.launcher-page, .game-product-page) .rs-hero__content { padding-top: 110px; padding-bottom: 45px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .launcher-page .launcher-page__background { transition: none; }
+  :is(.launcher-page, .game-product-page) .launcher-page__background { transition: none; }
 }
+
+.product-offers { display: flex; flex-wrap: wrap; align-items: end; gap: 20px; min-width: 0; }
+.product-offer { display: grid; gap: 12px; min-width: 0; max-width: 100%; }
+.product-offer__price { font-weight: 700; max-width: 240px; overflow-wrap: anywhere; }
+.product-offer__price small { display: block; font-weight: 400; font-size: 13px; }
+.game-product-page .game-details__actions { margin: 0 0 32px; }
+.game-product-page .rs-hero__title { max-width: 22ch; min-height: 1.1em; }
+.game-product-page .game-details__trailer-list { display: grid; gap: 12px; }
+.admin-modal__error { white-space: pre-line; }

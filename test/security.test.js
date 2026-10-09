@@ -49,6 +49,9 @@ test('free games can have an itch URL without a purchase; paid games require own
  const base={title:'Free game',slug:'free-game',shortDescription:'Game',accessType:'free',itchUrl:'https://studio.itch.io/free',itchGameId:2000};
  assert.equal(gamePostSchema.safeParse(base).success,true);
  assert.equal(gamePostSchema.safeParse({...base,accessType:'paid'}).success,false);
+ assert.equal(gamePostSchema.safeParse({...base,accessType:'paid',microsoftStoreBadge:badge}).success,true);
+ assert.equal(gamePostSchema.safeParse({...base,accessType:'paid',microsoftStoreBadge:badge,downloadUrl:'https://downloads.example.test/game.zip'}).success,false);
+ assert.equal(gamePostSchema.safeParse({...base,itchGameId:null}).success,true);
  assert.equal(gamePostSchema.safeParse({...base,accessType:'paid',purchaseUrl:'https://studio.itch.io/free/purchase'}).success,true);
  assert.equal(gamePostSchema.safeParse({...base,accessType:undefined}).success,false);
  assert.equal(gamePostSchema.safeParse({...base,itchUrl:'https://studio.itch.io.evil.test/free'}).success,false);

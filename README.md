@@ -1,73 +1,61 @@
-# Deadsmile Games API
+# Deadsmile Games API 1.6.1
 
-Node.js 24+, Express e PostgreSQL. A API autoriza jogos, contas, catálogo, newswire, saves, sessões, conquistas e consentimento de diagnóstico.
+Node.js 24+, Express e PostgreSQL. A API autoriza contas e jogos e disponibiliza catálogo, newswire, saves, sessões, conquistas e consentimento de diagnóstico.
 
-## Instalação
+## Instalação e banco
 
-1. Execute `npm ci`.
-2. Copie `.env.example` para `.env`. Configure o PostgreSQL, as URLs e chaves independentes para `SESSION_SECRET` e `DATA_ENCRYPTION_KEY`, com pelo menos 32 caracteres cada. Gere cada chave com `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`.
-3. Para banco vazio, execute `npm run db:bootstrap`. Para o banco existente, faça um backup e execute `npm run db:migrate`. Não importe `schema.sql` sobre um banco existente. A migração registra checksums, mantém os arquivos históricos e criptografa saves antigos. `npm run db:encrypt` pode retomar essa conversão.
-4. Configure `ADMIN_EMAIL`, `ADMIN_USERNAME` e `ADMIN_PASSWORD` e execute `npm run seed:admin` se precisar criar o administrador. Retire essas variáveis após o uso.
-5. Execute `npm run dev` ou `npm start`.
+Execute `npm ci` e copie `.env.example` para `.env`. Configure PostgreSQL, URLs e chaves independentes para `SESSION_SECRET` e `DATA_ENCRYPTION_KEY`, com pelo menos 32 caracteres. Preserve as chaves existentes para manter sessões e dados criptografados legíveis.
 
-`npm test` cria PostgreSQL isolado com PGlite e contas fictícias. Não usa o banco informado no seu `.env`. Chamadas externas dos testes são simuladas.
+Para banco vazio, execute `npm run db:bootstrap`. Para banco existente, faça um backup e execute `npm run db:migrate`. Não importe `schema.sql` sobre um banco existente. O migrador registra checksums e preserva migrações históricas. `npm run db:encrypt` retoma a conversão de saves antigos.
 
-## Jogos e lojas
+Esta entrega inclui `013_game_download_links.sql`, que converte `purchase_url` e `download_url` para `text`, preservando os dados e permitindo URLs longas aceitas pelo cadastro. O arquivo SQL também pode ser aberto no editor SQL. Migrações anteriores permanecem necessárias; a 012 remove somente o cache antigo de tradução da newswire.
 
-`accessType` é obrigatório: `free` ou `paid`. A migração classifica registros antigos conforme o comportamento anterior: URL de compra preenchida significa pago. Revise essa classificação no cadastro antes de publicar.
+Para criar o administrador, configure `ADMIN_EMAIL`, `ADMIN_USERNAME` e `ADMIN_PASSWORD` e execute `npm run seed:admin`; retire essas variáveis após o uso. Execute `npm run dev` ou `npm start`.
 
-Jogos pagos mantêm a verificação da biblioteca itch.io. Configure OAuth com `ITCH_CLIENT_ID`, `ITCH_REDIRECT_URI` e `ITCH_TOKEN_ENCRYPTION_KEY`; o callback é `/api/integrations/itch/callback`. O usuário não recebe a chave privada do servidor. A verificação acontece novamente ao iniciar uma sessão e obter dados de instalação.
+`npm test` usa PostgreSQL isolado com PGlite, contas fictícias e provedores simulados. Não usa o banco do seu `.env`.
 
-Jogos gratuitos podem usar builds publicados com URL, tamanho e SHA-256, o repositório GitHub já configurado, downloads oficiais do itch.io ou Microsoft Store. Para baixar do itch.io, preencha `itchGameId` e, opcionalmente, `itchUrl`. Configure `ITCH_DOWNLOAD_API_KEY` com uma chave do publicador que tenha acesso ao jogo. O servidor confirma que o jogo está publicado e tem `min_price = 0`. Seleciona apenas ZIP de Windows; múltiplos uploads exigem canal explícito na configuração de builds. Uma URL de página não substitui o ID nem concede acesso à API do provedor.
+## Jogos, preços e acesso
 
-Cole o badge HTML oficial da Microsoft no cadastro. Ele é convertido em ID e URLs permitidas; nenhum HTML arbitrário é executado. Microsoft Store usa o instalador oficial e gerencia sua instalação e atualizações. Isso não registra um executável local nem comprova compra de jogo pago.
+O cadastro exige `accessType: free` ou `paid`. Os botões usam somente as lojas e o download configurados. Jogos gratuitos publicados podem oferecer itch.io, Microsoft Store e download direto; jogos pagos oferecem compra no itch.io e/ou Microsoft, sem botão público de download direto.
 
-O campo aceita o HTML oficial com quebras de linha e indentação entre as tags. Tags extras, múltiplos badges no campo e destinos diferentes dos oficiais são recusados.
+`GET /api/games/:slug` inclui `offers`, preços por loja e metadados Microsoft. O preço itch.io vem do JSON público da página cadastrada, com confirmação do ID quando configurado, timeout, tamanho limitado e cache curto. Não precisa de chave privada do publicador. O preço Microsoft vem dos dados do produto completo, sem usar trial como preço de compra. Valores de moedas diferentes não são convertidos. Se a fonte não fornecer preço, ele permanece desconhecido e o cliente orienta consultar a loja.
 
-A migração `009_microsoft_store_cache.sql` cria o cache persistente de metadados da Store. `GET /api/launcher` consulta o produto `9P6P8284V337`; `GET /api/games/:slug` inclui `microsoftStore` para jogos com badge. Os dois endpoints usam o mesmo serviço, filtram texto/URLs, limitam respostas a 2 MiB e recusam redirecionamentos. Não repassam payloads internos do provedor.
+Fonte pública itch.io documentada: https://itch.io/docs/api/javascript. A resposta de cada loja é tratada como entrada não confiável. Nenhum JavaScript do provedor é executado no servidor.
 
-`Accept-Language` seleciona pt-BR/BR, en-US/US ou es-ES/ES. O catálogo é revalidado na próxima consulta depois de uma hora. Uma falha temporária permite mostrar o último resultado por até sete dias com `stale: true`. A instalação gratuita Microsoft exige consulta nova e preço zero do produto completo disponível; não usa cache antigo, trial ou campo gratuito do banco como prova de preço. Falhas e mudança de preço retornam os códigos localizados do catálogo mestre.
+Jogos pagos com download do launcher exigem URL de compra itch.io e `itchGameId`. Configure `ITCH_CLIENT_ID`, `ITCH_REDIRECT_URI` e `ITCH_TOKEN_ENCRYPTION_KEY` para OAuth. Callback registrado: `https://api-ust8.onrender.com/api/integrations/itch/callback`. A posse é verificada novamente antes da instalação e do início da sessão; remoção da posse revoga o acesso. Um jogo pago exclusivo da Microsoft pode ser cadastrado sem download do launcher. Compra Microsoft não comprova posse no itch.io.
 
-São consultados `storeedgefd.dsx.mp.microsoft.com/v9.0/products` e `displaycatalog.mp.microsoft.com/v7.0/products`, endpoints públicos da Microsoft usados pela Store. O formato público pode mudar; o serviço mantém fallback entre as duas fontes e o cache. Requisitos, idiomas, classificações e descritores, mídias, versão, tamanhos, preço, notas, permissões, termos e avaliações só são expostos quando presentes. A versão vem do pacote, nunca da versão do frontend da Store. `downloadCount` permanece `null`: contagem de avaliações ou campos internos de compras não são downloads. Analytics de aquisições exigem credenciais e acesso ao Partner Center; essas credenciais não foram fornecidas nesta entrega.
+O catálogo nunca expõe o `download_url` bruto. `downloadAvailable` e `launcherAvailable` exigem link no banco e publicação. `GET /api/games/:slug/download` fornece o link HTTPS cadastrado para jogos gratuitos publicados; em jogos pagos continua exigindo sessão e nova verificação de posse, para compatibilidade com clientes autorizados.
 
-Catálogo público retorna `downloadUrl: null` e `downloadAvailable`. O botão do site consulta `GET /api/games/:slug/download`: jogos gratuitos publicados recebem o `download_url` HTTPS cadastrado; jogos pagos exigem sessão e uma nova verificação da posse pelo itch.io. Jogos não publicados ou sem link válido são recusados. Metadados de instalação do launcher continuam no endpoint autenticado `/api/library/:gameId/install-metadata`, com os requisitos de tamanho e hash do instalador.
+O launcher usa `/api/library/:gameId/install-metadata` autenticado. Sem `download_url`, a instalação é recusada. Um build Windows publicado precisa ter URL, tamanho e SHA-256; permanece também a resolução GitHub da configuração existente. Um link de página ou badge não substitui arquivo instalável nem concede autorização. A biblioteca mostra jogos gratuitos publicados e jogos pagos com posse válida registrada.
+
+## Microsoft Store
+
+O campo de badge aceita o HTML oficial, inclusive indentação e quebras de linha. A API extrai somente ID e URLs oficiais; tags extras, destinos falsos e conteúdo executável são rejeitados. O body da newswire permite badges oficiais entre parágrafos e remove scripts, handlers, estilos e imagens arbitrárias.
+
+`GET /api/launcher` consulta o produto `9P6P8284V337`. Detalhes de jogos com badge usam o mesmo serviço. Idioma e mercado são en-US/US, pt-BR/BR ou es-ES/ES. Classificação é regional; sem correspondente, fica ausente. O placeholder RP da interface não é certificação.
+
+O serviço consulta endpoints públicos Microsoft, limita respostas a 2 MiB, recusa redirecionamentos e usa cache persistente. Dados são revalidados após uma hora; uma falha temporária permite o último resultado por até sete dias, explicitamente marcado `stale`. O formato público pode mudar, por isso há fallback entre fontes.
+
+Só são retornadas informações existentes: ícone, screenshots, classificação, descritores, versão de pacote, atualização, novidades, privacidade, publicador, preço e demais metadados disponíveis. `downloadCount` permanece `null` sem uma contagem pública confiável; avaliações e compras internas não são downloads.
 
 ## Erros, conteúdo e privacidade
 
-`src/utils/errorCatalog.json` é a fonte dos erros em inglês, português brasileiro e espanhol. `Accept-Language` determina o idioma, com fallback para inglês. A resposta contém `error.code`, `error.locale` e `error.message`. Não há interpolação de exceções privadas. `/api/errors` fornece o catálogo do idioma solicitado.
+`src/utils/errorCatalog.json` é o catálogo mestre em inglês, português brasileiro e espanhol. `Accept-Language` seleciona o idioma; `/api/errors` fornece o catálogo correspondente. Erros retornam código, idioma e mensagem, sem exceções privadas. No CRUD, falhas de validação incluem campos rejeitados e mensagens localizadas, sem repetir os valores enviados.
 
-Execute `npm run errors:sync` com os diretórios irmãos `api`, `website` e `launcher` para atualizar os fallbacks offline dos clientes. Esses arquivos são gerados pela API e não devem ser editados nos clientes.
+Execute `npm run errors:sync` com `api`, `website` e `launcher` lado a lado para atualizar fallbacks offline e overlay. `npm run content:sync` sincroniza a política HTML da newswire com o website. Conteúdo original do banco é preservado; não há Azure, serviço de tradução ou chave de tradutor.
 
-A newswire usa `/api/newswire`; `/api/news` continua compatível com clientes antigos. Publicações aceitam `gameId` opcional. Corpo HTML usa uma lista restrita de tags. Exclusão do jogo remove a referência sem excluir a notícia.
+Newswire usa `/api/newswire`, com compatibilidade para `/api/news`. Publicações aceitam `gameId` opcional. Excluir um jogo remove a referência sem excluir a notícia. CRUD emite eventos de criação, edição e exclusão; clientes atualizam sem F5. Só novas publicações geram avisos de publicação.
 
-O body também aceita um ou mais badges oficiais Microsoft Store misturados ao texto. O link deve usar `https://get.microsoft.com/installer/download/ID?referrer=appbadge`, e a imagem `https://get.microsoft.com/images/en-us%20light.svg` ou sua variante oficial de idioma/tema. A API preserva somente esse par validado, normaliza largura, descrição e carregamento e remove scripts, handlers, estilos e outras imagens. Execute `npm run content:sync` na API para sincronizar essa política com site e launcher. Posts cujo badge foi removido pela versão anterior precisam recebê-lo novamente e ser salvos; o HTML descartado não está no banco. Esta correção não acrescenta migração.
+Diagnóstico exige consentimento vinculado à conta. Revogação apaga eventos anteriores e bloqueia coleta concorrente. Payloads são restritos a código de erro e plataforma. Saves usam AES-256-GCM vinculado a usuário, jogo e slot; autorização, limites e conflitos são verificados no backend.
 
-Diagnóstico exige consentimento de conta. Revogação apaga eventos anteriores e bloqueia gravações concorrentes. Payload permite apenas código de erro e plataforma. Saves usam AES-256-GCM associado a usuário, jogo e slot. Preserve as chaves utilizadas para conseguir ler os dados; a versão anterior de segredos continua compatível.
+O callback itch.io reutiliza CSS e fontes do website, com carregamento acessível, timeout, mensagens da API e retorno à aba de jogos. `npm run ui:sync` atualiza essas cópias após mudanças no CSS. Tokens do fragmento são removidos do endereço antes das chamadas.
 
 ## Produção
 
-Configure URLs HTTPS reais, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, `DATA_ENCRYPTION_KEY` e segredos independentes. Conexões remotas PostgreSQL verificam TLS; use `DATABASE_SSL_CA` se houver autoridade privada. Configure reCAPTCHA e os provedores de e-mail para os respectivos recursos.
+Publique API, website e launcher 1.6.1 em conjunto e aplique as migrações antes da nova API. Configure HTTPS, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, segredos independentes, CORS, e-mail e reCAPTCHA. PostgreSQL remoto verifica TLS; use `DATABASE_SSL_CA` se houver CA privada.
 
-Aplique as migrações antes de disponibilizar a nova API. Publique API, site e launcher da mesma entrega. Em outro domínio, ajuste CORS, `VITE_API_URL`, CSP do site e `API_URL`/origens permitidas do launcher em conjunto. Não coloque `.env`, backups, logs ou builds com credenciais no repositório público.
+`render.yaml` configura Starter pago, Node 24, health check, migração antes da publicação, pool limitado e encerramento gracioso. Não modifica automaticamente um serviço existente. O plano gratuito suspende o serviço após inatividade; código e health check não eliminam essa regra. Documentação: https://render.com/docs/free e https://render.com/docs/blueprint-spec.
 
-Os testes não substituem o teste de OAuth, entrega de e-mail, ZIP real e pacote assinado de Windows com suas credenciais de produção.
+O website usa rewrite `/api` da Vercel para este backend; WebSocket conecta diretamente ao Render com ticket autenticado. Alterações de domínio devem atualizar CORS, CSP e URLs nos três projetos. Não publique `.env`, credenciais, backups ou logs.
 
-## Sincronização de conteúdo — versão 1.3.0
-
-Execute `npm run db:migrate` antes de publicar. A migração `010_content_change_events.sql` amplia a restrição dos eventos para edição e exclusão de jogos, newswire e vídeos. O CRUD emite esses eventos para atualizar site e launcher; somente novas publicações enviam avisos de publicação. As migrações históricas continuam intactas. A classificação principal da Store é selecionada pelo mercado solicitado: DJCTQ/BR, ESRB/US ou PEGI/ES; sem correspondência, retorna `null`.
-
-## Revisão de fluxos e interface — versão 1.5.0
-
-Execute `npm run db:migrate` antes de publicar. A migração `012_remove_news_translations.sql` remove somente o cache de traduções. Posts originais e referências de jogos permanecem intactos. A migração histórica 011 foi preservada para não invalidar checksums de bancos existentes; não é uma dependência ativa da aplicação. Newswire retorna o conteúdo cadastrado, sem tradução automática, credenciais Azure ou chamadas a serviços pagos.
-
-A página `/api/integrations/itch/callback` usa os mesmos `global.css`, `website.css`, fontes e componentes visuais do site. Os arquivos necessários já estão incluídos em `public`. `npm run ui:sync` atualiza essas cópias quando os projetos estão lado a lado; execute novamente após alterar os estilos compartilhados. Carregamento tem estado acessível, timeout, mensagens da API e link para retornar à aba de jogos da conta. Tokens do fragmento são retirados do endereço antes das chamadas e não entram no HTML ou CSS.
-
-`render.yaml` prepara um serviço Starter pago com Node 24, health check `/api/health`, migração antes da publicação, pool limitado e encerramento gracioso. Não foi aplicado ao serviço existente nesta entrega. O plano gratuito suspende o serviço após 15 minutos sem tráfego; código ou health check não garantem eliminar essa suspensão. Aplique as configurações ao serviço existente, preservando `SESSION_SECRET`, `DATA_ENCRYPTION_KEY` e as demais chaves usadas nos dados atuais. Configure todos os provedores necessários conforme `.env.example`. Não gere novas chaves de criptografia para substituir as existentes. Documentação: https://render.com/docs/free e https://render.com/docs/blueprint-spec.
-
-Website e launcher usam `https://api-ust8.onrender.com`. O website acessa HTTP por `/api` no próprio domínio via rewrite da Vercel, e WebSocket diretamente no Render com ticket autenticado. Preserve o callback itch.io registrado: `https://api-ust8.onrender.com/api/integrations/itch/callback`.
-
-Validação inclui migrações, contratos HTTP, acesso pago/gratuito, sanitização, caminhos de retorno e callback com CSS compartilhado. OAuth real e implantação Render não foram executados neste ambiente.
-
-## Estilos — versão 1.5.1
-
-O CSS público foi sincronizado com o website da mesma entrega. A atualização de layout de `/launcher` não altera rotas, lógica de negócio, dados ou migrações da API. A última migração continua sendo 012.
+Os testes cobrem migrações, contratos HTTP, acesso pago/gratuito, preços, sanitização, dados de Store, privacidade, saves, callback e erros. OAuth real, entrega de e-mail, implantação Render e instalação Windows não foram executados neste ambiente.

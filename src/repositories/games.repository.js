@@ -6,7 +6,6 @@ const GAME_SUMMARY_SELECT = `
     g.status, g.release_date, g.hero_image, g.cover_image,
     g.trailer_url, g.featured, g.purchase_url, g.download_url, g.itch_game_id,
     g.access_type, g.itch_url, g.microsoft_product_id, g.microsoft_badge_image,
-    EXISTS (SELECT 1 FROM game_builds b WHERE b.game_id = g.id AND b.status = 'published') AS has_build,
     g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled,
     COALESCE(genre_agg.genres,    '{}') AS genres,
     COALESCE(platform_agg.platforms, '{}') AS platforms

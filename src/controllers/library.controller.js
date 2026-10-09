@@ -21,5 +21,5 @@ export const verify = asyncHandler(async (req, res) => {
 
 export const installMetadata = asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  sendSuccess(res, await getInstallMetadata(req.session.userId, req.params.gameId, res.locals.locale));
+  sendSuccess(res, await getInstallMetadata(req.session.userId, req.params.gameId));
 });

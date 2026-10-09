@@ -5,6 +5,7 @@ import { toClientGame } from '../utils/clientGame.js';
 import { getMicrosoftProduct } from './microsoft-store.service.js';
 import { verifyGameOwnership } from './itch-integration.service.js';
 import { isHttpsUrl } from '../utils/url.js';
+import { getItchPrice, gameOffers } from './game-commerce.service.js';
 
 export async function getGamesList({ page, limit, featured, genre, platform, status }) {
   const { items, total } = await listGames({ page, limit, featured, genre, platform, status });
@@ -23,15 +24,17 @@ export async function getGameDetails(slug, locale = 'en') {
   const game = await findGameBySlug(slug);
   if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
 
-  const [related, content, microsoftStore] = await Promise.all([
+  const [related, content, microsoftStore, itchPrice] = await Promise.all([
     findRelatedGames(game.id, game.genres, 4),
     findGameContent(game.id, game.title),
     game.microsoft_product_id ? getMicrosoftProduct(game.microsoft_product_id, locale, { optional: true }) : null,
+    getItchPrice(game.access_type === 'free' ? game.itch_url || game.purchase_url : game.purchase_url || game.itch_url, game.itch_game_id),
   ]);
 
   return {
     ...toClientGame(game),
     microsoftStore,
+    offers: await gameOffers(game, microsoftStore, itchPrice),
     description: game.description,
     screenshots: game.screenshots,
     relatedGames: related.map(toClientGame),

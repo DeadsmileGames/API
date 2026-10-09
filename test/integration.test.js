@@ -22,7 +22,6 @@ process.env.DATA_ENCRYPTION_KEY='isolated-test-data-key-'.repeat(2);
 process.env.ITCH_CLIENT_ID='test-client';
 process.env.ITCH_TOKEN_ENCRYPTION_KEY='isolated-test-itch-key-'.repeat(2);
 process.env.ITCH_REDIRECT_URI='https://api.example.test/callback';
-process.env.ITCH_DOWNLOAD_API_KEY='test-provider-token';
 process.env.VERCEL='1';
 process.env.NODE_ENV='development';
 const {pool}=await import('../src/config/database.js');
@@ -47,6 +46,7 @@ globalThis.fetch=async(input,options)=>{
   const page=Number(new URL(url).searchParams.get('page')||1);
   return Response.json({per_page:50,owned_keys:revoked || page>2?[]:[{id:800+page,game_id:page===1?999:1000}]});
  }
+ if(url.endsWith('/data.json')) return Response.json({id:url.includes('/paid/')?1000:2000,price:url.includes('/paid/')?'$4.99':'$0.00'});
  if(url.endsWith('/profile/games')) return Response.json({games:[{id:2000,min_price:0,published:true}]});
  if(url.endsWith('/games/2000/uploads')) return Response.json({uploads:[{id:700,filename:'free-v100.zip',p_windows:true,size:100,min_price:0},{id:701,filename:'paid-extra.zip',p_windows:true,size:100,min_price:1000}]});
  if(url.endsWith('/uploads/700/download')) return Response.json({url:'https://uploads.itch.zone/free-v100.zip'});
@@ -89,25 +89,16 @@ test('launcher metadata uses locale-specific persistent caching and game details
  assert(!JSON.stringify(detail.body).includes('PackageUri'));
 });
 
-test('Microsoft installation checks current full-product price instead of trusting the free flag or a free trial', async () => {
- storePaid = true;
- try {
-  const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
-  assert.equal(install.status, 409); assert.equal(install.body.error.code, 'MICROSOFT_GAME_NOT_FREE');
-  assert.match(install.body.error.message, /gratuito/);
- } finally { storePaid = false; }
- const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
- assert.equal(install.status, 200);
+test('launcher refuses Store or itch-only installation without the game database download link', async () => {
+ for (const id of [freeId, msId]) {
+  const install = await player.request(`/library/${id}/install-metadata`, { method: 'POST', language: 'pt-BR' });
+  assert.equal(install.status, 409); assert.equal(install.body.error.code, 'GAME_RELEASE_NOT_CONFIGURED');
+ }
+ const result=await player.request(`/library/${freeId}/verify`,{method:'POST'});assert.equal(result.status,200);assert.equal(result.body.data.owned,true);
+ const library=await player.request('/library');assert(library.body.data.items.some((item)=>item.id===freeId));assert(library.body.data.items.some((item)=>item.id===msId));
+ assert(library.body.data.items.every((item)=>item.downloadUrl===null));
 });
 
-test('free game is acquired without itch account and downloaded from the provider',async()=>{
- const result=await player.request(`/library/${freeId}/verify`,{method:'POST'});assert.equal(result.status,200);assert.equal(result.body.data.owned,true);
- const install=await player.request(`/library/${freeId}/install-metadata`,{method:'POST'});assert.equal(install.status,200);assert.equal(install.body.data.downloadUrl,'https://uploads.itch.zone/free-v100.zip');
- const library=await player.request('/library');assert.equal(library.body.data.items[0].isFree,true);
-});
-test('Microsoft-only free game delegates to the official installer',async()=>{
- const result=await player.request(`/library/${msId}/install-metadata`,{method:'POST'});assert.equal(result.status,200);assert.equal(result.body.data.delivery,'microsoft-store');assert.match(result.body.data.storeUrl,/get.microsoft.com/);
-});
 test('paid ownership checks all pages, including short pages, and revokes removed ownership',async()=>{
  let result=await player.request(`/library/${paidId}/verify`,{method:'POST'});assert.equal(result.status,409);assert.equal(result.body.error.code,'ITCH_NOT_CONNECTED');
  await pool.query('INSERT INTO user_itch_accounts(user_id,itch_user_id,itch_username,access_token_encrypted) VALUES($1,1234,\'test\',$2)',[userId,encryptToken('test-token')]);
@@ -135,6 +126,17 @@ test('website downloads use the database link for free games and recheck paid ow
   assert.equal(denied.body.error.code, 'GAME_NOT_OWNED');
   assert.equal(denied.body.error.locale, 'pt-BR');
  } finally { revoked = false; await pool.query('UPDATE games SET download_url=null WHERE id=ANY($1::uuid[])', [[freeId, paidId]]); }
+});
+
+test('game validation identifies the rejected field in each locale without echoing its value', async () => {
+ const payload = { title: 'Invalid game', slug: 'Invalid Slug', shortDescription: 'Game', accessType: 'free', heroImage: 'javascript:PRIVATE_SENTINEL' };
+ for (const language of ['en', 'pt-BR', 'es']) {
+  const response = await admin.request('/admin/game', { method: 'POST', language, body: payload });
+  assert.equal(response.status, 400); assert.equal(response.body.error.locale, language);
+  assert.deepEqual(response.body.error.fields.map((item) => item.field), ['slug', 'heroImage']);
+  assert(response.body.error.fields.every((item) => item.message));
+  assert(!JSON.stringify(response.body).includes('PRIVATE_SENTINEL'));
+ }
 });
 
 test('newswire returns the persisted original in every interface language', async () => {
@@ -267,14 +269,14 @@ test('protected saves reject ciphertext tampering and another account scope', as
  assert.throws(()=>decryptSecret(parts.join('.'),`save:${userId}:${freeId}:default`),{code:'SECRET_DECRYPT_FAILED'});
 });
 
-test('Store outages return labelled stale metadata but never authorize Microsoft installation using stale pricing', async () => {
+test('Store outages return labelled stale metadata and never create a launcher download link', async () => {
  await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '2 hours'");
  storeOffline = true;
  const page = await guest.request('/launcher', { language: 'pt-BR' });
  assert.equal(page.status, 200); assert.equal(page.body.data.stale, true);
  const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
- assert.equal(install.status, 502); assert.equal(install.body.error.code, 'MICROSOFT_STORE_UNAVAILABLE');
- assert.match(install.body.error.message, /temporariamente/);
+ assert.equal(install.status, 409); assert.equal(install.body.error.code, 'GAME_RELEASE_NOT_CONFIGURED');
+ assert.match(install.body.error.message, /download/);
  await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '8 days'");
  const expired = await guest.request('/launcher', { language: 'pt-BR' });
  assert.equal(expired.status, 502); assert(!JSON.stringify(expired.body).includes('provider unavailable'));
