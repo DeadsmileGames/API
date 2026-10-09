@@ -22,6 +22,12 @@ Jogos gratuitos podem usar builds publicados com URL, tamanho e SHA-256, o repos
 
 Cole o badge HTML oficial da Microsoft no cadastro. Ele é convertido em ID e URLs permitidas; nenhum HTML arbitrário é executado. Microsoft Store usa o instalador oficial e gerencia sua instalação e atualizações. Isso não registra um executável local nem comprova compra de jogo pago.
 
+A migração `009_microsoft_store_cache.sql` cria o cache persistente de metadados da Store. `GET /api/launcher` consulta o produto `9P6P8284V337`; `GET /api/games/:slug` inclui `microsoftStore` para jogos com badge. Os dois endpoints usam o mesmo serviço, filtram texto/URLs, limitam respostas a 2 MiB e recusam redirecionamentos. Não repassam payloads internos do provedor.
+
+`Accept-Language` seleciona pt-BR/BR, en-US/US ou es-ES/ES. O catálogo é revalidado na próxima consulta depois de uma hora. Uma falha temporária permite mostrar o último resultado por até sete dias com `stale: true`. A instalação gratuita Microsoft exige consulta nova e preço zero do produto completo disponível; não usa cache antigo, trial ou campo gratuito do banco como prova de preço. Falhas e mudança de preço retornam os códigos localizados do catálogo mestre.
+
+São consultados `storeedgefd.dsx.mp.microsoft.com/v9.0/products` e `displaycatalog.mp.microsoft.com/v7.0/products`, endpoints públicos da Microsoft usados pela Store. O formato público pode mudar; o serviço mantém fallback entre as duas fontes e o cache. Requisitos, idiomas, classificações e descritores, mídias, versão, tamanhos, preço, notas, permissões, termos e avaliações só são expostos quando presentes. A versão vem do pacote, nunca da versão do frontend da Store. `downloadCount` permanece `null`: contagem de avaliações ou campos internos de compras não são downloads. Analytics de aquisições exigem credenciais e acesso ao Partner Center; essas credenciais não foram fornecidas nesta entrega.
+
 URLs temporárias de download saem apenas do endpoint autenticado `/api/library/:gameId/install-metadata`. Catálogo público retorna `downloadUrl: null`.
 
 ## Erros, conteúdo e privacidade

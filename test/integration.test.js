@@ -8,6 +8,10 @@ import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 const originalFetch = globalThis.fetch;
 let revoked = false;
 let calls = [];
+let storePaid = false;
+let storeOffline = false;
+const storeEdge = JSON.parse(await readFile(new URL('./fixtures/store-edge.json', import.meta.url), 'utf8'));
+const storeCatalog = JSON.parse(await readFile(new URL('./fixtures/store-catalog.json', import.meta.url), 'utf8'));
 const db = await PGlite.create({extensions:{pg_trgm}});
 await db.exec(await readFile(new URL('../src/database/schema.sql',import.meta.url),'utf8'));
 const socket = new PGLiteSocketServer({db,port:0,host:'127.0.0.1',maxConnections:20});
@@ -33,6 +37,12 @@ globalThis.fetch=async(input,options)=>{
  const url=String(input);
  if(url.startsWith(base)) return originalFetch(input,options);
  calls.push(url);
+ if (/^https:\/\/(?:storeedgefd.dsx|displaycatalog).mp.microsoft.com\//.test(url)) {
+  if (storeOffline) throw new Error('provider unavailable');
+  const value = structuredClone(url.includes('storeedgefd') ? storeEdge : storeCatalog);
+  if (storePaid) { if (value.Payload) value.Payload.Skus[0].Availabilities[0].Price = 5; if (value.Product) value.Product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price.ListPrice = 5; }
+  return Response.json(value);
+ }
  if(url.includes('/profile/owned-keys')) {
   const page=Number(new URL(url).searchParams.get('page')||1);
   return Response.json({per_page:50,owned_keys:revoked || page>2?[]:[{id:800+page,game_id:page===1?999:1000}]});
@@ -65,6 +75,30 @@ function client() {
 const player=client(),other=client(),admin=client(),guest=client();
 await player.login('player');await other.login('other');await admin.login('admin');
 test.after(async()=>{globalThis.fetch=originalFetch;await new Promise(r=>server.close(r));unusedServer.close();await pool.end();await socket.stop();await db.close();});
+
+test('launcher metadata uses locale-specific persistent caching and game details share the Store model', async () => {
+ const first = await guest.request('/launcher', { language: 'pt-BR' });
+ assert.equal(first.status, 200); assert.equal(first.body.data.locale, 'pt-BR'); assert.equal(first.body.data.market, 'BR');
+ assert.equal(first.body.data.version, '1.0.0.0'); assert.equal(first.body.data.primaryRating.id, 'DJCTQ:14'); assert.equal(first.body.data.downloadCount, null);
+ assert.equal(first.headers.get('content-language'), 'pt-BR');
+ const count = calls.length;
+ const second = await guest.request('/launcher', { language: 'pt-BR' });
+ assert.equal(second.status, 200); assert.equal(calls.length, count);
+ const detail = await guest.request('/games/store', { language: 'pt-BR' });
+ assert.equal(detail.status, 200); assert.equal(detail.body.data.microsoftStore.productId, '9P6P8284V337');
+ assert(!JSON.stringify(detail.body).includes('PackageUri'));
+});
+
+test('Microsoft installation checks current full-product price instead of trusting the free flag or a free trial', async () => {
+ storePaid = true;
+ try {
+  const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
+  assert.equal(install.status, 409); assert.equal(install.body.error.code, 'MICROSOFT_GAME_NOT_FREE');
+  assert.match(install.body.error.message, /gratuito/);
+ } finally { storePaid = false; }
+ const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
+ assert.equal(install.status, 200);
+});
 
 test('free game is acquired without itch account and downloaded from the provider',async()=>{
  const result=await player.request(`/library/${freeId}/verify`,{method:'POST'});assert.equal(result.status,200);assert.equal(result.body.data.owned,true);
@@ -146,4 +180,18 @@ test('protected saves reject ciphertext tampering and another account scope', as
  assert.throws(()=>decryptSecret(encrypted,`save:${otherId}:${freeId}:default`),{code:'SECRET_DECRYPT_FAILED'});
  const parts=encrypted.split('.');parts[3]=Buffer.alloc(16).toString('base64url');
  assert.throws(()=>decryptSecret(parts.join('.'),`save:${userId}:${freeId}:default`),{code:'SECRET_DECRYPT_FAILED'});
+});
+
+test('Store outages return labelled stale metadata but never authorize Microsoft installation using stale pricing', async () => {
+ await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '2 hours'");
+ storeOffline = true;
+ const page = await guest.request('/launcher', { language: 'pt-BR' });
+ assert.equal(page.status, 200); assert.equal(page.body.data.stale, true);
+ const install = await player.request(`/library/${msId}/install-metadata`, { method: 'POST', language: 'pt-BR' });
+ assert.equal(install.status, 502); assert.equal(install.body.error.code, 'MICROSOFT_STORE_UNAVAILABLE');
+ assert.match(install.body.error.message, /temporariamente/);
+ await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '8 days'");
+ const expired = await guest.request('/launcher', { language: 'pt-BR' });
+ assert.equal(expired.status, 502); assert(!JSON.stringify(expired.body).includes('provider unavailable'));
+ storeOffline = false;
 });

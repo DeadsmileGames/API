@@ -148,7 +148,9 @@
     "UPDATE_IN_PROGRESS": "An update is already in progress. Wait for it to finish.",
     "UPDATE_BUSY": "Close games and finish or cancel downloads before updating.",
     "UPDATE_VERIFICATION_FAILED": "The update failed its safety checks. Download the official installer.",
-    "DOWNLOAD_CANCELLED": "The download was cancelled."
+    "DOWNLOAD_CANCELLED": "The download was cancelled.",
+    "MICROSOFT_STORE_UNAVAILABLE": "Microsoft Store information is temporarily unavailable. Please try again.",
+    "MICROSOFT_GAME_NOT_FREE": "Microsoft Store no longer lists this game as free. Open its Store page to check availability."
   },
   "pt-BR": {
     "INTERNAL_ERROR": "Algo deu errado. Tente novamente mais tarde.",
@@ -299,7 +301,9 @@
     "UPDATE_IN_PROGRESS": "Uma atualização já está em andamento. Aguarde a conclusão.",
     "UPDATE_BUSY": "Feche os jogos e conclua ou cancele os downloads antes de atualizar.",
     "UPDATE_VERIFICATION_FAILED": "A atualização falhou nas verificações de segurança. Baixe o instalador oficial.",
-    "DOWNLOAD_CANCELLED": "O download foi cancelado."
+    "DOWNLOAD_CANCELLED": "O download foi cancelado.",
+    "MICROSOFT_STORE_UNAVAILABLE": "As informações da Microsoft Store estão temporariamente indisponíveis. Tente novamente.",
+    "MICROSOFT_GAME_NOT_FREE": "A Microsoft Store não lista mais este jogo como gratuito. Abra a página da Store para conferir a disponibilidade."
   },
   "es": {
     "INTERNAL_ERROR": "Algo salió mal. Inténtalo más tarde.",
@@ -450,6 +454,8 @@
     "UPDATE_IN_PROGRESS": "Ya hay una actualización en curso. Espera a que termine.",
     "UPDATE_BUSY": "Cierra los juegos y completa o cancela las descargas antes de actualizar.",
     "UPDATE_VERIFICATION_FAILED": "La actualización no superó las verificaciones de seguridad. Descarga el instalador oficial.",
-    "DOWNLOAD_CANCELLED": "La descarga se canceló."
+    "DOWNLOAD_CANCELLED": "La descarga se canceló.",
+    "MICROSOFT_STORE_UNAVAILABLE": "La información de Microsoft Store no está disponible temporalmente. Inténtalo de nuevo.",
+    "MICROSOFT_GAME_NOT_FREE": "Microsoft Store ya no muestra este juego como gratuito. Abre su página para consultar la disponibilidad."
   }
 }

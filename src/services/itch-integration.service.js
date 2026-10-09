@@ -4,6 +4,7 @@ import { getGithubGameDownload } from './github-game-releases.service.js';
 import { toClientGame } from '../utils/clientGame.js';
 import { storeBadgeFromRow } from '../utils/storeBadge.js';
 import { getFreeItchDownload } from './free-itch.service.js';
+import { getMicrosoftProduct } from './microsoft-store.service.js';
 import { AppError } from '../utils/AppError.js';
 import { decryptToken, encryptToken } from '../utils/tokenCipher.js';
 import {
@@ -236,7 +237,7 @@ export async function getLibrary(userId) {
   return { items: (await listEntitlements(userId)).map((row) => ({ ...toClientGame(row), acquiredAt: row.acquired_at, lastVerifiedAt: row.last_verified_at })) };
 }
 
-export async function getInstallMetadata(userId, gameId) {
+export async function getInstallMetadata(userId, gameId, locale = 'en') {
   const game = await findItchGame(gameId);
   if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
   const ownership = await verifyGameOwnership(userId, gameId);
@@ -249,6 +250,10 @@ export async function getInstallMetadata(userId, gameId) {
   if (game.download_url) return { delivery: 'archive', ...(await getGithubGameDownload(game)) };
   if (game.access_type === 'free' && game.itch_game_id) return getFreeItchDownload(game, build?.itch_channel);
   const badge = storeBadgeFromRow(game);
-  if (game.access_type === 'free' && badge) return { delivery: 'microsoft-store', storeUrl: badge.href };
+  if (game.access_type === 'free' && badge) {
+    const product = await getMicrosoftProduct(badge.productId, locale, { requireFresh: true });
+    if (product.isFree !== true) throw new AppError(409, 'MICROSOFT_GAME_NOT_FREE');
+    return { delivery: 'microsoft-store', storeUrl: badge.href, version: product.version };
+  }
   throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
 }

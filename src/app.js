@@ -15,6 +15,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { adminBodyLimiter } from './middleware/bodyLimiter.js';
 import { authRouter } from './routes/auth.routes.js';
 import { gamesRouter } from './routes/games.routes.js';
+import { launcherRouter } from './routes/launcher.routes.js';
 import { searchRouter } from './routes/search.routes.js';
 import { accountRouter } from './routes/account.routes.js';
 import { newsletterRouter } from './routes/newsletter.routes.js';
@@ -144,6 +145,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminBodyLimiter, adminRouter);
   app.use('/api/games', gamesRouter);
+  app.use('/api/launcher', launcherRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/account', accountRouter);
   app.use('/api/newsletter', newsletterRouter);

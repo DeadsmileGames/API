@@ -8,6 +8,6 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 export const details = asyncHandler(async (req, res) => {
-  const data = await getGameDetails(req.params.slug);
+  const data = await getGameDetails(req.params.slug, res.locals.locale);
   sendSuccess(res, data);
 });
