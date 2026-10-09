@@ -11,6 +11,7 @@ export function toClientGame(row, { includeDownload = false } = {}) {
     accessType: row.access_type, isFree: free,
     purchaseUrl: row.purchase_url || null,
     downloadUrl: includeDownload ? row.download_url || null : null,
+    downloadAvailable: row.status === 'released' && Boolean(row.download_url),
     commerceEnabled: !free,
     launcherAvailable: row.status === 'released' && Boolean(row.download_url || row.itch_game_id || row.microsoft_product_id || row.has_build),
     itchGameId: row.itch_game_id ? Number(row.itch_game_id) : null,

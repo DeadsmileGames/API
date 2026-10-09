@@ -1,4 +1,6 @@
 import { resolveLocale } from '../utils/publicErrors.js';
+import { escapeHtml } from '../utils/html.js';
+import { env } from '../config/env.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import {
@@ -15,16 +17,12 @@ const callbackPage = `
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Deadsmile Games</title>
-<link rel="stylesheet" href="/itch-callback.css">
+<link rel="stylesheet" href="/styles/global.css">
 </head>
 <body>
-  <main class="callback-card" data-state="loading" id="card">
-    <div class="card-mark" data-state="loading" id="mark">
-      <svg class="spinner" viewBox="0 0 54 54" aria-hidden="true">
-        <circle class="track" cx="27" cy="27" r="22"/>
-        <circle class="head"  cx="27" cy="27" r="22"/>
-      </svg>
-      <div class="badge" id="badge">
+  <main class="newsletter-action page-section">
+    <section class="newsletter-action__card" data-state="loading" id="card" role="status" aria-live="polite" aria-busy="true">
+    <div class="newsletter-action__icon newsletter-action__icon--loading" data-state="loading" id="mark" aria-hidden="true">
         <svg id="icon-check" width="34" height="34" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2.6"
              stroke-linecap="round" stroke-linejoin="round" hidden>
@@ -35,14 +33,15 @@ const callbackPage = `
              stroke-linecap="round" stroke-linejoin="round" hidden>
           <path d="M18 6 6 18M6 6l12 12"/>
         </svg>
-      </div>
     </div>
     <h1 id="title"></h1>
     <p id="message"></p>
 
-    <div class="loading-bar-wrap" id="progressWrap">
-      <div class="loading-bar"><i></i></div>
+    <div class="save-progress" id="progressWrap">
+      <div class="save-progress__bar"></div>
     </div>
+    <a class="btn btn--secondary" id="returnLink" href="__RETURN_URL__" hidden></a>
+    </section>
   </main>
 
 <script src="/error-catalog.js" defer></script>
@@ -54,7 +53,7 @@ const callbackPage = `
 export const callback = (_req, res) => {
   res.set('Cache-Control', 'no-store');
   res.set('Referrer-Policy', 'no-referrer');
-  res.type('html').send(callbackPage);
+  res.type('html').send(callbackPage.replace('__RETURN_URL__', escapeHtml(`${env.frontendUrl}/account#games`)));
 };
 
 export const status = asyncHandler(async (req, res) => {

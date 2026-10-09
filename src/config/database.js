@@ -50,7 +50,9 @@ function directConnectionString() {
   return env.databaseUrl;
 }
 
-export const pool = new Pool(poolConfig(env.databaseUrl, 'deadsmile-games-api', 10));
+const poolSize = Number(process.env.DATABASE_POOL_SIZE || 10);
+if (!Number.isInteger(poolSize) || poolSize < 1 || poolSize > 30) throw new Error('DATABASE_POOL_SIZE must be between 1 and 30.');
+export const pool = new Pool(poolConfig(env.databaseUrl, 'deadsmile-games-api', poolSize));
 
 const directUrl = directConnectionString();
 export const directPool = directUrl === env.databaseUrl

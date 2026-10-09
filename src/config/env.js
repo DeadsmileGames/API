@@ -37,7 +37,7 @@ if (isProduction && !process.env.DATA_ENCRYPTION_KEY) required('DATA_ENCRYPTION_
 if (process.env.DATA_ENCRYPTION_KEY && process.env.DATA_ENCRYPTION_KEY.length < 32) throw new Error('DATA_ENCRYPTION_KEY must be at least 32 characters.');
 
 const frontendUrl = validAppUrl('FRONTEND_URL', process.env.FRONTEND_URL || 'https://deadsmilegames.vercel.app');
-const backendUrl = validAppUrl('BACKEND_URL', process.env.BACKEND_URL || 'https://deadsmile.vercel.app');
+const backendUrl = validAppUrl('BACKEND_URL', process.env.BACKEND_URL || 'https://api-ust8.onrender.com');
 
 export const env = {
   nodeEnv,

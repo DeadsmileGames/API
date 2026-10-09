@@ -22,7 +22,7 @@ Jogos gratuitos podem usar builds publicados com URL, tamanho e SHA-256, o repos
 
 Cole o badge HTML oficial da Microsoft no cadastro. Ele é convertido em ID e URLs permitidas; nenhum HTML arbitrário é executado. Microsoft Store usa o instalador oficial e gerencia sua instalação e atualizações. Isso não registra um executável local nem comprova compra de jogo pago.
 
-Na API 1.2.2, esse campo aceita o HTML formatado com quebras de linha e indentação entre as tags. Continuam proibidos tags extras, múltiplos badges nesse campo e destinos diferentes dos oficiais. A correção é compatível com website e launcher 1.2.1 e não exige migração.
+O campo aceita o HTML oficial com quebras de linha e indentação entre as tags. Tags extras, múltiplos badges no campo e destinos diferentes dos oficiais são recusados.
 
 A migração `009_microsoft_store_cache.sql` cria o cache persistente de metadados da Store. `GET /api/launcher` consulta o produto `9P6P8284V337`; `GET /api/games/:slug` inclui `microsoftStore` para jogos com badge. Os dois endpoints usam o mesmo serviço, filtram texto/URLs, limitam respostas a 2 MiB e recusam redirecionamentos. Não repassam payloads internos do provedor.
 
@@ -30,7 +30,7 @@ A migração `009_microsoft_store_cache.sql` cria o cache persistente de metadad
 
 São consultados `storeedgefd.dsx.mp.microsoft.com/v9.0/products` e `displaycatalog.mp.microsoft.com/v7.0/products`, endpoints públicos da Microsoft usados pela Store. O formato público pode mudar; o serviço mantém fallback entre as duas fontes e o cache. Requisitos, idiomas, classificações e descritores, mídias, versão, tamanhos, preço, notas, permissões, termos e avaliações só são expostos quando presentes. A versão vem do pacote, nunca da versão do frontend da Store. `downloadCount` permanece `null`: contagem de avaliações ou campos internos de compras não são downloads. Analytics de aquisições exigem credenciais e acesso ao Partner Center; essas credenciais não foram fornecidas nesta entrega.
 
-URLs temporárias de download saem apenas do endpoint autenticado `/api/library/:gameId/install-metadata`. Catálogo público retorna `downloadUrl: null`.
+Catálogo público retorna `downloadUrl: null` e `downloadAvailable`. O botão do site consulta `GET /api/games/:slug/download`: jogos gratuitos publicados recebem o `download_url` HTTPS cadastrado; jogos pagos exigem sessão e uma nova verificação da posse pelo itch.io. Jogos não publicados ou sem link válido são recusados. Metadados de instalação do launcher continuam no endpoint autenticado `/api/library/:gameId/install-metadata`, com os requisitos de tamanho e hash do instalador.
 
 ## Erros, conteúdo e privacidade
 
@@ -55,3 +55,15 @@ Os testes não substituem o teste de OAuth, entrega de e-mail, ZIP real e pacote
 ## Sincronização de conteúdo — versão 1.3.0
 
 Execute `npm run db:migrate` antes de publicar. A migração `010_content_change_events.sql` amplia a restrição dos eventos para edição e exclusão de jogos, newswire e vídeos. O CRUD emite esses eventos para atualizar site e launcher; somente novas publicações enviam avisos de publicação. As migrações históricas continuam intactas. A classificação principal da Store é selecionada pelo mercado solicitado: DJCTQ/BR, ESRB/US ou PEGI/ES; sem correspondência, retorna `null`.
+
+## Revisão de fluxos e interface — versão 1.5.0
+
+Execute `npm run db:migrate` antes de publicar. A migração `012_remove_news_translations.sql` remove somente o cache de traduções. Posts originais e referências de jogos permanecem intactos. A migração histórica 011 foi preservada para não invalidar checksums de bancos existentes; não é uma dependência ativa da aplicação. Newswire retorna o conteúdo cadastrado, sem tradução automática, credenciais Azure ou chamadas a serviços pagos.
+
+A página `/api/integrations/itch/callback` usa os mesmos `global.css`, `website.css`, fontes e componentes visuais do site. Os arquivos necessários já estão incluídos em `public`. `npm run ui:sync` atualiza essas cópias quando os projetos estão lado a lado; execute novamente após alterar os estilos compartilhados. Carregamento tem estado acessível, timeout, mensagens da API e link para retornar à aba de jogos da conta. Tokens do fragmento são retirados do endereço antes das chamadas e não entram no HTML ou CSS.
+
+`render.yaml` prepara um serviço Starter pago com Node 24, health check `/api/health`, migração antes da publicação, pool limitado e encerramento gracioso. Não foi aplicado ao serviço existente nesta entrega. O plano gratuito suspende o serviço após 15 minutos sem tráfego; código ou health check não garantem eliminar essa suspensão. Aplique as configurações ao serviço existente, preservando `SESSION_SECRET`, `DATA_ENCRYPTION_KEY` e as demais chaves usadas nos dados atuais. Configure todos os provedores necessários conforme `.env.example`. Não gere novas chaves de criptografia para substituir as existentes. Documentação: https://render.com/docs/free e https://render.com/docs/blueprint-spec.
+
+Website e launcher usam `https://api-ust8.onrender.com`. O website acessa HTTP por `/api` no próprio domínio via rewrite da Vercel, e WebSocket diretamente no Render com ticket autenticado. Preserve o callback itch.io registrado: `https://api-ust8.onrender.com/api/integrations/itch/callback`.
+
+Validação inclui migrações, contratos HTTP, acesso pago/gratuito, sanitização, caminhos de retorno e callback com CSS compartilhado. OAuth real e implantação Render não foram executados neste ambiente.

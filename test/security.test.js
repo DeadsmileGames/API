@@ -63,3 +63,9 @@ test('errors use the negotiated locale and never reveal an exception', () => {
  assert.deepEqual(Object.keys(errorCatalog('en')),Object.keys(errorCatalog('pt-BR')));
  assert.deepEqual(Object.keys(errorCatalog('en')),Object.keys(errorCatalog('es')));
 });
+
+test('itch callback return paths preserve account tabs and reject external destinations', async () => {
+ const { connectItchSchema } = await import('../src/validators/itch-integration.validators.js');
+ for (const returnPath of ['/account#games', '/account#security', '/account', '/games/abbys-restless-heart']) assert(connectItchSchema.safeParse({ client: 'site', returnPath }).success);
+ for (const returnPath of ['//evil.test', '/account#javascript:alert(1)', '/account/../evil', '/games/a?redirect=https://evil.test']) assert.equal(connectItchSchema.safeParse({ client: 'site', returnPath }).success, false);
+});

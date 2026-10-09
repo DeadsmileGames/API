@@ -34,8 +34,22 @@ test('existing database migrates without changing historical checksums or losing
     assert.match(saved.payload, /^enc\.v2\./);
     const { decryptSecret } = await import('../src/utils/secretCipher.js');
     assert.equal(decryptSecret(saved.payload, 'save:00000000-0000-4000-8000-000000000001:00000000-0000-4000-8000-000000000002:default'), 'original-save');
-    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 10);
+    assert.equal((await db.query('SELECT count(*) AS count FROM schema_migrations')).rows[0].count, 12);
     await db.query("INSERT INTO content_events(event_type,entity_id) VALUES('game.updated','test'),('news.deleted','test'),('video.updated','test')");
     await assert.rejects(db.query("INSERT INTO content_events(event_type,entity_id) VALUES('unrecognized.event','test')"));
+    assert.equal((await db.query("SELECT to_regclass('public.news_translations') AS name")).rows[0].name, null);
   } finally { await socket.stop(); await db.close(); }
+});
+
+test('removing the translation cache preserves original newswire posts', async () => {
+ const db = await PGlite.create({ extensions: { pg_trgm } });
+ try {
+  await db.exec(await readFile(new URL('../src/database/schema.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../src/database/migrations/011_news_translations.sql', import.meta.url), 'utf8'));
+  const post = (await db.query("INSERT INTO news(title,slug,category,body) VALUES('Original','original-news','Devlog','<p>Original body</p>') RETURNING id")).rows[0];
+  await db.query("INSERT INTO news_translations(news_id,locale,scope,source_hash,payload,expires_at) VALUES($1,'pt-BR','detail',$2,'{}',now())", [post.id, 'a'.repeat(64)]);
+  await db.exec(await readFile(new URL('../src/database/migrations/012_remove_news_translations.sql', import.meta.url), 'utf8'));
+  assert.deepEqual((await db.query('SELECT title,body FROM news WHERE id=$1', [post.id])).rows, [{ title: 'Original', body: '<p>Original body</p>' }]);
+  assert.equal((await db.query("SELECT to_regclass('public.news_translations') AS name")).rows[0].name, null);
+ } finally { await db.close(); }
 });

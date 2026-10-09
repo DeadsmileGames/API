@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: api-ust8
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    preDeployCommand: npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 15
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_POOL_SIZE
+        value: 5
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://deadsmilegames.vercel.app
+      - key: BACKEND_URL
+        value: https://api-ust8.onrender.com
+      - key: COOKIE_SAMESITE
+        value: none

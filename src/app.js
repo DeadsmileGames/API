@@ -9,7 +9,7 @@ import hpp from 'hpp';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from './config/env.js';
-import { pool } from './config/database.js';
+import { pool, directPool } from './config/database.js';
 import { csrfCookie, csrfToken, verifyCsrf } from './middleware/csrf.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { adminBodyLimiter } from './middleware/bodyLimiter.js';
@@ -94,6 +94,11 @@ export function createApp() {
     next();
   });
 
+  app.get('/api/health', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({ status: 'ok', service: 'Deadsmile Games API' });
+  });
+
   app.use(express.static(path.join(__dirname, '../public'), { index: false }));
 
   const allowedOrigins = env.isProduction
@@ -137,10 +142,6 @@ export function createApp() {
   app.get('/api/csrf', csrfToken);
   app.use('/api', verifyCsrf);
 
-  app.get('/api/health', (_req, res) => {
-    res.set('Cache-Control', 'no-store');
-    res.status(200).json({ status: 'ok', service: 'Deadsmile Games API' });
-  });
 
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminBodyLimiter, adminRouter);
@@ -169,10 +170,24 @@ const app = createApp();
 
 const server = createServer(app);
 
-attachRealtimeServer(server);
+const realtime = attachRealtimeServer(server);
 
 if (!process.env.VERCEL) {
   server.listen(env.port);
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    const deadline = setTimeout(() => process.exit(1), 10000);
+    deadline.unref();
+    for (const connection of realtime.clients) connection.close(1001, 'Service restarting');
+    server.close(async () => {
+      try { await Promise.all([pool.end(), ...(directPool !== pool ? [directPool.end()] : [])]); process.exit(0); }
+      catch { process.exit(1); }
+    });
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }
 
 export default server;

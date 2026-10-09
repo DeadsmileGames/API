@@ -66,6 +66,7 @@ export const twoFactorLimiter = databaseLimiter({ scope: 'two-factor', windowMs:
 export const registerLimiter = databaseLimiter({ scope: 'register', windowMs: 60 * 60_000, limit: 10 });
 export const publicWriteLimiter = databaseLimiter({ scope: 'public-write', windowMs: 15 * 60_000, limit: 20 });
 export const integrationLimiter = databaseLimiter({ scope: 'integration', windowMs: 60_000, limit: 20 });
+export const downloadLimiter = databaseLimiter({ scope: 'game-download', windowMs: 60_000, limit: 30 });
 export const forgotPasswordLimiter = databaseLimiter({ scope: 'forgot-password', windowMs: 15 * 60_000, limit: 5 });
 export const resetPasswordLimiter = databaseLimiter({ scope: 'reset-password', windowMs: 15 * 60_000, limit: 5 });
 export const publicEmailLimiter = databaseLimiter({

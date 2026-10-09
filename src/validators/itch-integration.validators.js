@@ -7,7 +7,7 @@ export const connectItchSchema = z.object({
     .string()
     .trim()
     .max(240)
-    .regex(/^\/(?:account|games(?:\/[a-z0-9-]+)?)$/, 'Invalid return path.')
+    .regex(/^\/(?:account(?:#(?:profile|account|privacy|security|games))?|games(?:\/[a-z0-9-]+)?)$/, 'Invalid return path.')
     .optional()
     .nullable(),
 }).strict();

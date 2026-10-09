@@ -115,6 +115,56 @@ test('paid ownership checks all pages, including short pages, and revokes remove
  revoked=true;result=await player.request('/platform/sessions',{method:'POST',body:{gameId:paidId,platform:'windows'}});assert.equal(result.status,403);assert.equal(result.body.error.code,'GAME_ACCESS_REQUIRED');
  const library=await player.request('/library');assert(!library.body.data.items.some(x=>x.id===paidId));revoked=false;
 });
+
+test('website downloads use the database link for free games and recheck paid ownership on itch.io', async () => {
+ await pool.query('UPDATE games SET download_url=$2 WHERE id=ANY($1::uuid[])', [[freeId, paidId], 'https://downloads.example.test/game.zip']);
+ try {
+  const free = await guest.request('/games/free/download');
+  assert.equal(free.status, 200);
+  assert.equal(free.body.data.downloadUrl, 'https://downloads.example.test/game.zip');
+  assert.equal(free.headers.get('cache-control'), 'no-store');
+  const publicPaid = await guest.request('/games/paid');
+  assert.equal(publicPaid.body.data.downloadUrl, null);
+  assert.equal(publicPaid.body.data.downloadAvailable, true);
+  assert.equal((await guest.request('/games/paid/download')).status, 401);
+  assert.equal((await other.request('/games/paid/download')).body.error.code, 'ITCH_NOT_CONNECTED');
+  assert.equal((await player.request('/games/paid/download')).status, 200);
+  revoked = true;
+  const denied = await player.request('/games/paid/download', { language: 'pt-BR' });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.error.code, 'GAME_NOT_OWNED');
+  assert.equal(denied.body.error.locale, 'pt-BR');
+ } finally { revoked = false; await pool.query('UPDATE games SET download_url=null WHERE id=ANY($1::uuid[])', [[freeId, paidId]]); }
+});
+
+test('newswire returns the persisted original in every interface language', async () => {
+ const created = await admin.request('/admin/newsletter', { method: 'POST', body: { title: 'English original', body: '<p>English story.</p>' } });
+ for (const language of ['en', 'pt-BR', 'es']) {
+  const original = await guest.request(`/newswire/${created.body.data.slug}`, { language });
+  assert.equal(original.body.data.title, 'English original');
+  assert.equal(original.body.data.body, '<p>English story.</p>');
+  assert.equal(Object.hasOwn(original.body.data, 'translation'), false);
+ }
+ assert.equal((await pool.query('SELECT body FROM news WHERE id=$1', [created.body.data.id])).rows[0].body, '<p>English story.</p>');
+});
+test('itch callback reuses website CSS and ships bounded accessible connection states', async () => {
+ const origin = new URL(base).origin;
+ const response = await originalFetch(`${base}/integrations/itch/callback`);
+ assert.equal(response.status, 200);
+ assert.equal(response.headers.get('cache-control'), 'no-store');
+ const html = await response.text();
+ assert(html.includes('href="/styles/global.css"'));
+ assert(html.includes('newsletter-action__card'));
+ assert(html.includes('aria-busy="true"'));
+ assert(!html.includes('callback-card'));
+ assert.equal(await (await originalFetch(`${origin}/styles/global.css`)).text(), await readFile(new URL('../public/styles/global.css', import.meta.url), 'utf8'));
+ assert.equal((await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status, 200);
+ const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
+ assert(script.includes('controller.abort()'));
+ assert(script.includes('location.hash.slice(1)'));
+ assert(script.includes('history.replaceState'));
+});
+
 test('CSRF, role checks and malicious payloads fail with localized safe errors',async()=>{
  let result=await guest.request('/admin/game',{method:'POST',csrf:false,body:{}});assert.equal(result.status,403);
  result=await player.request('/admin/game',{method:'POST',body:{},language:'pt-BR'});assert.equal(result.status,403);assert.equal(result.body.error.locale,'pt-BR');assert.match(result.body.error.message,/permissão/);
