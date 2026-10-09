@@ -5,8 +5,8 @@ import { findUserByEmail } from '../repositories/users.repository.js';
 import {
   consumeResetToken,
   createResetToken,
-  deleteExpiredResetTokens,
-} from '../repositories/password-resets.repository.js';
+  deleteExpiredResetTokens } from
+'../repositories/password-resets.repository.js';
 import { sendPasswordResetEmail } from './email.service.js';
 import { env } from '../config/env.js';
 
@@ -37,7 +37,7 @@ export async function requestPasswordReset(email) {
       await sendPasswordResetEmail({
         to: user.email,
         username: user.username,
-        resetUrl,
+        resetUrl
       });
     } catch (error) {
       console.error('Password reset delivery failed', { code: error?.code || null });
@@ -51,13 +51,13 @@ export async function requestPasswordReset(email) {
 
 export async function resetPassword({ token, password }) {
   if (!token || typeof token !== 'string') {
-    throw new AppError(400, 'INVALID_TOKEN', 'Invalid or expired reset link.');
+    throw new AppError(400, 'INVALID_TOKEN');
   }
 
   const passwordHash = await hashPassword(password);
   const consumed = await consumeResetToken({ tokenHash: sha256(token), passwordHash });
   if (!consumed) {
-    throw new AppError(400, 'INVALID_TOKEN', 'Invalid or expired reset link.');
+    throw new AppError(400, 'INVALID_TOKEN');
   }
   return { reset: true };
 }

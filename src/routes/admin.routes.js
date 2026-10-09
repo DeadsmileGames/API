@@ -12,6 +12,7 @@ adminRouter.use(requireAuth, requireRole('admin'));
 
 adminRouter.post('/newsletter',        validate(newsletterPostSchema), controller.newsletter);
 adminRouter.post('/video',             validate(videoPostSchema),      controller.video);
+adminRouter.get('/game/:id', validate(adminIdSchema, 'params'), controller.gameDetails);
 adminRouter.post('/game',              validate(gamePostSchema),       controller.game);
 adminRouter.delete('/newsletter/:id', validate(adminIdSchema, 'params'), controller.deleteNewsletter);
 adminRouter.delete('/video/:id', validate(adminIdSchema, 'params'), controller.deleteVideo);

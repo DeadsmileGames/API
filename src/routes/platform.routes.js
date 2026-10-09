@@ -32,6 +32,7 @@ platformRouter.get('/achievements/:gameId', validate(gameIdSchema, 'params'), co
 platformRouter.post('/achievements/:gameId/:key/unlock', integrationLimiter, validate(achievementSchema, 'params'), expectedAccount, controller.unlock);
 platformRouter.get('/saves/:gameId/:slot', integrationLimiter, validate(saveParamsSchema, 'params'), controller.downloadSave);
 platformRouter.put('/saves/:gameId/:slot', integrationLimiter, validate(saveParamsSchema, 'params'), validate(saveBodySchema), expectedAccount, controller.uploadSave);
+platformRouter.get('/telemetry-consent', controller.getConsent);
 platformRouter.patch('/telemetry-consent', validate(consentSchema), controller.consent);
 platformRouter.post('/telemetry', integrationLimiter, validate(telemetrySchema), controller.telemetry);
 platformRouter.get('/saves/:gameId', integrationLimiter, validate(gameIdSchema, 'params'), controller.saves);

@@ -5,11 +5,7 @@ export async function listNews({ limit = 12, offset = 0 } = {}) {
     `SELECT n.id, n.slug, n.category, n.title, n.excerpt, n.image, n.published_at,
             linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug
      FROM news n
-     LEFT JOIN LATERAL (
-       SELECT g.id, g.title, g.slug FROM games g
-       WHERE g.id = n.game_id OR (n.game_id IS NULL AND lower(n.title) LIKE '%' || lower(g.title) || '%')
-       ORDER BY (g.id = n.game_id) DESC, length(g.title) DESC LIMIT 1
-     ) linked ON true
+     LEFT JOIN games linked ON linked.id = n.game_id
      ORDER BY n.published_at DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
@@ -18,7 +14,8 @@ export async function listNews({ limit = 12, offset = 0 } = {}) {
 }
 
 export async function findNews(slug) {
-  const { rows } = await query('SELECT * FROM news WHERE slug = $1 LIMIT 1', [slug]);
+  const { rows } = await query(`SELECT n.*, g.title AS game_title, g.slug AS game_slug, g.cover_image AS game_cover_image
+     FROM news n LEFT JOIN games g ON g.id = n.game_id WHERE n.slug = $1 LIMIT 1`, [slug]);
   return rows[0] || null;
 }
 

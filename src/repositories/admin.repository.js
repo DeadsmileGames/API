@@ -1,6 +1,8 @@
 import { pool } from '../config/database.js';
+import { parseStoreBadge } from '../utils/storeBadge.js';
+import { sanitizeContent } from '../utils/contentHtml.js';
 
-export async function createNewsletter({ title, excerpt, body, image }) {
+export async function createNewsletter({ title, excerpt, body, image, gameId }) {
   const slugBase = title
     .toLowerCase()
     .trim()
@@ -14,10 +16,10 @@ export async function createNewsletter({ title, excerpt, body, image }) {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO news (slug, category, title, excerpt, body, image)
-       VALUES ($1, 'Newsletter', $2, $3, $4, $5)
-       RETURNING id, slug, category, title, excerpt, body, image, published_at`,
-      [slug, title, excerpt || null, body || '', image || null]
+      `INSERT INTO news (slug, category, title, excerpt, body, image, game_id)
+       VALUES ($1, 'Newsletter', $2, $3, $4, $5, $6)
+       RETURNING id, slug, category, title, excerpt, body, image, game_id, published_at`,
+      [slug, title, excerpt || null, sanitizeContent(body), image || null, gameId || null]
     );
     await client.query('COMMIT');
     return rows[0];
@@ -42,8 +44,9 @@ export async function createVideo({ title, category, thumbnail, videoUrl, durati
 export async function createGame({
   title, slug, shortDescription, description,
   status, releaseDate, heroImage, coverImage, purchaseUrl, downloadUrl, itchGameId,
-  trailerUrl, featured, genres = [], platforms = [],
+  trailerUrl, featured, accessType, itchUrl, microsoftStoreBadge, genres = [], platforms = [],
 }) {
+  const badge = parseStoreBadge(microsoftStoreBadge);
   const client = await pool.connect();
 
   try {
@@ -53,8 +56,8 @@ export async function createGame({
       `INSERT INTO games
         (title, slug, short_description, description, status,
           release_date, hero_image, cover_image, trailer_url, featured,
-          purchase_url, download_url, itch_game_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          purchase_url, download_url, itch_game_id, access_type, itch_url, microsoft_product_id, microsoft_badge_image)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *`,
       [
         title, slug, shortDescription, description || null,
@@ -62,10 +65,12 @@ export async function createGame({
         heroImage || null, coverImage || null,
         trailerUrl || null, !!featured,
         purchaseUrl || null, downloadUrl || null, itchGameId || null,
+        accessType, itchUrl || null, badge?.productId || null, badge?.imageUrl || null,
       ]
     );
 
     const game = gameResult.rows[0];
+    await client.query("INSERT INTO release_channels (game_id, name, label, public) VALUES ($1, 'stable', 'Stable', true) ON CONFLICT (game_id, name) DO NOTHING", [game.id]);
 
     for (const name of genres) {
       const g = await client.query(
@@ -105,23 +110,23 @@ export async function createGame({
 
 export async function updateNews(
     id,
-    { title, excerpt, body, image }
+    { title, excerpt, body, image, gameId }
 ) {
     const { rows } = await pool.query(
         `UPDATE news
          SET title = $2,
              excerpt = $3,
              body = $4,
-             image = $5
+             image = $5, game_id = $6, updated_at = now()
          WHERE id = $1
          RETURNING id, slug, category, title, excerpt,
-                   body, image, published_at`,
+                   body, image, game_id, published_at`,
         [
             id,
             title,
             excerpt || null,
-            body,
-            image || null,
+            sanitizeContent(body),
+            image || null, gameId || null,
         ]
     );
 
@@ -173,13 +178,14 @@ export async function updateGame(
         coverImage,
         purchaseUrl,
         downloadUrl,
-        itchGameId,
+        itchGameId, accessType, itchUrl, microsoftStoreBadge,
         trailerUrl,
         featured,
         genres = [],
         platforms = [],
     }
 ) {
+    const badge = parseStoreBadge(microsoftStoreBadge);
     const client = await pool.connect();
 
     try {
@@ -199,7 +205,8 @@ export async function updateGame(
                  featured = $11,
                  purchase_url = $12,
                  download_url = $13,
-                 itch_game_id = $14
+                 itch_game_id = $14, access_type = $15, itch_url = $16,
+                 microsoft_product_id = $17, microsoft_badge_image = $18, updated_at = now()
              WHERE id = $1
              RETURNING *`,
             [
@@ -216,7 +223,7 @@ export async function updateGame(
                 Boolean(featured),
                 purchaseUrl || null,
                 downloadUrl || null,
-                itchGameId || null,
+                itchGameId || null, accessType, itchUrl || null, badge?.productId || null, badge?.imageUrl || null,
             ]
         );
 

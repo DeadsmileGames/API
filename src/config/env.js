@@ -33,6 +33,9 @@ if (sessionSecret.length < 32) {
   throw new Error('SESSION_SECRET must be at least 32 characters long.');
 }
 
+if (isProduction && !process.env.DATA_ENCRYPTION_KEY) required('DATA_ENCRYPTION_KEY');
+if (process.env.DATA_ENCRYPTION_KEY && process.env.DATA_ENCRYPTION_KEY.length < 32) throw new Error('DATA_ENCRYPTION_KEY must be at least 32 characters.');
+
 const frontendUrl = validAppUrl('FRONTEND_URL', process.env.FRONTEND_URL || 'https://deadsmilegames.vercel.app');
 const backendUrl = validAppUrl('BACKEND_URL', process.env.BACKEND_URL || 'https://deadsmile.vercel.app');
 
@@ -47,12 +50,14 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY,
   notifyEmail: process.env.NOTIFY_EMAIL,
   sessionSecret,
+  dataEncryptionKey: process.env.DATA_ENCRYPTION_KEY || '',
   recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
   cookieSameSite,
   brevoApiKey: process.env.BREVO_API_KEY,
   brevoSenderEmail: process.env.BREVO_SENDER_EMAIL,
   brevoSenderName: process.env.BREVO_SENDER_NAME || 'Deadsmile Games',
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN || '',
+  itchDownloadApiKey: process.env.ITCH_DOWNLOAD_API_KEY || '',
   itchClientId: process.env.ITCH_CLIENT_ID || '',
   itchLauncherClientId: process.env.ITCH_LAUNCHER_CLIENT_ID || '',
   itchTokenEncryptionKey: process.env.ITCH_TOKEN_ENCRYPTION_KEY || '',

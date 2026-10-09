@@ -1,3 +1,4 @@
+import catalog from '../utils/errorCatalog.json' with { type: 'json' };
 import { z } from 'zod';
 
 const uuid = z.string().uuid();
@@ -64,8 +65,8 @@ export const telemetrySchema = z.object({
   sessionId: uuid.optional().nullable(),
   eventType: z.enum(['launcher_crash', 'game_crash', 'install_failed', 'update_failed']),
   appVersion: z.string().trim().max(40).optional().nullable(),
-  payload: z.record(
-    z.string().min(1).max(64),
-    z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]),
-  ).refine((value) => Object.keys(value).length <= 50, 'Telemetry payload has too many fields.').optional().default({}),
+  payload: z.object({
+    code: z.enum(Object.keys(catalog.en)).optional(),
+    platform: z.enum(['windows', 'linux', 'macos']).optional(),
+  }).strict().optional().default({}),
 }).strict();

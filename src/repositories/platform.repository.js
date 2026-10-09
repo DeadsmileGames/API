@@ -21,9 +21,9 @@ export async function createSession({ userId, gameId, launcherVersion, gameVersi
        SELECT $1, g.id, $3, $4, $5 FROM games g
        WHERE g.id = $2
          AND (
-           g.purchase_url IS NULL OR EXISTS (
+           g.access_type = 'free' OR EXISTS (
              SELECT 1 FROM user_game_entitlements e
-             WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL
+             WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL AND e.source = 'itch'
            )
          )
        RETURNING id, game_id, started_at`,
@@ -140,13 +140,13 @@ export async function gameAccess(userId, gameId) {
   const { rows } = await query(
     `SELECT g.id, g.cloud_saves_enabled, g.telemetry_enabled,
             CASE
-              WHEN g.purchase_url IS NULL THEN true
+              WHEN g.access_type = 'free' THEN true
               ELSE EXISTS (
                 SELECT 1
                 FROM user_game_entitlements e
                 WHERE e.user_id = $1
                   AND e.game_id = g.id
-                  AND e.revoked_at IS NULL
+                  AND e.revoked_at IS NULL AND e.source = 'itch'
               )
             END AS allowed
      FROM games g
@@ -185,9 +185,9 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
        WHERE user_id = $1 AND game_id = $2 AND slot = $3 AND revision = $6::bigint
          AND EXISTS (
            SELECT 1 FROM games g WHERE g.id = $2 AND g.cloud_saves_enabled
-             AND (g.purchase_url IS NULL OR EXISTS (
+             AND (g.access_type = 'free' OR EXISTS (
                SELECT 1 FROM user_game_entitlements e
-               WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL
+               WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL AND e.source = 'itch'
              ))
          )
        RETURNING slot, revision, sha256, updated_at`,
@@ -200,9 +200,9 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
      SELECT $1, g.id, $3, $4, $5 FROM games g
      WHERE g.id = $2 AND g.cloud_saves_enabled
        AND (
-         g.purchase_url IS NULL OR EXISTS (
+         g.access_type = 'free' OR EXISTS (
            SELECT 1 FROM user_game_entitlements e
-           WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL
+           WHERE e.user_id = $1 AND e.game_id = g.id AND e.revoked_at IS NULL AND e.source = 'itch'
          )
        )
      ON CONFLICT (user_id, game_id, slot) DO NOTHING
@@ -213,12 +213,15 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
 }
 
 export async function setTelemetryConsent(userId, enabled) {
-  const { rows } = await query(
-    `UPDATE users SET telemetry_consent = $2, updated_at = now()
-     WHERE id = $1 RETURNING telemetry_consent`,
-    [userId, enabled]
-  );
-  return rows[0] || null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('UPDATE users SET telemetry_consent = $2, updated_at = now() WHERE id = $1', [userId, enabled]);
+    if (!enabled) await client.query('DELETE FROM telemetry_events WHERE user_id = $1', [userId]);
+    await client.query('COMMIT');
+    return { enabled };
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function getTelemetryConsent(userId) {
@@ -229,33 +232,40 @@ export async function getTelemetryConsent(userId) {
 export async function telemetryContext(userId, gameId, sessionId) {
   if (sessionId) {
     const { rows } = await query(
-      `SELECT game_id FROM game_sessions WHERE id = $1 AND user_id = $2`,
+      `SELECT s.game_id, g.telemetry_enabled FROM game_sessions s JOIN games g ON g.id = s.game_id WHERE s.id = $1 AND s.user_id = $2`,
       [sessionId, userId],
     );
     const session = rows[0];
     if (!session) return null;
     if (gameId && String(session.game_id) !== String(gameId)) return null;
-    return { gameId: gameId || session.game_id, sessionId };
+    return { gameId: gameId || session.game_id, sessionId, enabled: session.telemetry_enabled !== false };
   }
   if (gameId) {
     const access = await gameAccess(userId, gameId);
     if (!access?.allowed) return null;
-    return { gameId, sessionId: null };
+    return { gameId, sessionId: null, enabled: access.telemetry_enabled !== false };
   }
-  return { gameId: null, sessionId: null };
+  return { gameId: null, sessionId: null, enabled: true };
 }
 
 export async function insertTelemetry({ userId, gameId, sessionId, eventType, appVersion, payload }) {
-  const { rows } = await query(
-    `INSERT INTO telemetry_events (user_id, game_id, session_id, event_type, app_version, payload)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, created_at`,
-    [userId, gameId || null, sessionId || null, eventType, appVersion || null, payload],
-  );
-  if (Math.random() < 0.01) {
-    query(`DELETE FROM telemetry_events WHERE created_at < now() - interval '30 days'`).catch(() => {});
-  }
-  return rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const consent = await client.query('SELECT telemetry_consent FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    let event = null;
+    if (consent.rows[0]?.telemetry_consent) {
+      const { rows } = await client.query(
+        `INSERT INTO telemetry_events (user_id, game_id, session_id, event_type, app_version, payload)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
+        [userId, gameId || null, sessionId || null, eventType, appVersion || null, payload]);
+      event = rows[0];
+    }
+    await client.query('COMMIT');
+    if (Math.random() < 0.01) query("DELETE FROM telemetry_events WHERE created_at < now() - interval '30 days'").catch(() => {});
+    return event;
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function statusSnapshot() {

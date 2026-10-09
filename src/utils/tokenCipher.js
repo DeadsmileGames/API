@@ -4,7 +4,7 @@ import { AppError } from './AppError.js';
 
 function key() {
   if (env.itchTokenEncryptionKey.length < 32) {
-    throw new AppError(503, 'ITCH_NOT_CONFIGURED', 'itch.io connection is temporarily unavailable.');
+    throw new AppError(503, 'ITCH_NOT_CONFIGURED');
   }
   return crypto.scryptSync(env.itchTokenEncryptionKey, 'deadsmile-itch-oauth-v1', 32);
 }
@@ -24,6 +24,6 @@ export function decryptToken(value) {
     decipher.setAuthTag(Buffer.from(tag, 'base64url'));
     return Buffer.concat([decipher.update(Buffer.from(encrypted, 'base64url')), decipher.final()]).toString('utf8');
   } catch {
-    throw new AppError(503, 'ITCH_RECONNECT_REQUIRED', 'Reconnect your itch.io account to continue.');
+    throw new AppError(503, 'ITCH_RECONNECT_REQUIRED');
   }
 }

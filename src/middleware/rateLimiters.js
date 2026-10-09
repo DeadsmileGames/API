@@ -6,14 +6,14 @@ import { env } from '../config/env.js';
 import { sendError } from '../utils/apiResponse.js';
 
 function rateLimitHandler(_req, res) {
-  return sendError(res, 429, 'RATE_LIMITED', 'Too many requests. Please slow down and try again shortly.');
+  return sendError(res, 429, 'RATE_LIMITED');
 }
 
 function requestIp(req) {
   if (process.env.VERCEL) {
-    const forwarded = String(req.get('x-vercel-forwarded-for') || req.get('x-forwarded-for') || '')
-      .split(',')[0]
-      .trim();
+    const forwarded = String(req.get('x-vercel-forwarded-for') || req.get('x-forwarded-for') || '').
+    split(',')[0].
+    trim();
     if (net.isIP(forwarded)) return forwarded;
   }
   const direct = String(req.ip || req.socket?.remoteAddress || '').trim();
@@ -39,7 +39,7 @@ function databaseLimiter({ scope, windowMs, limit }) {
            hits = api_rate_limits.hits + 1,
            expires_at = EXCLUDED.expires_at
          RETURNING hits`,
-        [scope, keyHash(req), windowStart, expiresAt],
+        [scope, keyHash(req), windowStart, expiresAt]
       );
       const hits = Number(rows[0]?.hits || 1);
       const remaining = Math.max(0, limit - hits);
@@ -71,7 +71,7 @@ export const resetPasswordLimiter = databaseLimiter({ scope: 'reset-password', w
 export const publicEmailLimiter = databaseLimiter({
   scope: 'account-email',
   windowMs: 15 * 60_000,
-  limit: 6,
+  limit: 6
 });
 
 export const searchLimiter = rateLimit({
@@ -79,5 +79,5 @@ export const searchLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: rateLimitHandler,
+  handler: rateLimitHandler
 });

@@ -1,3 +1,4 @@
+import { encryptStoredData } from './encrypt-data.js';
 import crypto from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -82,6 +83,7 @@ try {
       throw error;
     }
   }
+  await encryptStoredData(client);
 } finally {
   if (locked) {
     try {

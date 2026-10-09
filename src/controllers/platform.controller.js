@@ -26,3 +26,4 @@ export const saves = asyncHandler(async (req, res) => {
 export const deleteSave = asyncHandler(async (req, res) =>
   sendSuccess(res, await service.deleteSave(req.session.userId, req.params.gameId, req.params.slot))
 );
+export const getConsent = asyncHandler(async (req, res) => sendSuccess(res, await service.getConsent(req.session.userId)));

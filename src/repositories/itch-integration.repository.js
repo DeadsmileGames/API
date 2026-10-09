@@ -69,9 +69,9 @@ export async function removeItchAccount(userId) {
 
 export async function listItchGames() {
   const { rows } = await query(
-    `SELECT id, title, slug, purchase_url, download_url, itch_game_id
+    `SELECT *
      FROM games
-     WHERE itch_game_id IS NOT NULL AND purchase_url IS NOT NULL
+     WHERE itch_game_id IS NOT NULL AND access_type = 'paid'
      ORDER BY created_at ASC`
   );
   return rows;
@@ -79,7 +79,7 @@ export async function listItchGames() {
 
 export async function findItchGame(gameId) {
   const { rows } = await query(
-    `SELECT id, title, slug, purchase_url, download_url, itch_game_id
+    `SELECT *
      FROM games
      WHERE id = $1`,
     [gameId]
@@ -105,17 +105,18 @@ export async function findPreferredItchChannel(userId, gameId) {
   return rows[0]?.itch_channel || null;
 }
 
-export async function grantEntitlement({ userId, gameId, externalReference, acquiredAt }) {
+export async function grantEntitlement({ userId, gameId, externalReference, acquiredAt, source = 'itch' }) {
   await query(
     `INSERT INTO user_game_entitlements
        (user_id, game_id, source, external_reference, acquired_at, last_verified_at, revoked_at)
-     VALUES ($1, $2, 'itch', $3, COALESCE($4, now()), now(), NULL)
+     VALUES ($1, $2, $5, $3, COALESCE($4, now()), now(), NULL)
      ON CONFLICT (user_id, game_id) DO UPDATE SET
+       source = EXCLUDED.source,
        external_reference = EXCLUDED.external_reference,
        acquired_at = LEAST(user_game_entitlements.acquired_at, EXCLUDED.acquired_at),
        last_verified_at = now(),
        revoked_at = NULL`,
-    [userId, gameId, externalReference, acquiredAt]
+    [userId, gameId, externalReference || null, acquiredAt || null, source]
   );
 }
 
@@ -134,6 +135,8 @@ export async function listEntitlements(userId) {
        e.acquired_at, e.last_verified_at,
        g.id, g.title, g.slug, g.short_description, g.status, g.release_date,
        g.hero_image, g.cover_image, g.trailer_url, g.purchase_url, g.download_url,
+       g.access_type, g.itch_url, g.microsoft_product_id, g.microsoft_badge_image,
+       EXISTS (SELECT 1 FROM game_builds b WHERE b.game_id = g.id AND b.status = 'published') AS has_build,
        g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled, g.itch_game_id,
        COALESCE(genre_agg.genres, '{}') AS genres,
        COALESCE(platform_agg.platforms, '{}') AS platforms
@@ -147,9 +150,20 @@ export async function listEntitlements(userId) {
        SELECT gp.game_id, array_agg(pl.name ORDER BY pl.name) AS platforms
        FROM game_platforms gp JOIN platforms pl ON pl.id = gp.platform_id GROUP BY gp.game_id
      ) platform_agg ON platform_agg.game_id = g.id
-     WHERE e.user_id = $1 AND e.revoked_at IS NULL
+     WHERE e.user_id = $1 AND e.revoked_at IS NULL AND (g.access_type = 'free' OR e.source = 'itch')
      ORDER BY e.acquired_at DESC`,
     [userId]
   );
   return rows;
+}
+
+export async function findInstallBuild(userId, gameId) {
+  const { rows } = await query(`SELECT b.* FROM game_builds b
+    JOIN release_channels c ON c.id = b.channel_id AND c.game_id = b.game_id
+    WHERE b.game_id = $2 AND b.status = 'published' AND b.platform = 'windows' AND b.architecture = 'x64'
+      AND ((c.name = 'stable' AND c.public) OR EXISTS (
+        SELECT 1 FROM beta_access a WHERE a.user_id = $1 AND a.game_id = b.game_id
+        AND a.channel_id = c.id AND (a.expires_at IS NULL OR a.expires_at > now())))
+    ORDER BY (c.name <> 'stable') DESC, b.published_at DESC NULLS LAST LIMIT 1`, [userId, gameId]);
+  return rows[0] || null;
 }

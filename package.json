@@ -1,14 +1,18 @@
 {
   "name": "deadsmile-games-backend",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/app.js",
     "start": "node src/app.js",
     "db:migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seed-admin.js",
-    "db:check-abby": "node scripts/check-abby-integration.js"
+    "db:check-abby": "node scripts/check-abby-integration.js",
+    "test": "node --test test/*.test.js",
+    "errors:sync": "node scripts/sync-error-catalog.js",
+    "db:bootstrap": "node scripts/bootstrap.js",
+    "db:encrypt": "node scripts/encrypt-data.js"
   },
   "dependencies": {
     "@getbrevo/brevo": "^6.0.3",
@@ -26,6 +30,7 @@
     "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "resend": "^6.26.0",
+    "sanitize-html": "^2.18.0",
     "speakeasy": "^2.0.0",
     "ws": "^8.21.3",
     "zod": "^3.25.76"
@@ -34,6 +39,11 @@
     "qs": "6.16.0"
   },
   "engines": {
-    "node": "24.x"
-  }
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11"
+  },
+  "license": "UNLICENSED"
 }

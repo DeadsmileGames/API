@@ -1,3 +1,4 @@
+import { resolveLocale } from '../utils/publicErrors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import {
@@ -44,6 +45,7 @@ const callbackPage = `
     </div>
   </main>
 
+<script src="/error-catalog.js" defer></script>
 <script src="/itch-callback.js" defer></script>
 </body>
 </html>
@@ -64,7 +66,7 @@ export const connect = asyncHandler(async (req, res) => {
 });
 
 export const complete = asyncHandler(async (req, res) => {
-  sendSuccess(res, await completeItchConnection(req.body));
+  sendSuccess(res, await completeItchConnection(req.body, (locale) => { res.locals.locale = resolveLocale(locale); res.set('Content-Language', res.locals.locale); }));
 });
 
 export const disconnect = asyncHandler(async (req, res) => {

@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import { getGithubGameDownload } from './github-game-releases.service.js';
+import { toClientGame } from '../utils/clientGame.js';
+import { storeBadgeFromRow } from '../utils/storeBadge.js';
+import { getFreeItchDownload } from './free-itch.service.js';
 import { AppError } from '../utils/AppError.js';
 import { decryptToken, encryptToken } from '../utils/tokenCipher.js';
 import {
@@ -8,7 +11,8 @@ import {
   createOAuthState,
   findItchAccount,
   findItchGame,
-  findPreferredItchChannel,
+  findInstallBuild,
+
   grantEntitlement,
   listEntitlements,
   listItchGames,
@@ -16,8 +20,8 @@ import {
   removeItchAccount,
   revokeEntitlement,
   touchItchAccount,
-  upsertItchAccount,
-} from '../repositories/itch-integration.repository.js';
+  upsertItchAccount } from
+'../repositories/itch-integration.repository.js';
 
 const API_ROOT = 'https://api.itch.io';
 
@@ -27,7 +31,7 @@ function configured() {
 
 function requireConfigured() {
   if (!configured()) {
-    throw new AppError(503, 'ITCH_NOT_CONFIGURED', 'itch.io connection is temporarily unavailable.');
+    throw new AppError(503, 'ITCH_NOT_CONFIGURED');
   }
 }
 
@@ -39,8 +43,8 @@ async function itchRequest(path, token, params, { method = 'GET' } = {}) {
   const url = new URL(`${API_ROOT}${path}`);
   const body = new URLSearchParams();
   for (const [key, value] of Object.entries(params || {})) {
-    if (method === 'GET') url.searchParams.set(key, String(value));
-    else body.set(key, String(value));
+    if (method === 'GET') url.searchParams.set(key, String(value));else
+    body.set(key, String(value));
   }
   let response;
   try {
@@ -49,19 +53,19 @@ async function itchRequest(path, token, params, { method = 'GET' } = {}) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' }),
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' })
       },
       ...(method === 'GET' ? {} : { body }),
-      signal: AbortSignal.timeout(10_000),
+      redirect: 'error', signal: AbortSignal.timeout(10_000)
     });
   } catch {
-    throw new AppError(503, 'ITCH_UNAVAILABLE', 'itch.io could not be reached. Try again shortly.');
+    throw new AppError(503, 'ITCH_UNAVAILABLE');
   }
   const data = await response.json().catch(() => null);
-  if (!data || !response.ok || (Array.isArray(data.errors) && data.errors.length > 0)) {
+  if (!data || !response.ok || Array.isArray(data.errors) && data.errors.length > 0) {
     const expired = response.status === 401 || response.status === 403;
-    throw new AppError(expired ? 409 : 503, expired ? 'ITCH_RECONNECT_REQUIRED' : 'ITCH_UNAVAILABLE',
-      expired ? 'Reconnect your itch.io account to continue.' : 'itch.io could not complete the request. Try again shortly.');
+    throw new AppError(expired ? 409 : 503, expired ? 'ITCH_RECONNECT_REQUIRED' : 'ITCH_UNAVAILABLE'
+    );
   }
   return data;
 }
@@ -73,30 +77,28 @@ async function ownedKeysFor(account) {
   for (let page = 1; page <= 200; page += 1) {
     const data = await itchRequest('/profile/owned-keys', token, { page });
     if (!Array.isArray(data.owned_keys)) {
-      throw new AppError(503, 'ITCH_LIBRARY_INVALID', 'itch.io returned an invalid library response.');
+      throw new AppError(503, 'ITCH_LIBRARY_INVALID');
     }
     const pageKeys = data.owned_keys;
     if (pageKeys.length === 0) return keys;
     const pageIdentity = pageKeys.map((item) => String(item?.id || '')).join(',');
     if (seenPages.has(pageIdentity)) {
-      throw new AppError(503, 'ITCH_LIBRARY_INVALID', 'itch.io returned repeated library pages.');
+      throw new AppError(503, 'ITCH_LIBRARY_INVALID');
     }
     seenPages.add(pageIdentity);
     keys.push(...pageKeys);
-    const perPage = Number(data.per_page);
-    if (Number.isSafeInteger(perPage) && perPage > 0 && pageKeys.length < perPage) return keys;
   }
-  throw new AppError(503, 'ITCH_LIBRARY_TOO_LARGE', 'itch.io library pagination did not finish.');
+  throw new AppError(503, 'ITCH_LIBRARY_TOO_LARGE');
 }
 
 function ownershipFor(game, keys) {
   const match = keys.find((item) =>
-    String(item?.game_id || item?.game?.id || '') === String(game.itch_game_id)
-    && item?.id != null
+  String(item?.game_id || item?.game?.id || '') === String(game.itch_game_id) &&
+  item?.id != null
   );
-  return match
-    ? { owned: true, reference: String(match.id), acquiredAt: match.created_at || null }
-    : { owned: false };
+  return match ?
+  { owned: true, reference: String(match.id), acquiredAt: match.created_at || null } :
+  { owned: false };
 }
 
 function publicAccount(account) {
@@ -109,32 +111,7 @@ function publicAccount(account) {
     profileUrl: account.itch_profile_url,
     connectedAt: account.connected_at,
     verifiedAt: account.verified_at,
-    lastSyncAt: account.last_sync_at,
-  };
-}
-
-function clientGame(row) {
-  return {
-    id: row.id,
-    title: row.title,
-    slug: row.slug,
-    shortDescription: row.short_description,
-    status: row.status,
-    releaseDate: row.release_date,
-    heroImage: row.hero_image,
-    coverImage: row.cover_image,
-    trailerUrl: row.trailer_url,
-    purchaseUrl: row.purchase_url,
-    downloadUrl: row.itch_game_id && row.purchase_url ? null : row.download_url,
-    itchGameId: row.itch_game_id ? Number(row.itch_game_id) : null,
-    engine: row.engine || 'native',
-    savePathTemplate: row.save_path_template || null,
-    cloudSavesEnabled: Boolean(row.cloud_saves_enabled),
-    telemetryEnabled: row.telemetry_enabled !== false,
-    genres: row.genres || [],
-    platforms: row.platforms || [],
-    acquiredAt: row.acquired_at,
-    lastVerifiedAt: row.last_verified_at,
+    lastSyncAt: account.last_sync_at
   };
 }
 
@@ -151,7 +128,7 @@ export async function beginItchConnection(userId, { client, locale, returnPath }
     client,
     locale,
     returnPath: client === 'site' ? returnPath || '/account' : null,
-    expiresAt: new Date(Date.now() + 10 * 60 * 1_000),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1_000)
   });
   const url = new URL('https://itch.io/user/oauth');
   url.searchParams.set('client_id', env.itchClientId);
@@ -162,22 +139,23 @@ export async function beginItchConnection(userId, { client, locale, returnPath }
   return { authorizeUrl: url.toString(), expiresIn: 600 };
 }
 
-export async function completeItchConnection({ state, accessToken }) {
+export async function completeItchConnection({ state, accessToken }, setLocale = () => {}) {
   requireConfigured();
   const flow = await consumeOAuthState(stateHash(state));
-  if (!flow) throw new AppError(400, 'ITCH_LINK_EXPIRED', 'This connection request expired. Start again.');
+  if (!flow) throw new AppError(400, 'ITCH_LINK_EXPIRED');
+  setLocale(flow.locale);
   const [credentials, profile] = await Promise.all([
-    itchRequest('/credentials/info', accessToken),
-    itchRequest('/profile', accessToken),
-  ]);
+  itchRequest('/credentials/info', accessToken),
+  itchRequest('/profile', accessToken)]
+  );
   const scopes = new Set(credentials.scopes || []);
   const hasProfile = scopes.has('profile');
-  if ((!hasProfile && !scopes.has('profile:me')) || (!hasProfile && !scopes.has('profile:owned'))) {
-    throw new AppError(400, 'ITCH_SCOPE_MISSING', 'Required itch.io access was not granted.');
+  if (!hasProfile && !scopes.has('profile:me') || !hasProfile && !scopes.has('profile:owned')) {
+    throw new AppError(400, 'ITCH_SCOPE_MISSING');
   }
   const itchUser = profile.user;
   if (!itchUser?.id || !itchUser?.username) {
-    throw new AppError(400, 'ITCH_PROFILE_INVALID', 'The itch.io account could not be verified.');
+    throw new AppError(400, 'ITCH_PROFILE_INVALID');
   }
   try {
     await upsertItchAccount({
@@ -185,11 +163,11 @@ export async function completeItchConnection({ state, accessToken }) {
       itchUserId: itchUser.id,
       username: itchUser.username,
       profileUrl: itchUser.url || null,
-      encryptedToken: encryptToken(accessToken),
+      encryptedToken: encryptToken(accessToken)
     });
   } catch (error) {
     if (error?.code === '23505') {
-      throw new AppError(409, 'ITCH_ACCOUNT_IN_USE', 'This itch.io account is already connected to another Deadsmile Games account.');
+      throw new AppError(409, 'ITCH_ACCOUNT_IN_USE');
     }
     throw error;
   }
@@ -201,7 +179,7 @@ export async function completeItchConnection({ state, accessToken }) {
   return {
     client: flow.client,
     locale: flow.locale,
-    returnUrl: flow.client === 'site' ? `${env.frontendUrl}${flow.return_path}` : null,
+    returnUrl: flow.client === 'site' ? `${env.frontendUrl}${flow.return_path}` : null
   };
 }
 
@@ -211,37 +189,28 @@ export async function disconnectItch(userId) {
 }
 
 export async function verifyGameOwnership(userId, gameId) {
+  const game = await findItchGame(gameId);
+  if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
+  if (game.status !== 'released') throw new AppError(409, 'GAME_NOT_RELEASED');
+  if (game.access_type === 'free') {
+    await grantEntitlement({ userId, gameId, source: 'free' });
+    return { owned: true, status: 'owned', accessType: 'free', gameId };
+  }
   requireConfigured();
-  const [account, game] = await Promise.all([findItchAccount(userId), findItchGame(gameId)]);
-  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED', 'Connect your itch.io account to continue.');
-  if (!game) throw new AppError(404, 'GAME_NOT_FOUND', 'That game could not be found.');
-  if (!game.itch_game_id || !game.purchase_url) {
-    throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED', 'This game is not ready for itch.io ownership checks yet.');
-  }
+  const account = await findItchAccount(userId);
+  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED');
+  if (!game.itch_game_id || !game.purchase_url) throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED');
   const result = ownershipFor(game, await ownedKeysFor(account));
-  if (result.owned) {
-    await grantEntitlement({
-      userId,
-      gameId: game.id,
-      externalReference: result.reference,
-      acquiredAt: result.acquiredAt,
-    });
-  } else {
-    await revokeEntitlement(userId, game.id);
-  }
+  if (result.owned) await grantEntitlement({ userId, gameId, externalReference: result.reference, acquiredAt: result.acquiredAt });else
+  await revokeEntitlement(userId, gameId);
   await touchItchAccount(userId);
-  return {
-    owned: result.owned,
-    status: result.owned ? 'owned' : 'not_owned',
-    gameId: game.id,
-    purchaseUrl: game.purchase_url,
-  };
+  return { owned: result.owned, status: result.owned ? 'owned' : 'not_owned', gameId, purchaseUrl: game.purchase_url };
 }
 
 export async function syncItchLibrary(userId) {
   requireConfigured();
   const account = await findItchAccount(userId);
-  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED', 'Connect your itch.io account to continue.');
+  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED');
   const games = await listItchGames();
   const results = [];
   const keys = await ownedKeysFor(account);
@@ -252,7 +221,7 @@ export async function syncItchLibrary(userId) {
         userId,
         gameId: game.id,
         externalReference: result.reference,
-        acquiredAt: result.acquiredAt,
+        acquiredAt: result.acquiredAt
       });
     } else {
       await revokeEntitlement(userId, game.id);
@@ -264,41 +233,22 @@ export async function syncItchLibrary(userId) {
 }
 
 export async function getLibrary(userId) {
-  return { items: (await listEntitlements(userId)).map(clientGame) };
+  return { items: (await listEntitlements(userId)).map((row) => ({ ...toClientGame(row), acquiredAt: row.acquired_at, lastVerifiedAt: row.last_verified_at })) };
 }
 
 export async function getInstallMetadata(userId, gameId) {
-  requireConfigured();
-  const [account, game, preferredItchChannel] = await Promise.all([
-    findItchAccount(userId),
-    findItchGame(gameId),
-    findPreferredItchChannel(userId, gameId),
-  ]);
-  if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED', 'Connect your itch.io account to continue.');
-  if (!game) throw new AppError(404, 'GAME_NOT_FOUND', 'That game could not be found.');
-  if (!game.itch_game_id || !game.purchase_url) {
-    throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED', 'This game is not ready for itch.io downloads yet.');
+  const game = await findItchGame(gameId);
+  if (!game) throw new AppError(404, 'GAME_NOT_FOUND');
+  const ownership = await verifyGameOwnership(userId, gameId);
+  if (!ownership.owned) throw new AppError(403, 'GAME_NOT_OWNED');
+  const build = await findInstallBuild(userId, gameId);
+  if (build?.download_url) {
+    return { delivery: 'archive', downloadUrl: build.download_url, filename: new URL(build.download_url).pathname.split('/').pop(),
+      sha256: build.sha256, sizeBytes: Number(build.size_bytes), version: build.version };
   }
-  const ownership = ownershipFor(game, await ownedKeysFor(account));
-  if (!ownership.owned) {
-    await revokeEntitlement(userId, game.id);
-    throw new AppError(403, 'GAME_NOT_OWNED', 'This game is not available in your library.');
-  }
-  await grantEntitlement({
-    userId,
-    gameId: game.id,
-    externalReference: ownership.reference,
-    acquiredAt: ownership.acquiredAt,
-  });
-  await touchItchAccount(userId);
-  const itchGameId = Number(game.itch_game_id);
-  if (!Number.isSafeInteger(itchGameId) || itchGameId <= 0) {
-    throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED', 'This game does not have a valid itch.io game ID.');
-  }
-  return {
-    itchGameId,
-    preferredItchChannel: preferredItchChannel || null,
-    itchUserId: Number(account.itch_user_id),
-    ...(await getGithubGameDownload(game)),
-  };
+  if (game.download_url) return { delivery: 'archive', ...(await getGithubGameDownload(game)) };
+  if (game.access_type === 'free' && game.itch_game_id) return getFreeItchDownload(game, build?.itch_channel);
+  const badge = storeBadgeFromRow(game);
+  if (game.access_type === 'free' && badge) return { delivery: 'microsoft-store', storeUrl: badge.href };
+  throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
 }

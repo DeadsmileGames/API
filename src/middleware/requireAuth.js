@@ -5,7 +5,7 @@ export async function requireAuth(req, res, next) {
   res.set('Cache-Control', 'private, no-store');
   const userId = req.session?.userId;
   if (!userId) {
-    return sendError(res, 401, 'UNAUTHENTICATED', 'You must be signed in to do that.');
+    return sendError(res, 401, 'UNAUTHENTICATED');
   }
 
   try {
@@ -13,12 +13,12 @@ export async function requireAuth(req, res, next) {
       `SELECT id, role, email_verified_at
       FROM users
       WHERE id = $1`,
-      [userId],
+      [userId]
     );
     const user = rows[0];
     if (!user) {
       req.session.destroy(() => {});
-      return sendError(res, 401, 'UNAUTHENTICATED', 'You must be signed in to do that.');
+      return sendError(res, 401, 'UNAUTHENTICATED');
     }
     if (!user.email_verified_at) {
       req.session.destroy(() => {});
@@ -26,8 +26,8 @@ export async function requireAuth(req, res, next) {
       return sendError(
         res,
         403,
-        'EMAIL_NOT_VERIFIED',
-        'Confirm your email before accessing your account.',
+        'EMAIL_NOT_VERIFIED'
+
       );
     }
     req.auth = { userId: user.id, role: user.role };
@@ -35,24 +35,24 @@ export async function requireAuth(req, res, next) {
       const previousDevice = req.session.device;
 
       await new Promise((resolve, reject) => {
-          req.session.regenerate((error) => {
-              if (error) {
-                  reject(error);
-              } else {
-                  resolve();
-              }
-          });
+        req.session.regenerate((error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
       });
 
       req.session.userId = user.id;
       req.session.role = user.role;
 
       if (previousDevice) {
-          req.session.device = previousDevice;
+        req.session.device = previousDevice;
       }
-  } else if (req.session.role !== user.role) {
+    } else if (req.session.role !== user.role) {
       req.session.role = user.role;
-  }
+    }
     return next();
   } catch (error) {
     return next(error);
@@ -62,10 +62,10 @@ export async function requireAuth(req, res, next) {
 export function requireRole(role) {
   return (req, res, next) => {
     if (!req.auth?.userId) {
-      return sendError(res, 401, 'UNAUTHENTICATED', 'You must be signed in to do that.');
+      return sendError(res, 401, 'UNAUTHENTICATED');
     }
     if (req.auth.role !== role) {
-      return sendError(res, 403, 'FORBIDDEN', 'You do not have permission to do that.');
+      return sendError(res, 403, 'FORBIDDEN');
     }
     return next();
   };

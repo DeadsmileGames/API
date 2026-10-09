@@ -15,7 +15,7 @@ function publicationView(type, item) {
   const preview = item.excerpt || item.short_description || item.shortDescription || item.description || '';
   const sourceImage = item.image || item.thumbnail || item.cover_image || item.coverImage || null;
   const image = sourceImage ? safeAbsoluteUrl(sourceImage, env.frontendUrl) : null;
-  const path = type === 'game' ? `/games/${item.slug}` : type === 'news' ? `/news/${item.slug}` : `/?video=${encodeURIComponent(id)}#videos`;
+  const path = type === 'game' ? `/games/${item.slug}` : type === 'news' ? `/newswire/${item.slug}` : `/?video=${encodeURIComponent(id)}#videos`;
   return {
     id,
     title,

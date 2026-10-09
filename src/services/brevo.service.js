@@ -2,70 +2,70 @@ import { BrevoClient } from '@getbrevo/brevo';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 
-const brevo = env.brevoApiKey
-  ? new BrevoClient({
-      apiKey: env.brevoApiKey,
-      timeoutInSeconds: 15,
-      maxRetries: 2,
-    })
-  : null;
+const brevo = env.brevoApiKey ?
+new BrevoClient({
+  apiKey: env.brevoApiKey,
+  timeoutInSeconds: 15,
+  maxRetries: 2
+}) :
+null;
 
 export async function sendTransactionalEmail({
   to,
   subject,
   text,
-  html,
+  html
 }) {
   if (!brevo) {
     throw new AppError(
       500,
-      'EMAIL_NOT_CONFIGURED',
-      'Email service is temporarily unavailable.',
+      'EMAIL_NOT_CONFIGURED'
+
     );
   }
 
   if (!env.brevoSenderEmail) {
     throw new AppError(
       500,
-      'EMAIL_NOT_CONFIGURED',
-      'Email service is temporarily unavailable.',
+      'EMAIL_NOT_CONFIGURED'
+
     );
   }
 
   if (!to) {
     throw new AppError(
       500,
-      'EMAIL_INVALID_RECIPIENT',
-      'Email recipient is invalid.',
+      'EMAIL_INVALID_RECIPIENT'
+
     );
   }
 
   try {
     const result =
-      await brevo.transactionalEmails.sendTransacEmail({
-        subject,
-        textContent: text,
-        htmlContent: html,
-        sender: {
-          name: env.brevoSenderName,
-          email: env.brevoSenderEmail,
-        },
-        to: [
-          {
-            email: to,
-          },
-        ],
-      });
+    await brevo.transactionalEmails.sendTransacEmail({
+      subject,
+      textContent: text,
+      htmlContent: html,
+      sender: {
+        name: env.brevoSenderName,
+        email: env.brevoSenderEmail
+      },
+      to: [
+      {
+        email: to
+      }]
+
+    });
 
     return {
       sent: true,
-      messageId: result?.messageId ?? null,
+      messageId: result?.messageId ?? null
     };
   } catch {
     throw new AppError(
       502,
-      'EMAIL_SEND_FAILED',
-      'Unable to send the email right now. Please try again later.',
+      'EMAIL_SEND_FAILED'
+
     );
   }
 }

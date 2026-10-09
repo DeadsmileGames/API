@@ -7,24 +7,24 @@ import { verifyPassword } from '../utils/password.js';
 
 import {
   findUserByEmail,
-  findUserById,
-} from '../repositories/users.repository.js';
+  findUserById } from
+'../repositories/users.repository.js';
 
 import {
   createPendingEmailToken,
   deleteUnsentToken,
-  confirmEmailToken,
-} from '../repositories/account-email.repository.js';
+  confirmEmailToken } from
+'../repositories/account-email.repository.js';
 
 import { sendTransactionalEmail } from './brevo.service.js';
 import { escapeHtml } from '../utils/html.js';
 
 const sha256 = (value) =>
-  crypto.createHash('sha256').update(value).digest('hex');
+crypto.createHash('sha256').update(value).digest('hex');
 async function deliverConfirmation({
   userId,
   purpose,
-  email,
+  email
 }) {
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = sha256(token);
@@ -34,23 +34,23 @@ async function deliverConfirmation({
     purpose,
     email,
     hash: tokenHash,
-    expiresAt: new Date(Date.now() + 30 * 60_000),
+    expiresAt: new Date(Date.now() + 30 * 60_000)
   });
 
   if (!saved) {
     throw new AppError(
       429,
-      'EMAIL_CONFIRMATION_COOLDOWN',
-      'Please wait one minute before requesting another confirmation email.',
+      'EMAIL_CONFIRMATION_COOLDOWN'
+
     );
   }
 
   const url =
-    `${env.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  `${env.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
-  const label = purpose === 'change'
-    ? 'Confirm your new email address'
-    : 'Confirm your account email';
+  const label = purpose === 'change' ?
+  'Confirm your new email address' :
+  'Confirm your account email';
 
   try {
     await sendTransactionalEmail({
@@ -59,9 +59,9 @@ async function deliverConfirmation({
       subject: `${label} — Deadsmile Games`,
 
       text:
-        `${label}:\n\n${url}\n\n` +
-        'This link expires in 30 minutes and can only be used once. ' +
-        'If you did not request it, ignore this email.',
+      `${label}:\n\n${url}\n\n` +
+      'This link expires in 30 minutes and can only be used once. ' +
+      'If you did not request it, ignore this email.',
 
       html: `
         <div style="
@@ -97,7 +97,7 @@ async function deliverConfirmation({
             If you did not request this, ignore this message.
           </p>
         </div>
-      `,
+      `
     });
   } catch (error) {
     await deleteUnsentToken(userId, tokenHash);
@@ -108,12 +108,12 @@ export async function sendRegistrationEmail(user) {
   await deliverConfirmation({
     userId: user.id,
     purpose: 'register',
-    email: user.email,
+    email: user.email
   });
 }
 export async function resendRegistrationEmail({
   email,
-  password,
+  password
 }) {
   const user = await findUserByEmail(email);
 
@@ -123,7 +123,7 @@ export async function resendRegistrationEmail({
 
   const valid = await verifyPassword(
     user.password_hash,
-    password,
+    password
   );
 
   if (!valid || user.email_verified_at) {
@@ -135,47 +135,47 @@ export async function resendRegistrationEmail({
   return { sent: true };
 }
 export async function requestEmailChange(
-  userId,
-  { email, password },
-) {
+userId,
+{ email, password })
+{
   const user = await findUserById(userId);
 
   if (!user) {
     throw new AppError(
       404,
-      'USER_NOT_FOUND',
-      'Account not found.',
+      'USER_NOT_FOUND'
+
     );
   }
 
   if (!user.email_verified_at) {
     throw new AppError(
       403,
-      'EMAIL_NOT_VERIFIED',
-      'Confirm your current email before changing it.',
+      'EMAIL_NOT_VERIFIED'
+
     );
   }
 
   if (email === user.email) {
     throw new AppError(
       400,
-      'EMAIL_UNCHANGED',
-      'Enter a different email address.',
+      'EMAIL_UNCHANGED'
+
     );
   }
   const { rows } = await query(
     'SELECT password_hash FROM users WHERE id = $1',
-    [userId],
+    [userId]
   );
 
   if (
-    !rows[0] ||
-    !await verifyPassword(rows[0].password_hash, password)
-  ) {
+  !rows[0] ||
+  !(await verifyPassword(rows[0].password_hash, password)))
+  {
     throw new AppError(
       401,
-      'INVALID_PASSWORD',
-      'Current password is incorrect.',
+      'INVALID_PASSWORD'
+
     );
   }
 
@@ -184,26 +184,26 @@ export async function requestEmailChange(
   if (existing) {
     throw new AppError(
       409,
-      'EMAIL_TAKEN',
-      'That email is already registered.',
+      'EMAIL_TAKEN'
+
     );
   }
   await deliverConfirmation({
     userId,
     purpose: 'change',
-    email,
+    email
   });
   await sendTransactionalEmail({
     to: user.email,
     subject: 'Email change requested — Deadsmile Games',
 
     text:
-      `A request was made to change your Deadsmile Games ` +
-      `account email to ${email}.\n\n` +
-      `Your current email remains unchanged until the ` +
-      `new address is confirmed.\n\n` +
-      `If this was not you, change your password ` +
-      `and contact support.`,
+    `A request was made to change your Deadsmile Games ` +
+    `account email to ${email}.\n\n` +
+    `Your current email remains unchanged until the ` +
+    `new address is confirmed.\n\n` +
+    `If this was not you, change your password ` +
+    `and contact support.`,
 
     html: `
       <p>
@@ -219,10 +219,10 @@ export async function requestEmailChange(
         If this was not you, change your password
         and contact support.
       </p>
-    `,
+    `
   }).catch((error) => {
     console.error('Old-address notification failed', {
-      code: error?.code || null,
+      code: error?.code || null
     });
   });
 
@@ -234,8 +234,8 @@ export async function confirmAccountEmail(rawToken) {
   if (!result || result.conflict) {
     throw new AppError(
       400,
-      'EMAIL_CONFIRMATION_INVALID',
-      'This email confirmation link is invalid or expired.',
+      'EMAIL_CONFIRMATION_INVALID'
+
     );
   }
 
@@ -246,10 +246,10 @@ export async function confirmAccountEmail(rawToken) {
       subject: 'Your account email was changed — Deadsmile Games',
 
       text:
-        `Your Deadsmile Games account email was changed ` +
-        `to ${result.newEmail}.\n\n` +
-        `If this was not you, contact support immediately ` +
-        `and reset your password.`,
+      `Your Deadsmile Games account email was changed ` +
+      `to ${result.newEmail}.\n\n` +
+      `If this was not you, contact support immediately ` +
+      `and reset your password.`,
 
       html: `
         <p>
@@ -261,16 +261,16 @@ export async function confirmAccountEmail(rawToken) {
           If this was not you, contact support immediately
           and reset your password.
         </p>
-      `,
+      `
     }).catch((error) => {
       console.error('Email change notification failed', {
-        code: error?.code || null,
+        code: error?.code || null
       });
     });
   }
 
   return {
     verified: true,
-    emailChanged: result.purpose === 'change',
+    emailChanged: result.purpose === 'change'
   };
 }

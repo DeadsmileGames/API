@@ -1,4 +1,5 @@
 import express from 'express';
+import { errorCatalog, resolveLocale } from './utils/publicErrors.js';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -62,6 +63,13 @@ function sessionCookieOptions() {
 
 export function createApp() {
   const app = express();
+  app.use((req, res, next) => {
+    res.locals.locale = resolveLocale(req.get('Accept-Language'));
+    res.set('Content-Language', res.locals.locale);
+    res.vary('Accept-Language');
+    if (req.path.startsWith('/api')) res.set('Cache-Control', 'no-store');
+    next();
+  });
   app.disable('x-powered-by');
   app.set('query parser', 'simple');
   if (env.isProduction) app.set('trust proxy', 1);
@@ -89,12 +97,12 @@ export function createApp() {
 
   const allowedOrigins = env.isProduction
     ? [env.frontendUrl]
-    : [env.frontendUrl, 'http://localhost:5173', 'http://localhost:8081'];
+    : [env.frontendUrl, 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174', 'http://localhost:8081'];
   const corsOptions = {
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Accept-Language'],
     maxAge: 600,
   };
   app.options('*', cors(corsOptions));
@@ -107,7 +115,7 @@ export function createApp() {
     return standardJson(req, res, next);
   });
 
-  app.use(cookieParser());
+  app.use(cookieParser(env.sessionSecret));
   app.use(csrfCookie);
   app.use(session({
     store: new PgSession({
@@ -124,6 +132,7 @@ export function createApp() {
     cookie: sessionCookieOptions(),
   }));
 
+  app.get('/api/errors', (_req, res) => res.json({ success: true, data: { locale: res.locals.locale, messages: errorCatalog(res.locals.locale) } }));
   app.get('/api/csrf', csrfToken);
   app.use('/api', verifyCsrf);
 
@@ -139,6 +148,7 @@ export function createApp() {
   app.use('/api/account', accountRouter);
   app.use('/api/newsletter', newsletterRouter);
   app.use('/api/support', supportRouter);
+  app.use('/api/newswire', newsRouter);
   app.use('/api/news', newsRouter);
   app.use('/api/videos', videosRouter);
   app.use('/api/downloads', downloadsRouter);

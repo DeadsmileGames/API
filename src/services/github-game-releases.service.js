@@ -5,7 +5,7 @@ function configuration() {
   const repository = String(env.githubGameRepository || '').trim();
   const token = String(env.githubGameToken || '').trim();
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || !token) {
-    throw new AppError(503, 'GITHUB_GAMES_NOT_CONFIGURED', 'Game downloads are not configured yet.');
+    throw new AppError(503, 'GITHUB_GAMES_NOT_CONFIGURED');
   }
   return { repository, token };
 }
@@ -15,13 +15,13 @@ function releaseAssetFromGame(game, repository) {
   try {
     url = new URL(game.download_url);
   } catch {
-    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED', 'The game needs a GitHub Release download URL.');
+    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
   }
   const segments = url.pathname.split('/').filter(Boolean);
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password
-    || url.search || url.hash || segments.length !== 6 || segments[2] !== 'releases'
-    || segments[3] !== 'download' || `${segments[0]}/${segments[1]}`.toLowerCase() !== repository.toLowerCase()) {
-    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED', 'The game release URL does not match the configured private repository.');
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password ||
+  url.search || url.hash || segments.length !== 6 || segments[2] !== 'releases' ||
+  segments[3] !== 'download' || `${segments[0]}/${segments[1]}`.toLowerCase() !== repository.toLowerCase()) {
+    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
   }
   let tag;
   let filename;
@@ -29,11 +29,11 @@ function releaseAssetFromGame(game, repository) {
     tag = decodeURIComponent(segments[4]);
     filename = decodeURIComponent(segments[5]);
   } catch {
-    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED', 'The game release URL is invalid.');
+    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
   }
-  if (!tag || tag.length > 150 || !/^[A-Za-z0-9._/-]+$/.test(tag)
-    || !filename || filename.length > 255 || !/^[A-Za-z0-9._ -]+\.zip$/i.test(filename)) {
-    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED', 'The game must refer to a valid ZIP asset in a release.');
+  if (!tag || tag.length > 150 || !/^[A-Za-z0-9._/-]+$/.test(tag) ||
+  !filename || filename.length > 255 || !/^[A-Za-z0-9._ -]+\.zip$/i.test(filename)) {
+    throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
   }
   return { tag, filename };
 }
@@ -48,20 +48,20 @@ async function githubFetch(url, token, accept) {
         Authorization: `Bearer ${token}`,
         Accept: accept,
         'User-Agent': 'Deadsmile-Games-API',
-        'X-GitHub-Api-Version': '2022-11-28',
+        'X-GitHub-Api-Version': '2022-11-28'
       },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(12_000)
     });
   } catch {
-    throw new AppError(503, 'GITHUB_UNAVAILABLE', 'GitHub could not be reached. Try again later.');
+    throw new AppError(503, 'GITHUB_UNAVAILABLE');
   }
   if (response.status === 401 || response.status === 403) {
     await response.body?.cancel().catch(() => {});
-    throw new AppError(503, 'GITHUB_GAMES_ACCESS_DENIED', 'The game repository is not accessible to the server.');
+    throw new AppError(503, 'GITHUB_GAMES_ACCESS_DENIED');
   }
   if (response.status === 404) {
     await response.body?.cancel().catch(() => {});
-    throw new AppError(409, 'GAME_RELEASE_NOT_FOUND', 'The selected game release was not found.');
+    throw new AppError(409, 'GAME_RELEASE_NOT_FOUND');
   }
   return response;
 }
@@ -81,11 +81,11 @@ function compareReleaseVersions(left, right) {
 }
 
 function validZipAsset(asset) {
-  return asset && asset.state === 'uploaded'
-    && typeof asset.name === 'string' && /^[A-Za-z0-9._ -]+\.zip$/i.test(asset.name)
-    && Number.isSafeInteger(asset.id)
-    && Number.isSafeInteger(asset.size)
-    && asset.size > 0 && asset.size <= 2 * 1024 * 1024 * 1024;
+  return asset && asset.state === 'uploaded' &&
+  typeof asset.name === 'string' && /^[A-Za-z0-9._ -]+\.zip$/i.test(asset.name) &&
+  Number.isSafeInteger(asset.id) &&
+  Number.isSafeInteger(asset.size) &&
+  asset.size > 0 && asset.size <= 2 * 1024 * 1024 * 1024;
 }
 
 function zipAssetForRelease(release, preferredFilename) {
@@ -104,10 +104,10 @@ async function latestGameRelease(repoApi, token, tag, filename) {
     const response = await githubFetch(`${repoApi}/releases?per_page=100&page=${page}`, token, 'application/vnd.github+json');
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      throw new AppError(503, 'GITHUB_UNAVAILABLE', 'GitHub could not list game releases.');
+      throw new AppError(503, 'GITHUB_UNAVAILABLE');
     }
     const releases = await response.json().catch(() => null);
-    if (!Array.isArray(releases)) throw new AppError(503, 'GITHUB_UNAVAILABLE', 'GitHub returned invalid release data.');
+    if (!Array.isArray(releases)) throw new AppError(503, 'GITHUB_UNAVAILABLE');
     for (const release of releases) {
       if (!release || release.draft || release.prerelease || typeof release.tag_name !== 'string') continue;
       const candidateTag = release.tag_name;
@@ -136,30 +136,30 @@ export async function getGithubGameDownload(game) {
     const releaseResponse = await githubFetch(`${repoApi}/releases/tags/${encodeURIComponent(tag)}`, token, 'application/vnd.github+json');
     if (!releaseResponse.ok) {
       await releaseResponse.body?.cancel().catch(() => {});
-      throw new AppError(503, 'GITHUB_UNAVAILABLE', 'GitHub could not locate the game release.');
+      throw new AppError(503, 'GITHUB_UNAVAILABLE');
     }
     release = await releaseResponse.json().catch(() => null);
-    if (release?.draft || release?.prerelease) throw new AppError(409, 'GAME_RELEASE_NOT_FOUND', 'The selected game release is not published.');
+    if (release?.draft || release?.prerelease) throw new AppError(409, 'GAME_RELEASE_NOT_FOUND');
     asset = release?.assets?.find((item) => item.name === filename && validZipAsset(item));
   }
   if (!asset) {
-    throw new AppError(409, 'GAME_ASSET_UNAVAILABLE', 'The selected game ZIP is missing or has an invalid size.');
+    throw new AppError(409, 'GAME_ASSET_UNAVAILABLE');
   }
   const assetResponse = await githubFetch(`${repoApi}/releases/assets/${asset.id}`, token, 'application/octet-stream');
   if (assetResponse.status !== 302) {
     await assetResponse.body?.cancel().catch(() => {});
-    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE', 'GitHub did not provide a direct download link for this private release.');
+    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE');
   }
   const location = assetResponse.headers.get('location');
   let download;
   try {
     download = new URL(location);
   } catch {
-    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE', 'GitHub did not provide a valid download link.');
+    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE');
   }
-  if (download.protocol !== 'https:' || download.username || download.password
-    || !(download.hostname === 'githubusercontent.com' || download.hostname.endsWith('.githubusercontent.com'))) {
-    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE', 'GitHub returned an unexpected download destination.');
+  if (download.protocol !== 'https:' || download.username || download.password ||
+  !(download.hostname === 'githubusercontent.com' || download.hostname.endsWith('.githubusercontent.com'))) {
+    throw new AppError(503, 'GITHUB_REDIRECT_UNAVAILABLE');
   }
   const digest = String(asset.digest || '');
   const version = releaseVersion(release?.tag_name || tag);
@@ -168,6 +168,6 @@ export async function getGithubGameDownload(game) {
     filename: asset.name,
     sizeBytes: asset.size,
     sha256: /^sha256:[0-9a-f]{64}$/i.test(digest) ? digest.slice(7).toLowerCase() : null,
-    version,
+    version
   };
 }

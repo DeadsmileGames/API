@@ -47,11 +47,12 @@ export async function updateLastLogin(userId) {
 
 export async function upsertAdminUser({ username, email, passwordHash }) {
   const { rows } = await query(
-    `INSERT INTO users (username, email, password_hash, role)
-     VALUES ($1, $2, $3, 'admin')
+    `INSERT INTO users (username, email, password_hash, role, email_verified_at)
+     VALUES ($1, $2, $3, 'admin', now())
      ON CONFLICT (email) DO UPDATE
        SET password_hash = EXCLUDED.password_hash,
-           role          = 'admin'
+           role          = 'admin',
+           email_verified_at = COALESCE(users.email_verified_at, now())
      RETURNING id, email, username, role`,
     [username, email, passwordHash]
   );

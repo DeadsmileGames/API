@@ -15,16 +15,15 @@ function parseDatabaseUrl(value, name) {
   }
 }
 
-function sslConfig(url) {
-  const isLocal = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-  const hasSslOptions = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert'].some((key) => url.searchParams.has(key));
-  return !isLocal && !hasSslOptions ? true : undefined;
-}
 
 function poolConfig(connectionString, applicationName, max) {
   const url = parseDatabaseUrl(connectionString, applicationName);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (!local) {
+    for (const option of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) url.searchParams.delete(option);
+  }
   const config = {
-    connectionString,
+    connectionString: url.toString(),
     max,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
@@ -34,8 +33,7 @@ function poolConfig(connectionString, applicationName, max) {
     application_name: applicationName,
     keepAlive: true,
   };
-  const ssl = sslConfig(url);
-  if (ssl) config.ssl = ssl;
+  if (!local) config.ssl = { rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA ? { ca: process.env.DATABASE_SSL_CA } : {}) };
   return config;
 }
 

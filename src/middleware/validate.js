@@ -4,7 +4,7 @@ export function validate(schema, source = 'body') {
   return (req, res, next) => {
     const result = schema.safeParse(req[source]);
     if (!result.success) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'Check the fields and try again.');
+      return sendError(res, 400, 'VALIDATION_ERROR');
     }
     req[source] = result.data;
     next();

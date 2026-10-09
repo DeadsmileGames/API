@@ -33,7 +33,7 @@ export async function subscribe(email) {
   const confirmationToken = crypto.randomBytes(32).toString('hex');
   const subscriber = await repository.upsertNewsletterSubscriber({
     email: normalized,
-    confirmationTokenHash: hash(confirmationToken),
+    confirmationTokenHash: hash(confirmationToken)
   });
 
   if (subscriber.confirmed_at && !subscriber.unsubscribed_at) return { received: true };
@@ -44,22 +44,22 @@ export async function subscribe(email) {
     to: normalized,
     subject: 'Confirm your Deadsmile Games newsletter',
     text: `Confirm your Deadsmile Games newsletter:\n\n${confirmationUrl}\n\nIf you did not request this, ignore this message.`,
-    html,
+    html
   });
   return { received: true };
 }
 
 export async function confirm(token) {
   const subscriber = await repository.confirmNewsletter(hash(token));
-  if (!subscriber) throw new AppError(400, 'NEWSLETTER_LINK_INVALID', 'This confirmation link is invalid or has already been used.');
+  if (!subscriber) throw new AppError(400, 'NEWSLETTER_LINK_INVALID');
   return { confirmed: true };
 }
 
 export async function unsubscribe(token) {
   const subscriberId = parseUnsubscribeToken(token);
-  const subscriber = subscriberId
-    ? await repository.unsubscribeNewsletterById(subscriberId)
-    : await repository.unsubscribeNewsletterLegacy(token);
-  if (!subscriber) throw new AppError(400, 'NEWSLETTER_LINK_INVALID', 'This unsubscribe link is invalid or has already been used.');
+  const subscriber = subscriberId ?
+  await repository.unsubscribeNewsletterById(subscriberId) :
+  await repository.unsubscribeNewsletterLegacy(token);
+  if (!subscriber) throw new AppError(400, 'NEWSLETTER_LINK_INVALID');
   return { unsubscribed: true };
 }

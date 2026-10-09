@@ -4,7 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import * as repository from '../repositories/admin-platform.repository.js';
 
 function requiredResult(value, code, message) {
-  if (!value) throw new AppError(400, code, message);
+  if (!value) throw new AppError(400, code);
   return value;
 }
 

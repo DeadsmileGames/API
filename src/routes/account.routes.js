@@ -10,12 +10,12 @@ import { sendError } from '../utils/apiResponse.js';
 import { twoFactorLimiter, publicEmailLimiter } from '../middleware/rateLimiters.js';
 import {
   changeEmailSchema,
-  privacySchema,
-} from '../validators/account-email.validators.js';
+  privacySchema } from
+'../validators/account-email.validators.js';
 import {
-    listSessions,
-    revokeSession,
-} from "../controllers/sessions.controller.js";
+  listSessions,
+  revokeSession } from
+"../controllers/sessions.controller.js";
 
 function trustedFrontendOrigin(req, res, next) {
   const origin = req.get('origin');
@@ -29,7 +29,7 @@ function trustedFrontendOrigin(req, res, next) {
     }
   }
   if (origin === env.frontendUrl || refererOrigin === env.frontendUrl) return next();
-  return sendError(res, 403, 'TRUSTED_ORIGIN_REQUIRED', 'Use the authenticated application to perform this action.');
+  return sendError(res, 403, 'TRUSTED_ORIGIN_REQUIRED');
 }
 
 export const accountRouter = Router();
@@ -39,35 +39,35 @@ accountRouter.post(
   requireAuth,
   publicEmailLimiter,
   validate(changeEmailSchema),
-  changeEmail,
+  changeEmail
 );
 accountRouter.get(
   '/privacy',
   requireAuth,
-  privacy,
+  privacy
 );
 
 accountRouter.put(
   '/privacy',
   requireAuth,
   validate(privacySchema),
-  changePrivacy,
+  changePrivacy
 );
 accountRouter.get(
-    "/sessions",
-    requireAuth,
-    listSessions
+  "/sessions",
+  requireAuth,
+  listSessions
 );
 
 accountRouter.delete(
-    "/sessions/:deviceId",
-    requireAuth,
-    revokeSession
+  "/sessions/:deviceId",
+  requireAuth,
+  revokeSession
 );
 accountRouter.get('/profile/:username', validate(publicProfileSchema, 'params'), publicProfile);
-accountRouter.get('/',                  requireAuth,                           show);
-accountRouter.patch('/',                requireAuth, validate(updateAccountSchema), update);
-accountRouter.delete('/',               requireAuth, validate(deleteAccountSchema), remove);
+accountRouter.get('/', requireAuth, show);
+accountRouter.patch('/', requireAuth, validate(updateAccountSchema), update);
+accountRouter.delete('/', requireAuth, validate(deleteAccountSchema), remove);
 accountRouter.get('/totp/status', requireAuth, totpController.status);
 accountRouter.get('/totp/setup', requireAuth, trustedFrontendOrigin, totpController.setup);
 accountRouter.post('/totp/setup', requireAuth, twoFactorLimiter, totpController.setup);

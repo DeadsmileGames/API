@@ -8,45 +8,45 @@ import { publicAchievements, publicActivity } from '../repositories/platform.rep
 
 export async function getAccount(userId) {
   const user = await findUserById(userId);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Account not found.');
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND');
   return sanitizeUser(user);
 }
 
 export async function updateAccount(userId, payload) {
   const current = await findUserById(userId);
-  if (!current) throw new AppError(404, 'USER_NOT_FOUND', 'Account not found.');
+  if (!current) throw new AppError(404, 'USER_NOT_FOUND');
 
   if (payload.username && payload.username !== current.username) {
     const existing = await findUserByUsername(payload.username);
     if (existing && existing.id !== userId) {
-      throw new AppError(409, 'USERNAME_TAKEN', 'That username is already taken.');
+      throw new AppError(409, 'USERNAME_TAKEN');
     }
   }
 
-if (payload.email && payload.email !== current.email) {
-  throw new AppError(
-    400,
-    'EMAIL_CHANGE_REQUIRES_VERIFICATION',
-    'Change your email through the email verification form.',
-  );
-}
+  if (payload.email && payload.email !== current.email) {
+    throw new AppError(
+      400,
+      'EMAIL_CHANGE_REQUIRES_VERIFICATION'
+
+    );
+  }
 
   const updated = await updateProfile(userId, {
-    username: payload.username?.toLowerCase()
-      || current.username,
+    username: payload.username?.toLowerCase() ||
+    current.username,
 
     email: current.email,
 
     bio: payload.bio ?? current.bio,
 
     websiteUrl:
-      payload.websiteUrl ?? current.website_url,
+    payload.websiteUrl ?? current.website_url,
 
     location:
-      payload.location ?? current.location,
+    payload.location ?? current.location,
 
     avatarUrl:
-      payload.avatarUrl ?? current.avatar_url,
+    payload.avatarUrl ?? current.avatar_url
   });
 
   return getAccount(userId);
@@ -54,21 +54,21 @@ if (payload.email && payload.email !== current.email) {
 
 export async function getPublicProfile(username) {
   const user = await findPublicProfile(username);
-  if (!user) throw new AppError(404, 'PROFILE_NOT_FOUND', 'Profile not found.');
+  if (!user) throw new AppError(404, 'PROFILE_NOT_FOUND');
 
   const [recentGames, achievements] = await Promise.all([
-    publicActivity(user.id),
-    publicAchievements(user.id),
-  ]);
+  publicActivity(user.id),
+  publicAchievements(user.id)]
+  );
 
   return {
-    id:         user.id,
-    username:   user.username.toLowerCase(),
-    avatarUrl:  user.avatar_url  || null,
-    bio:        user.bio         || '',
+    id: user.id,
+    username: user.username.toLowerCase(),
+    avatarUrl: user.avatar_url || null,
+    bio: user.bio || '',
     websiteUrl: user.website_url || null,
-    location:   user.location    || null,
-    createdAt:  user.created_at,
+    location: user.location || null,
+    createdAt: user.created_at,
     recentGames: recentGames.map((item) => ({
       id: item.id,
       title: item.title,
@@ -76,15 +76,15 @@ export async function getPublicProfile(username) {
       coverImage: item.cover_image,
       heroImage: item.hero_image,
       purchaseUrl: item.purchase_url,
-      totalMs: user.share_playtime
-      ? Number(item.total_ms)
-      : null,
+      totalMs: user.share_playtime ?
+      Number(item.total_ms) :
+      null,
 
-    sessions: user.share_playtime
-      ? item.sessions
-      : null,
+      sessions: user.share_playtime ?
+      item.sessions :
+      null,
       lastPlayedAt: item.last_played_at,
-      screenshots: item.screenshots.map((shot) => shot.url),
+      screenshots: item.screenshots.map((shot) => shot.url)
     })),
     achievements: achievements.map((item) => ({
       key: item.key,
@@ -94,8 +94,8 @@ export async function getPublicProfile(username) {
       points: item.points,
       unlockedAt: item.unlocked_at,
       gameTitle: item.game_title,
-      gameSlug: item.game_slug,
-    })),
+      gameSlug: item.game_slug
+    }))
   };
 }
 
@@ -105,15 +105,16 @@ export async function deleteAccount(userId, password) {
     [userId]
   );
   const user = rows[0];
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Account not found.');
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND');
 
   const valid = await verifyPassword(user.password_hash, password);
-  if (!valid) throw new AppError(401, 'INVALID_PASSWORD', 'Current password is incorrect.');
+  if (!valid) throw new AppError(401, 'INVALID_PASSWORD');
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(`DELETE FROM user_sessions WHERE sess->>'userId' = $1`, [String(userId)]);
+    await client.query('DELETE FROM telemetry_events WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM users WHERE id = $1', [userId]);
     await client.query('COMMIT');
   } catch (error) {
@@ -129,30 +130,30 @@ export async function getPrivacy(userId) {
   if (!user) {
     throw new AppError(
       404,
-      'USER_NOT_FOUND',
-      'Account not found.',
+      'USER_NOT_FOUND'
+
     );
   }
 
   return {
     shareGameActivity: Boolean(
-      user.share_game_activity,
+      user.share_game_activity
     ),
 
     sharePlaytime: Boolean(
-      user.share_playtime,
+      user.share_playtime
     ),
 
     shareAchievements: Boolean(
-      user.share_achievements,
-    ),
+      user.share_achievements
+    )
   };
 }
 
 export async function setPrivacy(
-  userId,
-  privacy,
-) {
+userId,
+privacy)
+{
   const client = await pool.connect();
 
   try {
@@ -167,18 +168,18 @@ export async function setPrivacy(
        WHERE id = $1
        RETURNING id`,
       [
-        userId,
-        privacy.shareGameActivity,
-        privacy.sharePlaytime,
-        privacy.shareAchievements,
-      ],
+      userId,
+      privacy.shareGameActivity,
+      privacy.sharePlaytime,
+      privacy.shareAchievements]
+
     );
 
     if (!updated.rows.length) {
       throw new AppError(
         404,
-        'USER_NOT_FOUND',
-        'Account not found.',
+        'USER_NOT_FOUND'
+
       );
     }
 
@@ -187,9 +188,9 @@ export async function setPrivacy(
        SET public = $2
        WHERE user_id = $1`,
       [
-        userId,
-        privacy.shareGameActivity,
-      ],
+      userId,
+      privacy.shareGameActivity]
+
     );
 
     await client.query('COMMIT');

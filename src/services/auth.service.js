@@ -5,30 +5,30 @@ import {
   findUserByEmail,
   findUserById,
   findUserByUsername,
-  updateLastLogin,
-} from "../repositories/users.repository.js";
+  updateLastLogin } from
+"../repositories/users.repository.js";
 import { findTotpByUserId } from "../repositories/totp.repository.js";
 import { sendRegistrationEmail } from "./account-email.service.js";
 
-const INVALID_CREDENTIALS = "Invalid email or password.";
+
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
 export async function registerUser({ username, email, password }) {
   const [existingEmail, existingUsername] = await Promise.all([
-    findUserByEmail(email),
-    findUserByUsername(username),
-  ]);
+  findUserByEmail(email),
+  findUserByUsername(username)]
+  );
 
   if (existingEmail) {
-    throw new AppError(409, "EMAIL_TAKEN", "That email is already registered.");
+    throw new AppError(409, "EMAIL_TAKEN");
   }
 
   if (existingUsername) {
     throw new AppError(
       409,
-      "USERNAME_TAKEN",
-      "That username is already taken.",
+      "USERNAME_TAKEN"
+
     );
   }
 
@@ -37,13 +37,13 @@ export async function registerUser({ username, email, password }) {
   const user = await createUser({
     username,
     email,
-    passwordHash,
+    passwordHash
   });
 
   await sendRegistrationEmail(user);
 
   return {
-    verificationRequired: true,
+    verificationRequired: true
   };
 }
 
@@ -53,34 +53,26 @@ export async function authenticateUser({ email, password }) {
   if (!user) {
     const decoyHash = await decoyHashPromise;
     await verifyPassword(decoyHash, password).catch(() => {});
-    throw new AppError(401, "INVALID_CREDENTIALS", INVALID_CREDENTIALS);
+    throw new AppError(401, "INVALID_CREDENTIALS");
   }
-  if (!user.email_verified_at) {
-    throw new AppError(
-      403,
-      'EMAIL_NOT_VERIFIED',
-      'Confirm your email before signing in.',
-    );
-  }
-
- const valid = await verifyPassword(
+  const valid = await verifyPassword(
     user.password_hash,
-    password,
+    password
   );
 
   if (!valid) {
     throw new AppError(
       401,
-      'INVALID_CREDENTIALS',
-      INVALID_CREDENTIALS,
+      'INVALID_CREDENTIALS'
+
     );
   }
 
   if (!user.email_verified_at) {
     throw new AppError(
       403,
-      'EMAIL_NOT_VERIFIED',
-      'Confirm your email before signing in.',
+      'EMAIL_NOT_VERIFIED'
+
     );
   }
 
@@ -96,7 +88,8 @@ export async function authenticateUser({ email, password }) {
 
 export async function completeTwoFactorLogin(userId) {
   const user = await findUserById(userId);
-  if (!user) throw new AppError(404, "USER_NOT_FOUND", "Account not found.");
+  if (!user) throw new AppError(404, "USER_NOT_FOUND");
+  if (!user.email_verified_at) throw new AppError(403, 'EMAIL_NOT_VERIFIED');
 
   await updateLastLogin(userId);
   const updatedUser = await findUserById(userId);
@@ -119,6 +112,6 @@ export function sanitizeUser(user) {
     location: user.location || null,
     createdAt: user.created_at,
     updatedAt: user.updated_at,
-    lastLoginAt: user.last_login_at,
+    lastLoginAt: user.last_login_at
   };
 }
