@@ -67,3 +67,7 @@ A página `/api/integrations/itch/callback` usa os mesmos `global.css`, `website
 Website e launcher usam `https://api-ust8.onrender.com`. O website acessa HTTP por `/api` no próprio domínio via rewrite da Vercel, e WebSocket diretamente no Render com ticket autenticado. Preserve o callback itch.io registrado: `https://api-ust8.onrender.com/api/integrations/itch/callback`.
 
 Validação inclui migrações, contratos HTTP, acesso pago/gratuito, sanitização, caminhos de retorno e callback com CSS compartilhado. OAuth real e implantação Render não foram executados neste ambiente.
+
+## Estilos — versão 1.5.1
+
+O CSS público foi sincronizado com o website da mesma entrega. A atualização de layout de `/launcher` não altera rotas, lógica de negócio, dados ou migrações da API. A última migração continua sendo 012.
