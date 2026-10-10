@@ -254,8 +254,8 @@ export async function getInstallMetadata(userId, gameId) {
   if (!game.download_url) throw new AppError(409, 'GAME_RELEASE_NOT_CONFIGURED');
   await addGameToLibrary(userId, gameId);
   const build = await findInstallBuild(userId, gameId);
-  if (build?.download_url) {
-    return { delivery: 'archive', downloadUrl: build.download_url, filename: new URL(build.download_url).pathname.split('/').pop(),
+  if (build?.download_url === game.download_url) {
+    return { delivery: 'archive', downloadUrl: game.download_url, filename: new URL(game.download_url).pathname.split('/').pop(),
       sha256: build.sha256, sizeBytes: Number(build.size_bytes), version: build.version };
   }
   return { delivery: 'archive', ...(await getGithubGameDownload(game)) };

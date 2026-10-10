@@ -330,3 +330,43 @@ test('free website download registers library membership and disconnecting itch 
   assert((await other.request('/library')).body.data.items.some((game) => game.id === msId));
  } finally { await pool.query('UPDATE games SET download_url=null WHERE id=$1', [msId]); }
 });
+
+test('two-factor login persists the session on the first valid code and consumes the challenge once', async () => {
+ const { default: speakeasy } = await import('speakeasy');
+ const secret = 'JBSWY3DPEHPK3PXP';
+ await pool.query('INSERT INTO user_totp(user_id,secret,enabled) VALUES($1,$2,true)', [otherId, secret]);
+ const challenge = client();
+ try {
+  const login = await challenge.request('/auth/mobile-login', { method: 'POST', body: { email: 'other@example.test', password: 'TestPassword123!' } });
+  assert.equal(login.status, 200); assert.equal(login.body.data.requiresTwoFactor, true);
+  assert.equal((await challenge.request('/auth/me')).status, 401);
+  const token = speakeasy.totp({ secret, encoding: 'base32' });
+  const verified = await challenge.request('/auth/verify-2fa', { method: 'POST', body: { token } });
+  assert.equal(verified.status, 200); assert.equal(verified.body.data.id, otherId);
+  assert.equal((await challenge.request('/auth/me')).status, 200);
+  const repeat = await challenge.request('/auth/verify-2fa', { method: 'POST', body: { token } });
+  assert.equal(repeat.status, 401); assert.equal(repeat.body.error.code, 'TWO_FACTOR_CHALLENGE_EXPIRED');
+  assert.equal((await challenge.request('/auth/me')).status, 200);
+ } finally { await pool.query('DELETE FROM user_totp WHERE user_id=$1', [otherId]); }
+});
+
+test('installation metadata uses the configured URL and rejects an unrelated build URL', async () => {
+ const configured = 'https://downloads.example.test/configured.zip';
+ const alternate = 'https://downloads.example.test/unrelated.zip';
+ const channel = (await pool.query("INSERT INTO release_channels(game_id,name,label,public) VALUES($1,'stable','Stable',true) RETURNING id", [msId])).rows[0].id;
+ await pool.query('UPDATE games SET download_url=$2 WHERE id=$1', [msId, configured]);
+ await pool.query("INSERT INTO game_builds(game_id,channel_id,version,platform,download_url,sha256,size_bytes,status) VALUES($1,$2,'1.0.0','windows',$3,$4,100,'published')", [msId, channel, configured, 'a'.repeat(64)]);
+ try {
+  const valid = await player.request(`/library/${msId}/install-metadata`, { method: 'POST' });
+  assert.equal(valid.status, 200); assert.equal(valid.body.data.downloadUrl, configured);
+  await pool.query('UPDATE game_builds SET download_url=$2 WHERE game_id=$1', [msId, alternate]);
+  const different = await player.request(`/library/${msId}/install-metadata`, { method: 'POST' });
+  assert.notEqual(different.status, 200); assert(!JSON.stringify(different.body).includes(alternate));
+  await pool.query('UPDATE games SET download_url=null WHERE id=$1', [msId]);
+  const unavailable = await player.request(`/library/${msId}/install-metadata`, { method: 'POST' });
+  assert.equal(unavailable.status, 409); assert.equal(unavailable.body.error.code, 'GAME_RELEASE_NOT_CONFIGURED');
+ } finally {
+  await pool.query('DELETE FROM release_channels WHERE id=$1', [channel]);
+  await pool.query('UPDATE games SET download_url=null WHERE id=$1', [msId]);
+ }
+});

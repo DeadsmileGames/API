@@ -1,4 +1,4 @@
-# Deadsmile Games API 1.7.0
+# Deadsmile Games API 1.7.1
 
 Node.js 24+, Express e PostgreSQL. A API autoriza contas e jogos e disponibiliza catálogo, newswire, saves, sessões, conquistas e consentimento de diagnóstico.
 
@@ -26,7 +26,7 @@ Jogos pagos com download do launcher exigem URL de compra itch.io e `itchGameId`
 
 O catálogo nunca expõe o `download_url` bruto. `downloadAvailable` e `launcherAvailable` exigem link no banco e publicação. `GET /api/games/:slug/download` fornece o link HTTPS cadastrado para jogos gratuitos publicados; em jogos pagos continua exigindo sessão e nova verificação de posse, para compatibilidade com clientes autorizados.
 
-O launcher usa `/api/library/:gameId/install-metadata` autenticado. Sem `download_url`, a instalação é recusada. Um build Windows publicado precisa ter URL, tamanho e SHA-256; permanece também a resolução GitHub da configuração existente. Um link de página ou badge não substitui arquivo instalável nem concede autorização. A biblioteca `/api/library` mostra somente registros ativos adicionados à conta: `source=free` para gratuitos e `source=itch` para pagos. `/api/library/catalog` retorna todos os jogos cadastrados com `owned` e `inLibrary` separados. `POST /api/library/:gameId` registra gratuitamente sem itch.io ou verifica a posse paga antes de registrar. Downloads gratuitos feitos no website com sessão também adicionam o jogo à biblioteca; o download anônimo não cria registro de conta. Desinstalar não remove essa adição. Desconectar itch.io revoga somente registros de compras itch.io.
+O launcher usa `/api/library/:gameId/install-metadata` autenticado. Sem `download_url`, a instalação é recusada. Um build Windows publicado precisa usar exatamente o `download_url` cadastrado e ter tamanho e SHA-256; permanece também a resolução GitHub da configuração existente. Um link de página ou badge não substitui arquivo instalável nem concede autorização. A biblioteca `/api/library` mostra somente registros ativos adicionados à conta: `source=free` para gratuitos e `source=itch` para pagos. `/api/library/catalog` retorna todos os jogos cadastrados com `owned` e `inLibrary` separados. `POST /api/library/:gameId` registra gratuitamente sem itch.io ou verifica a posse paga antes de registrar. Downloads gratuitos feitos no website com sessão também adicionam o jogo à biblioteca; o download anônimo não cria registro de conta. Desinstalar não remove essa adição. Desconectar itch.io revoga somente registros de compras itch.io.
 
 ## Microsoft Store
 
@@ -52,7 +52,7 @@ O callback itch.io reutiliza CSS e fontes do website, com carregamento acessíve
 
 ## Produção
 
-Publique API, website e launcher 1.7.0 em conjunto e aplique as migrações antes da nova API. Configure HTTPS, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, segredos independentes, CORS, e-mail e reCAPTCHA. PostgreSQL remoto verifica TLS; use `DATABASE_SSL_CA` se houver CA privada.
+Publique API, website e launcher 1.7.1 em conjunto e aplique as migrações antes da nova API. Configure HTTPS, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, segredos independentes, CORS, e-mail e reCAPTCHA. PostgreSQL remoto verifica TLS; use `DATABASE_SSL_CA` se houver CA privada.
 
 `render.yaml` configura Starter pago, Node 24, health check, migração antes da publicação, pool limitado e encerramento gracioso. Não modifica automaticamente um serviço existente. O plano gratuito suspende o serviço após inatividade; código e health check não eliminam essa regra. Documentação: https://render.com/docs/free e https://render.com/docs/blueprint-spec.
 
