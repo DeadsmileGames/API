@@ -40,52 +40,173 @@ function stateHash(value) {
 async function itchRequest(path, token, params, { method = 'GET' } = {}) {
   const url = new URL(`${API_ROOT}${path}`);
   const body = new URLSearchParams();
+
   for (const [key, value] of Object.entries(params || {})) {
-    if (method === 'GET') url.searchParams.set(key, String(value));else
-    body.set(key, String(value));
+    if (method === 'GET') {
+      url.searchParams.set(key, String(value));
+    } else {
+      body.set(key, String(value));
+    }
   }
+
   let response;
+  let data;
+
   try {
     response = await fetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' })
+        ...(method === 'GET'
+          ? {}
+          : { 'Content-Type': 'application/x-www-form-urlencoded' })
       },
       ...(method === 'GET' ? {} : { body }),
-      redirect: 'error', signal: AbortSignal.timeout(10_000)
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000)
     });
-  } catch {
+
+    data = await response.json().catch(() => null);
+  } catch (error) {
+    const networkCodes = new Set([
+      'ENOTFOUND',
+      'ETIMEDOUT',
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_HEADERS_TIMEOUT',
+      'UND_ERR_BODY_TIMEOUT'
+    ]);
+
+    const cause = error?.cause?.code || error?.code;
+
+    console.warn('itch_request_failed', {
+      endpoint: path,
+      reason:
+        error?.name === 'TimeoutError'
+          ? 'TIMEOUT'
+          : networkCodes.has(cause)
+            ? cause
+            : 'FETCH_FAILED'
+    });
+
     throw new AppError(503, 'ITCH_UNAVAILABLE');
   }
-  const data = await response.json().catch(() => null);
-  if (!data || !response.ok || Array.isArray(data.errors) && data.errors.length > 0) {
-    const expired = response.status === 401 || response.status === 403;
-    throw new AppError(expired ? 409 : 503, expired ? 'ITCH_RECONNECT_REQUIRED' : 'ITCH_UNAVAILABLE'
+
+  const providerErrors = Array.isArray(data?.errors) ? data.errors : [];
+
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    providerErrors.length
+  ) {
+    const description = providerErrors
+      .filter((item) => typeof item === 'string')
+      .join(' ')
+      .toLowerCase();
+
+    const scopeMissing = /scope|permission/.test(description);
+
+    const invalidToken =
+      /invalid[_ ](?:api[_ ]key|key|token|credentials)|(?:token|key|credentials).*?(?:expired|revoked)|unauthenticated|unauthorized/.test(
+        description
+      );
+
+    const code = scopeMissing
+      ? 'ITCH_SCOPE_MISSING'
+      : response.status === 401 ||
+          response.status === 403 ||
+          invalidToken
+        ? 'ITCH_RECONNECT_REQUIRED'
+        : 'ITCH_UNAVAILABLE';
+
+    console.warn('itch_request_failed', {
+      endpoint: path,
+      status: response.status,
+      reason: code,
+      invalidJson: !data
+    });
+
+    throw new AppError(
+      code === 'ITCH_UNAVAILABLE' ? 503 : 409,
+      code
     );
   }
+
   return data;
 }
 
-async function ownedKeysFor(account) {
+async function ownedKeysFor(account, gameIds = []) {
   const token = decryptToken(account.access_token_encrypted);
+  const ids = [...new Set(gameIds.map(String))];
+
+  if (
+    ids.length > 50 ||
+    ids.some((id) => !/^[1-9]\d*$/.test(id))
+  ) {
+    throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED');
+  }
+
   const keys = [];
   const seenPages = new Set();
+
   for (let page = 1; page <= 200; page += 1) {
-    const data = await itchRequest('/profile/owned-keys', token, { page });
+    const data = await itchRequest('/profile/owned-keys', token, {
+      page,
+      per_page: 500,
+      ...(ids.length ? { game_ids: ids.join(',') } : {})
+    });
+
     if (!Array.isArray(data.owned_keys)) {
+      console.warn('itch_library_invalid', {
+        reason: 'MISSING_OWNED_KEYS',
+        page
+      });
+
       throw new AppError(503, 'ITCH_LIBRARY_INVALID');
     }
+
     const pageKeys = data.owned_keys;
-    if (pageKeys.length === 0) return keys;
-    const pageIdentity = pageKeys.map((item) => String(item?.id || '')).join(',');
-    if (seenPages.has(pageIdentity)) {
+
+    if (!pageKeys.length) return keys;
+
+    const invalidKey = pageKeys.some(
+      (item) =>
+        !/^[1-9]\d*$/.test(String(item?.id || '')) ||
+        !/^[1-9]\d*$/.test(
+          String(item?.game_id || item?.game?.id || '')
+        )
+    );
+
+    if (invalidKey) {
+      console.warn('itch_library_invalid', {
+        reason: 'INVALID_KEY_DATA',
+        page
+      });
+
       throw new AppError(503, 'ITCH_LIBRARY_INVALID');
     }
+
+    const pageIdentity = pageKeys
+      .map((item) => String(item.id))
+      .join(',');
+
+    if (seenPages.has(pageIdentity)) {
+      console.warn('itch_library_invalid', {
+        reason: 'REPEATED_PAGE',
+        page
+      });
+
+      throw new AppError(503, 'ITCH_LIBRARY_INVALID');
+    }
+
     seenPages.add(pageIdentity);
     keys.push(...pageKeys);
   }
+
   throw new AppError(503, 'ITCH_LIBRARY_TOO_LARGE');
 }
 
@@ -146,7 +267,9 @@ export async function completeItchConnection({ state, accessToken }, setLocale =
   itchRequest('/credentials/info', accessToken),
   itchRequest('/profile', accessToken)]
   );
-  const scopes = new Set(credentials.scopes || []);
+  const scopes = new Set(
+    Array.isArray(credentials.scopes) ? credentials.scopes : []
+  );
   const hasProfile = scopes.has('profile');
   if (!hasProfile && !scopes.has('profile:me') || !hasProfile && !scopes.has('profile:owned')) {
     throw new AppError(400, 'ITCH_SCOPE_MISSING');
@@ -170,10 +293,19 @@ export async function completeItchConnection({ state, accessToken }, setLocale =
     throw error;
   }
   try {
-    await syncItchLibrary(flow.user_id);
-  } catch (error) {
-    if (!(error instanceof AppError) || error.code === 'ITCH_NOT_CONNECTED') throw error;
+  await syncItchLibrary(flow.user_id);
+} catch (error) {
+  if (
+    !(error instanceof AppError) ||
+    error.code === 'ITCH_NOT_CONNECTED'
+  ) {
+    throw error;
   }
+
+  console.warn('itch_initial_sync_failed', {
+    code: error.code
+  });
+}
   return {
     client: flow.client,
     locale: flow.locale,
@@ -197,7 +329,10 @@ export async function verifyGameOwnership(userId, gameId) {
   const account = await findItchAccount(userId);
   if (!account) throw new AppError(409, 'ITCH_NOT_CONNECTED');
   if (!game.itch_game_id || !game.purchase_url) throw new AppError(409, 'ITCH_GAME_NOT_CONFIGURED');
-  const result = ownershipFor(game, await ownedKeysFor(account));
+  const result = ownershipFor(
+    game,
+    await ownedKeysFor(account, [game.itch_game_id])
+  );
   if (result.owned) await grantEntitlement({ userId, gameId, externalReference: result.reference, acquiredAt: result.acquiredAt });else
   await revokeEntitlement(userId, gameId);
   await touchItchAccount(userId);
