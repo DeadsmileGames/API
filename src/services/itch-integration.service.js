@@ -160,28 +160,43 @@ async function ownedKeysFor(account, gameIds = []) {
       ...(ids.length ? { game_ids: ids.join(',') } : {})
     });
 
-    if (!Array.isArray(data.owned_keys)) {
+    const rawKeys = data.owned_keys;
+
+    const emptyObject =
+      rawKeys !== null &&
+      typeof rawKeys === 'object' &&
+      !Array.isArray(rawKeys) &&
+      Object.keys(rawKeys).length === 0 &&
+      data.page === page;
+
+    const pageKeys = Array.isArray(rawKeys)
+      ? rawKeys
+      : emptyObject
+        ? []
+        : null;
+
+    if (pageKeys === null) {
       console.warn('itch_library_invalid', {
-        reason: 'MISSING_OWNED_KEYS',
+        reason: 'INVALID_OWNED_KEYS_FORMAT',
         page,
         receivedKeys: keys.length,
         hasOwnedKeys: Object.hasOwn(data, 'owned_keys'),
         ownedKeysType:
-          data.owned_keys === null
-            ? 'null'
-            : typeof data.owned_keys,
+          rawKeys === null ? 'null' : typeof rawKeys,
+        ownedKeysFieldCount:
+          rawKeys !== null && typeof rawKeys === 'object'
+            ? Object.keys(rawKeys).length
+            : null,
         responsePage:
-          Number.isSafeInteger(data.page)
-            ? data.page
-            : null
+          Number.isSafeInteger(data.page) ? data.page : null
       });
 
       throw new AppError(503, 'ITCH_LIBRARY_INVALID');
     }
 
-    const pageKeys = data.owned_keys;
-
-    if (!pageKeys.length) return keys;
+    if (pageKeys.length === 0) {
+      return keys;
+    }
 
     const invalidKey = pageKeys.some(
       (item) =>
