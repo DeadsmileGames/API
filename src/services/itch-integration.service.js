@@ -163,7 +163,17 @@ async function ownedKeysFor(account, gameIds = []) {
     if (!Array.isArray(data.owned_keys)) {
       console.warn('itch_library_invalid', {
         reason: 'MISSING_OWNED_KEYS',
-        page
+        page,
+        receivedKeys: keys.length,
+        hasOwnedKeys: Object.hasOwn(data, 'owned_keys'),
+        ownedKeysType:
+          data.owned_keys === null
+            ? 'null'
+            : typeof data.owned_keys,
+        responsePage:
+          Number.isSafeInteger(data.page)
+            ? data.page
+            : null
       });
 
       throw new AppError(503, 'ITCH_LIBRARY_INVALID');
@@ -205,6 +215,17 @@ async function ownedKeysFor(account, gameIds = []) {
 
     seenPages.add(pageIdentity);
     keys.push(...pageKeys);
+
+    if (
+      ids.length &&
+      ids.every((id) =>
+        keys.some(
+          (item) => String(item.game_id || item.game?.id) === id
+        )
+      )
+    ) {
+      return keys;
+    }
   }
 
   throw new AppError(503, 'ITCH_LIBRARY_TOO_LARGE');
