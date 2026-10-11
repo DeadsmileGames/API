@@ -1,13 +1,13 @@
-import { searchGames } from '../repositories/search.repository.js';
+import { searchGames } from "../repositories/search.repository.js";
 
 function toClientResult(row) {
   return {
-    id:               row.id,
-    title:            row.title,
-    slug:             row.slug,
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
     shortDescription: row.short_description,
-    coverImage:       row.cover_image,
-    status:           row.status,
+    coverImage: row.cover_image,
+    status: row.status,
   };
 }
 

@@ -3,17 +3,17 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import {
   registerUser,
   authenticateUser,
-  completeTwoFactorLogin } from
-"../services/auth.service.js";
+  completeTwoFactorLogin,
+} from "../services/auth.service.js";
 import {
   confirmAccountEmail,
-  resendRegistrationEmail } from
-"../services/account-email.service.js";
+  resendRegistrationEmail,
+} from "../services/account-email.service.js";
 
 import {
   requestPasswordReset,
-  resetPassword } from
-"../services/password-reset.service.js";
+  resetPassword,
+} from "../services/password-reset.service.js";
 import { attachDeviceSession } from "../utils/device-session.js";
 import { verifyRecaptcha } from "../services/recaptcha.service.js";
 
@@ -61,27 +61,19 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
   const expiresAt = req.session?.pendingTwoFactorExpiresAt;
 
   if (!pendingUserId || !expiresAt || Date.now() >= expiresAt) {
-    throw new AppError(
-      401,
-      "TWO_FACTOR_CHALLENGE_EXPIRED"
-
-    );
+    throw new AppError(401, "TWO_FACTOR_CHALLENGE_EXPIRED");
   }
 
   const valid = await verifyTotpLogin(pendingUserId, token);
 
   if (!valid) {
     req.session.pendingTwoFactorAttempts =
-    Number(req.session.pendingTwoFactorAttempts || 0) + 1;
+      Number(req.session.pendingTwoFactorAttempts || 0) + 1;
     if (req.session.pendingTwoFactorAttempts >= TWO_FACTOR_MAX_ATTEMPTS) {
       delete req.session.pendingTwoFactorUserId;
       delete req.session.pendingTwoFactorExpiresAt;
       delete req.session.pendingTwoFactorAttempts;
-      throw new AppError(
-        401,
-        "TWO_FACTOR_CHALLENGE_EXPIRED"
-
-      );
+      throw new AppError(401, "TWO_FACTOR_CHALLENGE_EXPIRED");
     }
     throw new AppError(400, "INVALID_TOTP");
   }
@@ -111,19 +103,18 @@ export const login = asyncHandler(async (req, res) => {
 
   const result = await authenticateUser({
     email,
-    password
+    password,
   });
   if (result.requiresTwoFactor) {
     await regenerateSession(req);
 
     req.session.pendingTwoFactorUserId = result.userId;
 
-    req.session.pendingTwoFactorExpiresAt =
-    Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
+    req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
 
     return sendSuccess(res, {
-      requiresTwoFactor: true
+      requiresTwoFactor: true,
     });
   }
   await regenerateSession(req);
@@ -143,11 +134,11 @@ export const logout = asyncHandler(async (req, res) => {
     secure: env.isProduction,
     sameSite: env.cookieSameSite,
     path: "/",
-    partitioned: env.isProduction && env.cookieSameSite === "none"
+    partitioned: env.isProduction && env.cookieSameSite === "none",
   });
 
   return sendSuccess(res, {
-    loggedOut: true
+    loggedOut: true,
   });
 });
 
@@ -160,7 +151,7 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 
   const result = await authenticateUser({
     email,
-    password
+    password,
   });
 
   if (result.requiresTwoFactor) {
@@ -168,12 +159,11 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 
     req.session.pendingTwoFactorUserId = result.userId;
 
-    req.session.pendingTwoFactorExpiresAt =
-    Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
+    req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
 
     return sendSuccess(res, {
-      requiresTwoFactor: true
+      requiresTwoFactor: true,
     });
   }
 
@@ -188,7 +178,7 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 
 export const mobileLogin = asyncHandler(async (req, res) => {
   return performLogin(req, res, {
-    requireRecaptcha: false
+    requireRecaptcha: false,
   });
 });
 

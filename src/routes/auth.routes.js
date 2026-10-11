@@ -56,12 +56,7 @@ authRouter.post(
   resendEmail,
 );
 
-authRouter.post(
-  "/register",
-  registerLimiter,
-  validate(registerSchema),
-  register,
-);
+authRouter.post("/register", registerLimiter, validate(registerSchema), register);
 authRouter.post("/login", loginLimiter, validate(loginSchema), login);
 authRouter.post("/logout", requireAuth, logout);
 authRouter.get("/me", requireAuth, me);
@@ -71,12 +66,7 @@ authRouter.post(
   validate(totpTokenSchema),
   verifyTwoFactor,
 );
-authRouter.post(
-  "/mobile-login",
-  loginLimiter,
-  validate(mobileLoginSchema),
-  mobileLogin,
-);
+authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
 authRouter.post(
   "/mobile-register",
   registerLimiter,

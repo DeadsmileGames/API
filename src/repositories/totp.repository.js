@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from "../config/database.js";
 
 export async function findTotpByUserId(userId) {
   const { rows } = await query(

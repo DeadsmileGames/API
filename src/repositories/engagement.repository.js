@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from "../config/database.js";
 
 export async function upsertNewsletterSubscriber({ email, confirmationTokenHash }) {
   const { rows } = await query(
@@ -116,7 +116,12 @@ export async function listPushTokens() {
   return rows.map((row) => row.expo_push_token);
 }
 
-export async function createEvent({ eventType, audienceUserId = null, entityId, payload }) {
+export async function createEvent({
+  eventType,
+  audienceUserId = null,
+  entityId,
+  payload,
+}) {
   const { rows } = await query(
     `INSERT INTO content_events (event_type, audience_user_id, entity_id, payload)
      VALUES ($1, $2, $3, $4::jsonb)

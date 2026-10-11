@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from "../config/database.js";
 
 export async function addWishlist(userId, gameId) {
   const { rows } = await query(
@@ -6,15 +6,15 @@ export async function addWishlist(userId, gameId) {
      VALUES ($1, $2)
      ON CONFLICT (user_id, game_id) DO NOTHING
      RETURNING *`,
-    [userId, gameId]
+    [userId, gameId],
   );
   return rows[0] || null;
 }
 
 export async function removeWishlist(userId, gameId) {
   const { rowCount } = await query(
-    'DELETE FROM wishlists WHERE user_id = $1 AND game_id = $2',
-    [userId, gameId]
+    "DELETE FROM wishlists WHERE user_id = $1 AND game_id = $2",
+    [userId, gameId],
   );
   return rowCount > 0;
 }
@@ -26,15 +26,15 @@ export async function listWishlist(userId) {
      JOIN games g ON g.id = w.game_id
      WHERE w.user_id = $1
      ORDER BY w.created_at DESC`,
-    [userId]
+    [userId],
   );
   return rows;
 }
 
 export async function checkWishlist(userId, gameId) {
   const { rows } = await query(
-    'SELECT 1 FROM wishlists WHERE user_id = $1 AND game_id = $2 LIMIT 1',
-    [userId, gameId]
+    "SELECT 1 FROM wishlists WHERE user_id = $1 AND game_id = $2 LIMIT 1",
+    [userId, gameId],
   );
   return rows.length > 0;
 }

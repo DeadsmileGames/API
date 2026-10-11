@@ -1,16 +1,18 @@
-import { pool, query } from '../config/database.js';
+import { pool, query } from "../config/database.js";
 
 export async function overview() {
   const [games, channels, builds, incidents, support, telemetry] = await Promise.all([
-    query('SELECT id, title, slug, engine, cloud_saves_enabled FROM games ORDER BY title'),
-    query('SELECT * FROM release_channels ORDER BY game_id, name'),
+    query(
+      "SELECT id, title, slug, engine, cloud_saves_enabled FROM games ORDER BY title",
+    ),
+    query("SELECT * FROM release_channels ORDER BY game_id, name"),
     query(`SELECT b.*, g.title AS game_title, c.name AS channel_name
            FROM game_builds b
            JOIN games g ON g.id = b.game_id
            JOIN release_channels c ON c.id = b.channel_id AND c.game_id = b.game_id
            ORDER BY b.created_at DESC LIMIT 100`),
-    query('SELECT * FROM service_incidents ORDER BY started_at DESC LIMIT 30'),
-    query('SELECT status, count(*)::int AS count FROM support_tickets GROUP BY status'),
+    query("SELECT * FROM service_incidents ORDER BY started_at DESC LIMIT 30"),
+    query("SELECT status, count(*)::int AS count FROM support_tickets GROUP BY status"),
     query(`SELECT event_type, count(*)::int AS count FROM telemetry_events
            WHERE created_at > now() - interval '30 days' GROUP BY event_type`),
   ]);
@@ -38,8 +40,8 @@ export async function createChannel(item) {
 export async function createBuild(item) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    if (item.status === 'published') {
+    await client.query("BEGIN");
+    if (item.status === "published") {
       await client.query(
         `UPDATE game_builds
          SET status = 'retired'
@@ -59,12 +61,24 @@ export async function createBuild(item) {
        FROM release_channels c
        WHERE c.id = $2 AND c.game_id = $1
        RETURNING *`,
-      [item.gameId, item.channelId, item.version, item.platform, item.architecture, item.itchChannel, item.downloadUrl, item.sha256, item.sizeBytes, item.notes, item.status],
+      [
+        item.gameId,
+        item.channelId,
+        item.version,
+        item.platform,
+        item.architecture,
+        item.itchChannel,
+        item.downloadUrl,
+        item.sha256,
+        item.sizeBytes,
+        item.notes,
+        item.status,
+      ],
     );
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return rows[0] || null;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -82,7 +96,15 @@ export async function createAchievement(item) {
        points = EXCLUDED.points,
        hidden = EXCLUDED.hidden
      RETURNING *`,
-    [item.gameId, item.key, item.title, item.description, item.iconUrl, item.points, item.hidden],
+    [
+      item.gameId,
+      item.key,
+      item.title,
+      item.description,
+      item.iconUrl,
+      item.points,
+      item.hidden,
+    ],
   );
   return rows[0] || null;
 }

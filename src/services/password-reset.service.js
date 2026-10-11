@@ -1,20 +1,20 @@
-import crypto from 'node:crypto';
-import { AppError } from '../utils/AppError.js';
-import { hashPassword } from '../utils/password.js';
-import { findUserByEmail } from '../repositories/users.repository.js';
+import crypto from "node:crypto";
+import { AppError } from "../utils/AppError.js";
+import { hashPassword } from "../utils/password.js";
+import { findUserByEmail } from "../repositories/users.repository.js";
 import {
   consumeResetToken,
   createResetToken,
-  deleteExpiredResetTokens } from
-'../repositories/password-resets.repository.js';
-import { sendPasswordResetEmail } from './email.service.js';
-import { env } from '../config/env.js';
+  deleteExpiredResetTokens,
+} from "../repositories/password-resets.repository.js";
+import { sendPasswordResetEmail } from "./email.service.js";
+import { env } from "../config/env.js";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000;
 const MIN_RESPONSE_MS = 300;
 
 function sha256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 function sleep(ms) {
@@ -28,7 +28,7 @@ export async function requestPasswordReset(email) {
   if (Math.random() < 0.02) deleteExpiredResetTokens().catch(() => {});
 
   if (user) {
-    const rawToken = crypto.randomBytes(32).toString('hex');
+    const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = sha256(rawToken);
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
     await createResetToken({ userId: user.id, tokenHash, expiresAt });
@@ -37,10 +37,10 @@ export async function requestPasswordReset(email) {
       await sendPasswordResetEmail({
         to: user.email,
         username: user.username,
-        resetUrl
+        resetUrl,
       });
     } catch (error) {
-      console.error('Password reset delivery failed', { code: error?.code || null });
+      console.error("Password reset delivery failed", { code: error?.code || null });
     }
   }
 
@@ -50,14 +50,14 @@ export async function requestPasswordReset(email) {
 }
 
 export async function resetPassword({ token, password }) {
-  if (!token || typeof token !== 'string') {
-    throw new AppError(400, 'INVALID_TOKEN');
+  if (!token || typeof token !== "string") {
+    throw new AppError(400, "INVALID_TOKEN");
   }
 
   const passwordHash = await hashPassword(password);
   const consumed = await consumeResetToken({ tokenHash: sha256(token), passwordHash });
   if (!consumed) {
-    throw new AppError(400, 'INVALID_TOKEN');
+    throw new AppError(400, "INVALID_TOKEN");
   }
   return { reset: true };
 }

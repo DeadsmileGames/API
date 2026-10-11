@@ -1,52 +1,50 @@
-import { AppError } from '../utils/AppError.js';
-import { findUserById, findUserByUsername } from '../repositories/users.repository.js';
-import { updateProfile, findPublicProfile } from '../repositories/users.profile.repository.js';
-import { pool, query } from '../config/database.js';
-import { verifyPassword } from '../utils/password.js';
-import { sanitizeUser } from './auth.service.js';
-import { publicAchievements, publicActivity } from '../repositories/platform.repository.js';
+import { AppError } from "../utils/AppError.js";
+import { findUserById, findUserByUsername } from "../repositories/users.repository.js";
+import {
+  updateProfile,
+  findPublicProfile,
+} from "../repositories/users.profile.repository.js";
+import { pool, query } from "../config/database.js";
+import { verifyPassword } from "../utils/password.js";
+import { sanitizeUser } from "./auth.service.js";
+import {
+  publicAchievements,
+  publicActivity,
+} from "../repositories/platform.repository.js";
 
 export async function getAccount(userId) {
   const user = await findUserById(userId);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND');
+  if (!user) throw new AppError(404, "USER_NOT_FOUND");
   return sanitizeUser(user);
 }
 
 export async function updateAccount(userId, payload) {
   const current = await findUserById(userId);
-  if (!current) throw new AppError(404, 'USER_NOT_FOUND');
+  if (!current) throw new AppError(404, "USER_NOT_FOUND");
 
   if (payload.username && payload.username !== current.username) {
     const existing = await findUserByUsername(payload.username);
     if (existing && existing.id !== userId) {
-      throw new AppError(409, 'USERNAME_TAKEN');
+      throw new AppError(409, "USERNAME_TAKEN");
     }
   }
 
   if (payload.email && payload.email !== current.email) {
-    throw new AppError(
-      400,
-      'EMAIL_CHANGE_REQUIRES_VERIFICATION'
-
-    );
+    throw new AppError(400, "EMAIL_CHANGE_REQUIRES_VERIFICATION");
   }
 
-  const updated = await updateProfile(userId, {
-    username: payload.username?.toLowerCase() ||
-    current.username,
+  await updateProfile(userId, {
+    username: payload.username?.toLowerCase() || current.username,
 
     email: current.email,
 
     bio: payload.bio ?? current.bio,
 
-    websiteUrl:
-    payload.websiteUrl ?? current.website_url,
+    websiteUrl: payload.websiteUrl ?? current.website_url,
 
-    location:
-    payload.location ?? current.location,
+    location: payload.location ?? current.location,
 
-    avatarUrl:
-    payload.avatarUrl ?? current.avatar_url
+    avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : current.avatar_url,
   });
 
   return getAccount(userId);
@@ -54,18 +52,18 @@ export async function updateAccount(userId, payload) {
 
 export async function getPublicProfile(username) {
   const user = await findPublicProfile(username);
-  if (!user) throw new AppError(404, 'PROFILE_NOT_FOUND');
+  if (!user) throw new AppError(404, "PROFILE_NOT_FOUND");
 
   const [recentGames, achievements] = await Promise.all([
-  publicActivity(user.id),
-  publicAchievements(user.id)]
-  );
+    publicActivity(user.id),
+    publicAchievements(user.id),
+  ]);
 
   return {
     id: user.id,
     username: user.username.toLowerCase(),
     avatarUrl: user.avatar_url || null,
-    bio: user.bio || '',
+    bio: user.bio || "",
     websiteUrl: user.website_url || null,
     location: user.location || null,
     createdAt: user.created_at,
@@ -76,15 +74,11 @@ export async function getPublicProfile(username) {
       coverImage: item.cover_image,
       heroImage: item.hero_image,
       purchaseUrl: item.purchase_url,
-      totalMs: user.share_playtime ?
-      Number(item.total_ms) :
-      null,
+      totalMs: user.share_playtime ? Number(item.total_ms) : null,
 
-      sessions: user.share_playtime ?
-      item.sessions :
-      null,
+      sessions: user.share_playtime ? item.sessions : null,
       lastPlayedAt: item.last_played_at,
-      screenshots: item.screenshots.map((shot) => shot.url)
+      screenshots: item.screenshots.map((shot) => shot.url),
     })),
     achievements: achievements.map((item) => ({
       key: item.key,
@@ -94,31 +88,35 @@ export async function getPublicProfile(username) {
       points: item.points,
       unlockedAt: item.unlocked_at,
       gameTitle: item.game_title,
-      gameSlug: item.game_slug
-    }))
+      gameSlug: item.game_slug,
+    })),
   };
 }
 
 export async function deleteAccount(userId, password) {
-  const { rows } = await query(
-    'SELECT id, password_hash FROM users WHERE id = $1',
-    [userId]
-  );
+  const { rows } = await query("SELECT id, password_hash FROM users WHERE id = $1", [
+    userId,
+  ]);
   const user = rows[0];
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND');
+  if (!user) throw new AppError(404, "USER_NOT_FOUND");
 
   const valid = await verifyPassword(user.password_hash, password);
-  if (!valid) throw new AppError(401, 'INVALID_PASSWORD');
+  if (!valid) throw new AppError(401, "INVALID_PASSWORD");
 
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query(`DELETE FROM user_sessions WHERE sess->>'userId' = $1`, [String(userId)]);
-    await client.query('DELETE FROM telemetry_events WHERE user_id = $1', [userId]);
-    await client.query('DELETE FROM users WHERE id = $1', [userId]);
-    await client.query('COMMIT');
+    await client.query("BEGIN");
+    await client.query(
+      `DELETE FROM user_sessions
+       WHERE sess->>'userId' = $1
+          OR sess->>'pendingTwoFactorUserId' = $1`,
+      [String(userId)],
+    );
+    await client.query("DELETE FROM telemetry_events WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM users WHERE id = $1", [userId]);
+    await client.query("COMMIT");
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -128,36 +126,23 @@ export async function getPrivacy(userId) {
   const user = await findUserById(userId);
 
   if (!user) {
-    throw new AppError(
-      404,
-      'USER_NOT_FOUND'
-
-    );
+    throw new AppError(404, "USER_NOT_FOUND");
   }
 
   return {
-    shareGameActivity: Boolean(
-      user.share_game_activity
-    ),
+    shareGameActivity: Boolean(user.share_game_activity),
 
-    sharePlaytime: Boolean(
-      user.share_playtime
-    ),
+    sharePlaytime: Boolean(user.share_playtime),
 
-    shareAchievements: Boolean(
-      user.share_achievements
-    )
+    shareAchievements: Boolean(user.share_achievements),
   };
 }
 
-export async function setPrivacy(
-userId,
-privacy)
-{
+export async function setPrivacy(userId, privacy) {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const updated = await client.query(
       `UPDATE users
@@ -168,34 +153,27 @@ privacy)
        WHERE id = $1
        RETURNING id`,
       [
-      userId,
-      privacy.shareGameActivity,
-      privacy.sharePlaytime,
-      privacy.shareAchievements]
-
+        userId,
+        privacy.shareGameActivity,
+        privacy.sharePlaytime,
+        privacy.shareAchievements,
+      ],
     );
 
     if (!updated.rows.length) {
-      throw new AppError(
-        404,
-        'USER_NOT_FOUND'
-
-      );
+      throw new AppError(404, "USER_NOT_FOUND");
     }
 
     await client.query(
       `UPDATE game_activity
        SET public = $2
        WHERE user_id = $1`,
-      [
-      userId,
-      privacy.shareGameActivity]
-
+      [userId, privacy.shareGameActivity],
     );
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();

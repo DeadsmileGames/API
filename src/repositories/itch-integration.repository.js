@@ -1,11 +1,20 @@
-import { pool, query } from '../config/database.js';
+import { pool, query } from "../config/database.js";
 
-export async function createOAuthState({ stateHash, userId, client, locale, returnPath, expiresAt }) {
-  await query('DELETE FROM itch_oauth_states WHERE expires_at < now() OR consumed_at IS NOT NULL');
+export async function createOAuthState({
+  stateHash,
+  userId,
+  client,
+  locale,
+  returnPath,
+  expiresAt,
+}) {
+  await query(
+    "DELETE FROM itch_oauth_states WHERE expires_at < now() OR consumed_at IS NOT NULL",
+  );
   await query(
     `INSERT INTO itch_oauth_states (state_hash, user_id, client, locale, return_path, expires_at)
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [stateHash, userId, client, locale, returnPath, expiresAt]
+    [stateHash, userId, client, locale, returnPath, expiresAt],
   );
 }
 
@@ -15,12 +24,18 @@ export async function consumeOAuthState(stateHash) {
      SET consumed_at = now()
      WHERE state_hash = $1 AND consumed_at IS NULL AND expires_at > now()
      RETURNING user_id, client, locale, return_path`,
-    [stateHash]
+    [stateHash],
   );
   return rows[0] || null;
 }
 
-export async function upsertItchAccount({ userId, itchUserId, username, profileUrl, encryptedToken }) {
+export async function upsertItchAccount({
+  userId,
+  itchUserId,
+  username,
+  profileUrl,
+  encryptedToken,
+}) {
   const { rows } = await query(
     `INSERT INTO user_itch_accounts
        (user_id, itch_user_id, itch_username, itch_profile_url, access_token_encrypted)
@@ -33,34 +48,46 @@ export async function upsertItchAccount({ userId, itchUserId, username, profileU
        connected_at = now(),
        verified_at = now()
      RETURNING *`,
-    [userId, itchUserId, username, profileUrl, encryptedToken]
+    [userId, itchUserId, username, profileUrl, encryptedToken],
   );
   return rows[0];
 }
 
 export async function findItchAccount(userId) {
-  const { rows } = await query('SELECT * FROM user_itch_accounts WHERE user_id = $1', [userId]);
+  const { rows } = await query("SELECT * FROM user_itch_accounts WHERE user_id = $1", [
+    userId,
+  ]);
   return rows[0] || null;
 }
 
 export async function touchItchAccount(userId) {
-  await query('UPDATE user_itch_accounts SET verified_at = now() WHERE user_id = $1', [userId]);
+  await query("UPDATE user_itch_accounts SET verified_at = now() WHERE user_id = $1", [
+    userId,
+  ]);
 }
 
 export async function markItchAccountSynced(userId) {
-  await query('UPDATE user_itch_accounts SET last_sync_at = now() WHERE user_id = $1', [userId]);
+  await query("UPDATE user_itch_accounts SET last_sync_at = now() WHERE user_id = $1", [
+    userId,
+  ]);
 }
 
 export async function removeItchAccount(userId) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query("UPDATE user_game_entitlements SET revoked_at = now(), last_verified_at = now() WHERE user_id = $1 AND source = 'itch'", [userId]);
-    const result = await client.query('DELETE FROM user_itch_accounts WHERE user_id = $1', [userId]);
-    await client.query('COMMIT');
+    await client.query("BEGIN");
+    await client.query(
+      "UPDATE user_game_entitlements SET revoked_at = now(), last_verified_at = now() WHERE user_id = $1 AND source = 'itch'",
+      [userId],
+    );
+    const result = await client.query(
+      "DELETE FROM user_itch_accounts WHERE user_id = $1",
+      [userId],
+    );
+    await client.query("COMMIT");
     return result.rowCount > 0;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -72,7 +99,7 @@ export async function listItchGames() {
     `SELECT *
      FROM games
      WHERE itch_game_id IS NOT NULL AND access_type = 'paid'
-     ORDER BY created_at ASC`
+     ORDER BY created_at ASC`,
   );
   return rows;
 }
@@ -82,7 +109,7 @@ export async function findItchGame(gameId) {
     `SELECT *
      FROM games
      WHERE id = $1`,
-    [gameId]
+    [gameId],
   );
   return rows[0] || null;
 }
@@ -100,12 +127,18 @@ export async function findPreferredItchChannel(userId, gameId) {
        AND ((c.name = 'stable' AND c.public) OR ba.user_id IS NOT NULL)
      ORDER BY (ba.user_id IS NOT NULL) DESC, b.published_at DESC NULLS LAST, b.created_at DESC
      LIMIT 1`,
-    [userId, gameId]
+    [userId, gameId],
   );
   return rows[0]?.itch_channel || null;
 }
 
-export async function grantEntitlement({ userId, gameId, externalReference, acquiredAt, source = 'itch' }) {
+export async function grantEntitlement({
+  userId,
+  gameId,
+  externalReference,
+  acquiredAt,
+  source = "itch",
+}) {
   await query(
     `INSERT INTO user_game_entitlements
        (user_id, game_id, source, external_reference, acquired_at, last_verified_at, revoked_at)
@@ -116,7 +149,7 @@ export async function grantEntitlement({ userId, gameId, externalReference, acqu
        acquired_at = LEAST(user_game_entitlements.acquired_at, EXCLUDED.acquired_at),
        last_verified_at = now(),
        revoked_at = NULL`,
-    [userId, gameId, externalReference || null, acquiredAt || null, source]
+    [userId, gameId, externalReference || null, acquiredAt || null, source],
   );
 }
 
@@ -125,7 +158,7 @@ export async function revokeEntitlement(userId, gameId) {
     `UPDATE user_game_entitlements
      SET revoked_at = now(), last_verified_at = now()
      WHERE user_id = $1 AND game_id = $2 AND source = 'itch'`,
-    [userId, gameId]
+    [userId, gameId],
   );
 }
 
@@ -153,18 +186,21 @@ export async function listEntitlements(userId, includeCatalog = false) {
      ) platform_agg ON platform_agg.game_id = g.id
      WHERE $2::boolean OR (e.user_id = $1 AND ((g.access_type = 'free' AND e.source = 'free') OR (g.access_type = 'paid' AND e.source = 'itch')))
      ORDER BY e.acquired_at DESC NULLS LAST, g.title`,
-    [userId, includeCatalog]
+    [userId, includeCatalog],
   );
   return rows;
 }
 
 export async function findInstallBuild(userId, gameId) {
-  const { rows } = await query(`SELECT b.* FROM game_builds b
+  const { rows } = await query(
+    `SELECT b.* FROM game_builds b
     JOIN release_channels c ON c.id = b.channel_id AND c.game_id = b.game_id
     WHERE b.game_id = $2 AND b.status = 'published' AND b.platform = 'windows' AND b.architecture = 'x64'
       AND ((c.name = 'stable' AND c.public) OR EXISTS (
         SELECT 1 FROM beta_access a WHERE a.user_id = $1 AND a.game_id = b.game_id
         AND a.channel_id = c.id AND (a.expires_at IS NULL OR a.expires_at > now())))
-    ORDER BY (c.name <> 'stable') DESC, b.published_at DESC NULLS LAST LIMIT 1`, [userId, gameId]);
+    ORDER BY (c.name <> 'stable') DESC, b.published_at DESC NULLS LAST LIMIT 1`,
+    [userId, gameId],
+  );
   return rows[0] || null;
 }

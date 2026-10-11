@@ -1,6 +1,6 @@
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { sendSuccess } from '../utils/apiResponse.js';
-import * as service from '../services/content.service.js';
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendSuccess } from "../utils/apiResponse.js";
+import * as service from "../services/content.service.js";
 
 export const news = asyncHandler(async (req, res) => {
   const data = await service.getNews(req.query);

@@ -1,5 +1,5 @@
-import { query } from '../config/database.js';
-import { sendTicketNotification } from './email.service.js';
+import { query } from "../config/database.js";
+import { sendTicketNotification } from "./email.service.js";
 
 export async function createTicket({ email, category, message }) {
   const { rows } = await query(

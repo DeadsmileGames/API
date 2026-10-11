@@ -1,9 +1,9 @@
-import { pool, query } from '../config/database.js';
+import { pool, query } from "../config/database.js";
 
 export async function createResetToken({ userId, tokenHash, expiresAt }) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     await client.query(
       `UPDATE password_resets
        SET used_at = NOW()
@@ -16,10 +16,10 @@ export async function createResetToken({ userId, tokenHash, expiresAt }) {
        RETURNING id, user_id, expires_at`,
       [userId, tokenHash, expiresAt],
     );
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return rows[0];
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -29,7 +29,7 @@ export async function createResetToken({ userId, tokenHash, expiresAt }) {
 export async function consumeResetToken({ tokenHash, passwordHash }) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const { rows } = await client.query(
       `SELECT id, user_id, expires_at, used_at
        FROM password_resets
@@ -38,8 +38,12 @@ export async function consumeResetToken({ tokenHash, passwordHash }) {
       [tokenHash],
     );
     const record = rows[0];
-    if (!record || record.used_at || new Date(record.expires_at).getTime() <= Date.now()) {
-      await client.query('ROLLBACK');
+    if (
+      !record ||
+      record.used_at ||
+      new Date(record.expires_at).getTime() <= Date.now()
+    ) {
+      await client.query("ROLLBACK");
       return null;
     }
 
@@ -51,19 +55,29 @@ export async function consumeResetToken({ tokenHash, passwordHash }) {
       [passwordHash, record.user_id],
     );
     if (!userResult.rows[0]) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return null;
     }
 
     await client.query(
-      'DELETE FROM account_email_tokens WHERE user_id = $1',
+      `UPDATE password_resets
+       SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
       [record.user_id],
     );
-    await client.query(`DELETE FROM user_sessions WHERE sess->>'userId' = $1`, [String(record.user_id)]);
-    await client.query('COMMIT');
+    await client.query("DELETE FROM account_email_tokens WHERE user_id = $1", [
+      record.user_id,
+    ]);
+    await client.query(
+      `DELETE FROM user_sessions
+       WHERE sess->>'userId' = $1
+          OR sess->>'pendingTwoFactorUserId' = $1`,
+      [String(record.user_id)],
+    );
+    await client.query("COMMIT");
     return { userId: record.user_id };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();

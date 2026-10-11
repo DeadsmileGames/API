@@ -1,14 +1,14 @@
-import { resolveLocale } from '../utils/publicErrors.js';
-import { escapeHtml } from '../utils/html.js';
-import { env } from '../config/env.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { sendSuccess } from '../utils/apiResponse.js';
+import { resolveLocale } from "../utils/publicErrors.js";
+import { escapeHtml } from "../utils/html.js";
+import { env } from "../config/env.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendSuccess } from "../utils/apiResponse.js";
 import {
   beginItchConnection,
   completeItchConnection,
   disconnectItch,
   getItchStatus,
-} from '../services/itch-integration.service.js';
+} from "../services/itch-integration.service.js";
 
 const callbackPage = `
 <!doctype html>
@@ -51,9 +51,16 @@ const callbackPage = `
 `;
 
 export const callback = (_req, res) => {
-  res.set('Cache-Control', 'no-store');
-  res.set('Referrer-Policy', 'no-referrer');
-  res.type('html').send(callbackPage.replace('__RETURN_URL__', escapeHtml(`${env.frontendUrl}/account#games`)));
+  res.set("Cache-Control", "no-store");
+  res.set("Referrer-Policy", "no-referrer");
+  res
+    .type("html")
+    .send(
+      callbackPage.replace(
+        "__RETURN_URL__",
+        escapeHtml(`${env.frontendUrl}/account#games`),
+      ),
+    );
 };
 
 export const status = asyncHandler(async (req, res) => {
@@ -65,7 +72,13 @@ export const connect = asyncHandler(async (req, res) => {
 });
 
 export const complete = asyncHandler(async (req, res) => {
-  sendSuccess(res, await completeItchConnection(req.body, (locale) => { res.locals.locale = resolveLocale(locale); res.set('Content-Language', res.locals.locale); }));
+  sendSuccess(
+    res,
+    await completeItchConnection(req.body, (locale) => {
+      res.locals.locale = resolveLocale(locale);
+      res.set("Content-Language", res.locals.locale);
+    }),
+  );
 });
 
 export const disconnect = asyncHandler(async (req, res) => {

@@ -1,7 +1,7 @@
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { sendSuccess } from '../utils/apiResponse.js';
-import * as totpService from '../services/totp.service.js';
-import { getAccount } from '../services/account.service.js';
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendSuccess } from "../utils/apiResponse.js";
+import * as totpService from "../services/totp.service.js";
+import { getAccount } from "../services/account.service.js";
 
 export const status = asyncHandler(async (req, res) => {
   const result = await totpService.getTotpStatus(req.session.userId);

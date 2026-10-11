@@ -5,31 +5,25 @@ import {
   findUserByEmail,
   findUserById,
   findUserByUsername,
-  updateLastLogin } from
-"../repositories/users.repository.js";
+  updateLastLogin,
+} from "../repositories/users.repository.js";
 import { findTotpByUserId } from "../repositories/totp.repository.js";
 import { sendRegistrationEmail } from "./account-email.service.js";
-
-
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
 export async function registerUser({ username, email, password }) {
   const [existingEmail, existingUsername] = await Promise.all([
-  findUserByEmail(email),
-  findUserByUsername(username)]
-  );
+    findUserByEmail(email),
+    findUserByUsername(username),
+  ]);
 
   if (existingEmail) {
     throw new AppError(409, "EMAIL_TAKEN");
   }
 
   if (existingUsername) {
-    throw new AppError(
-      409,
-      "USERNAME_TAKEN"
-
-    );
+    throw new AppError(409, "USERNAME_TAKEN");
   }
 
   const passwordHash = await hashPassword(password);
@@ -37,13 +31,13 @@ export async function registerUser({ username, email, password }) {
   const user = await createUser({
     username,
     email,
-    passwordHash
+    passwordHash,
   });
 
   await sendRegistrationEmail(user);
 
   return {
-    verificationRequired: true
+    verificationRequired: true,
   };
 }
 
@@ -55,25 +49,14 @@ export async function authenticateUser({ email, password }) {
     await verifyPassword(decoyHash, password).catch(() => {});
     throw new AppError(401, "INVALID_CREDENTIALS");
   }
-  const valid = await verifyPassword(
-    user.password_hash,
-    password
-  );
+  const valid = await verifyPassword(user.password_hash, password);
 
   if (!valid) {
-    throw new AppError(
-      401,
-      'INVALID_CREDENTIALS'
-
-    );
+    throw new AppError(401, "INVALID_CREDENTIALS");
   }
 
   if (!user.email_verified_at) {
-    throw new AppError(
-      403,
-      'EMAIL_NOT_VERIFIED'
-
-    );
+    throw new AppError(403, "EMAIL_NOT_VERIFIED");
   }
 
   const totp = await findTotpByUserId(user.id);
@@ -89,7 +72,7 @@ export async function authenticateUser({ email, password }) {
 export async function completeTwoFactorLogin(userId) {
   const user = await findUserById(userId);
   if (!user) throw new AppError(404, "USER_NOT_FOUND");
-  if (!user.email_verified_at) throw new AppError(403, 'EMAIL_NOT_VERIFIED');
+  if (!user.email_verified_at) throw new AppError(403, "EMAIL_NOT_VERIFIED");
 
   await updateLastLogin(userId);
   const updatedUser = await findUserById(userId);
@@ -107,11 +90,11 @@ export function sanitizeUser(user) {
     username: user.username,
     role: user.role,
     avatarUrl: user.avatar_url || null,
-    bio: user.bio || '',
+    bio: user.bio || "",
     websiteUrl: user.website_url || null,
     location: user.location || null,
     createdAt: user.created_at,
     updatedAt: user.updated_at,
-    lastLoginAt: user.last_login_at
+    lastLoginAt: user.last_login_at,
   };
 }

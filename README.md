@@ -59,3 +59,9 @@ Publique API, website e launcher 1.7.1 em conjunto e aplique as migrações ante
 O website usa rewrite `/api` da Vercel para este backend; WebSocket conecta diretamente ao Render com ticket autenticado. Alterações de domínio devem atualizar CORS, CSP e URLs nos três projetos. Não publique `.env`, credenciais, backups ou logs.
 
 Os testes cobrem migrações, contratos HTTP, acesso pago/gratuito, preços, sanitização, dados de Store, privacidade, saves, callback e erros. OAuth real, entrega de e-mail, implantação Render e instalação Windows não foram executados neste ambiente.
+
+## Correções desta revisão
+
+Redefinições de senha consomem todos os tokens pendentes da conta na mesma transação e revogam sessões autenticadas e desafios de duas etapas. Alterações confirmadas de e-mail e exclusão da conta também revogam os desafios. Tickets WebSocket estão vinculados à sessão ativa; eventos privados e a conexão são revalidados. Conquistas ocultas não expõem conteúdo antes do desbloqueio. Nomes de usuário são comparados sem distinguir maiúsculas, e remover o avatar salva o valor nulo. O comando `db:encrypt` identifica corretamente sua execução por caminho de arquivo.
+
+A leitura itch.io preserva compras confirmadas quando uma página do provedor é inválida e aceita o objeto vazio terminal somente com o número de página correto. Os 50 testes passaram em banco isolado. Esta revisão não adiciona migrações; os 14 arquivos SQL enviados, incluindo o schema, foram preservados byte a byte.

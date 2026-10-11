@@ -1,4 +1,4 @@
-import { pool, query } from '../config/database.js';
+import { pool, query } from "../config/database.js";
 
 export async function createPendingEmailToken({
   userId,
@@ -43,7 +43,7 @@ export async function confirmEmailToken(hash) {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const { rows } = await client.query(
       `SELECT user_id, purpose, target_email
@@ -57,7 +57,7 @@ export async function confirmEmailToken(hash) {
     const token = rows[0];
 
     if (!token) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return null;
     }
 
@@ -73,30 +73,22 @@ export async function confirmEmailToken(hash) {
 
     if (
       !user ||
-      (
-        token.purpose === 'register' &&
-        (
-          user.email !== token.target_email ||
-          user.email_verified_at
-        )
-      )
+      (token.purpose === "register" &&
+        (user.email !== token.target_email || user.email_verified_at))
     ) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return null;
     }
 
     if (
-      token.purpose === 'change' &&
-      (
-        !user.email_verified_at ||
-        user.email === token.target_email
-      )
+      token.purpose === "change" &&
+      (!user.email_verified_at || user.email === token.target_email)
     ) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return null;
     }
 
-    if (token.purpose === 'register') {
+    if (token.purpose === "register") {
       await client.query(
         `UPDATE users
          SET email_verified_at = now(),
@@ -112,7 +104,7 @@ export async function confirmEmailToken(hash) {
       );
 
       if (conflict.rows.length) {
-        await client.query('ROLLBACK');
+        await client.query("ROLLBACK");
         return { conflict: true };
       }
 
@@ -133,7 +125,8 @@ export async function confirmEmailToken(hash) {
       );
       await client.query(
         `DELETE FROM user_sessions
-         WHERE sess->>'userId' = $1`,
+         WHERE sess->>'userId' = $1
+            OR sess->>'pendingTwoFactorUserId' = $1`,
         [String(user.id)],
       );
     }
@@ -143,7 +136,7 @@ export async function confirmEmailToken(hash) {
       [user.id],
     );
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return {
       purpose: token.purpose,
@@ -151,7 +144,7 @@ export async function confirmEmailToken(hash) {
       newEmail: token.target_email,
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();

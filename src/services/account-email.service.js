@@ -1,32 +1,24 @@
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
-import { AppError } from '../utils/AppError.js';
-import { env } from '../config/env.js';
-import { query } from '../config/database.js';
-import { verifyPassword } from '../utils/password.js';
+import { AppError } from "../utils/AppError.js";
+import { env } from "../config/env.js";
+import { query } from "../config/database.js";
+import { verifyPassword } from "../utils/password.js";
 
-import {
-  findUserByEmail,
-  findUserById } from
-'../repositories/users.repository.js';
+import { findUserByEmail, findUserById } from "../repositories/users.repository.js";
 
 import {
   createPendingEmailToken,
   deleteUnsentToken,
-  confirmEmailToken } from
-'../repositories/account-email.repository.js';
+  confirmEmailToken,
+} from "../repositories/account-email.repository.js";
 
-import { sendTransactionalEmail } from './brevo.service.js';
-import { escapeHtml } from '../utils/html.js';
+import { sendTransactionalEmail } from "./brevo.service.js";
+import { escapeHtml } from "../utils/html.js";
 
-const sha256 = (value) =>
-crypto.createHash('sha256').update(value).digest('hex');
-async function deliverConfirmation({
-  userId,
-  purpose,
-  email
-}) {
-  const token = crypto.randomBytes(32).toString('hex');
+const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+async function deliverConfirmation({ userId, purpose, email }) {
+  const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = sha256(token);
 
   const saved = await createPendingEmailToken({
@@ -34,23 +26,19 @@ async function deliverConfirmation({
     purpose,
     email,
     hash: tokenHash,
-    expiresAt: new Date(Date.now() + 30 * 60_000)
+    expiresAt: new Date(Date.now() + 30 * 60_000),
   });
 
   if (!saved) {
-    throw new AppError(
-      429,
-      'EMAIL_CONFIRMATION_COOLDOWN'
-
-    );
+    throw new AppError(429, "EMAIL_CONFIRMATION_COOLDOWN");
   }
 
-  const url =
-  `${env.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  const url = `${env.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
-  const label = purpose === 'change' ?
-  'Confirm your new email address' :
-  'Confirm your account email';
+  const label =
+    purpose === "change"
+      ? "Confirm your new email address"
+      : "Confirm your account email";
 
   try {
     await sendTransactionalEmail({
@@ -59,9 +47,9 @@ async function deliverConfirmation({
       subject: `${label} — Deadsmile Games`,
 
       text:
-      `${label}:\n\n${url}\n\n` +
-      'This link expires in 30 minutes and can only be used once. ' +
-      'If you did not request it, ignore this email.',
+        `${label}:\n\n${url}\n\n` +
+        "This link expires in 30 minutes and can only be used once. " +
+        "If you did not request it, ignore this email.",
 
       html: `
         <div style="
@@ -97,7 +85,7 @@ async function deliverConfirmation({
             If you did not request this, ignore this message.
           </p>
         </div>
-      `
+      `,
     });
   } catch (error) {
     await deleteUnsentToken(userId, tokenHash);
@@ -107,24 +95,18 @@ async function deliverConfirmation({
 export async function sendRegistrationEmail(user) {
   await deliverConfirmation({
     userId: user.id,
-    purpose: 'register',
-    email: user.email
+    purpose: "register",
+    email: user.email,
   });
 }
-export async function resendRegistrationEmail({
-  email,
-  password
-}) {
+export async function resendRegistrationEmail({ email, password }) {
   const user = await findUserByEmail(email);
 
   if (!user) {
     return { sent: true };
   }
 
-  const valid = await verifyPassword(
-    user.password_hash,
-    password
-  );
+  const valid = await verifyPassword(user.password_hash, password);
 
   if (!valid || user.email_verified_at) {
     return { sent: true };
@@ -134,76 +116,47 @@ export async function resendRegistrationEmail({
 
   return { sent: true };
 }
-export async function requestEmailChange(
-userId,
-{ email, password })
-{
+export async function requestEmailChange(userId, { email, password }) {
   const user = await findUserById(userId);
 
   if (!user) {
-    throw new AppError(
-      404,
-      'USER_NOT_FOUND'
-
-    );
+    throw new AppError(404, "USER_NOT_FOUND");
   }
 
   if (!user.email_verified_at) {
-    throw new AppError(
-      403,
-      'EMAIL_NOT_VERIFIED'
-
-    );
+    throw new AppError(403, "EMAIL_NOT_VERIFIED");
   }
 
   if (email === user.email) {
-    throw new AppError(
-      400,
-      'EMAIL_UNCHANGED'
-
-    );
+    throw new AppError(400, "EMAIL_UNCHANGED");
   }
-  const { rows } = await query(
-    'SELECT password_hash FROM users WHERE id = $1',
-    [userId]
-  );
+  const { rows } = await query("SELECT password_hash FROM users WHERE id = $1", [userId]);
 
-  if (
-  !rows[0] ||
-  !(await verifyPassword(rows[0].password_hash, password)))
-  {
-    throw new AppError(
-      401,
-      'INVALID_PASSWORD'
-
-    );
+  if (!rows[0] || !(await verifyPassword(rows[0].password_hash, password))) {
+    throw new AppError(401, "INVALID_PASSWORD");
   }
 
   const existing = await findUserByEmail(email);
 
   if (existing) {
-    throw new AppError(
-      409,
-      'EMAIL_TAKEN'
-
-    );
+    throw new AppError(409, "EMAIL_TAKEN");
   }
   await deliverConfirmation({
     userId,
-    purpose: 'change',
-    email
+    purpose: "change",
+    email,
   });
   await sendTransactionalEmail({
     to: user.email,
-    subject: 'Email change requested — Deadsmile Games',
+    subject: "Email change requested — Deadsmile Games",
 
     text:
-    `A request was made to change your Deadsmile Games ` +
-    `account email to ${email}.\n\n` +
-    `Your current email remains unchanged until the ` +
-    `new address is confirmed.\n\n` +
-    `If this was not you, change your password ` +
-    `and contact support.`,
+      `A request was made to change your Deadsmile Games ` +
+      `account email to ${email}.\n\n` +
+      `Your current email remains unchanged until the ` +
+      `new address is confirmed.\n\n` +
+      `If this was not you, change your password ` +
+      `and contact support.`,
 
     html: `
       <p>
@@ -219,10 +172,10 @@ userId,
         If this was not you, change your password
         and contact support.
       </p>
-    `
+    `,
   }).catch((error) => {
-    console.error('Old-address notification failed', {
-      code: error?.code || null
+    console.error("Old-address notification failed", {
+      code: error?.code || null,
     });
   });
 
@@ -232,24 +185,20 @@ export async function confirmAccountEmail(rawToken) {
   const result = await confirmEmailToken(sha256(rawToken));
 
   if (!result || result.conflict) {
-    throw new AppError(
-      400,
-      'EMAIL_CONFIRMATION_INVALID'
-
-    );
+    throw new AppError(400, "EMAIL_CONFIRMATION_INVALID");
   }
 
-  if (result.purpose === 'change') {
+  if (result.purpose === "change") {
     await sendTransactionalEmail({
       to: result.oldEmail,
 
-      subject: 'Your account email was changed — Deadsmile Games',
+      subject: "Your account email was changed — Deadsmile Games",
 
       text:
-      `Your Deadsmile Games account email was changed ` +
-      `to ${result.newEmail}.\n\n` +
-      `If this was not you, contact support immediately ` +
-      `and reset your password.`,
+        `Your Deadsmile Games account email was changed ` +
+        `to ${result.newEmail}.\n\n` +
+        `If this was not you, contact support immediately ` +
+        `and reset your password.`,
 
       html: `
         <p>
@@ -261,16 +210,16 @@ export async function confirmAccountEmail(rawToken) {
           If this was not you, contact support immediately
           and reset your password.
         </p>
-      `
+      `,
     }).catch((error) => {
-      console.error('Email change notification failed', {
-        code: error?.code || null
+      console.error("Email change notification failed", {
+        code: error?.code || null,
       });
     });
   }
 
   return {
     verified: true,
-    emailChanged: result.purpose === 'change'
+    emailChanged: result.purpose === "change",
   };
 }

@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from "../config/database.js";
 
 export async function listNews({ limit = 12, offset = 0 } = {}) {
   const { rows } = await query(
@@ -8,14 +8,17 @@ export async function listNews({ limit = 12, offset = 0 } = {}) {
      LEFT JOIN games linked ON linked.id = n.game_id
      ORDER BY n.published_at DESC
      LIMIT $1 OFFSET $2`,
-    [limit, offset]
+    [limit, offset],
   );
   return rows;
 }
 
 export async function findNews(slug) {
-  const { rows } = await query(`SELECT n.*, g.title AS game_title, g.slug AS game_slug, g.cover_image AS game_cover_image
-     FROM news n LEFT JOIN games g ON g.id = n.game_id WHERE n.slug = $1 LIMIT 1`, [slug]);
+  const { rows } = await query(
+    `SELECT n.*, g.title AS game_title, g.slug AS game_slug, g.cover_image AS game_cover_image
+     FROM news n LEFT JOIN games g ON g.id = n.game_id WHERE n.slug = $1 LIMIT 1`,
+    [slug],
+  );
   return rows[0] || null;
 }
 
@@ -29,24 +32,24 @@ export async function listVideos({ limit = 12 } = {}) {
        ORDER BY (g.id = v.game_id) DESC, length(g.title) DESC LIMIT 1
      ) linked ON true
      ORDER BY v.published_at DESC LIMIT $1`,
-    [limit]
+    [limit],
   );
   return rows;
 }
 
 export async function findVideo(id) {
-  const { rows } = await query('SELECT * FROM videos WHERE id = $1 LIMIT 1', [id]);
+  const { rows } = await query("SELECT * FROM videos WHERE id = $1 LIMIT 1", [id]);
   return rows[0] || null;
 }
 
 export async function listDownloads() {
-  const { rows } = await query('SELECT * FROM downloads ORDER BY created_at DESC');
+  const { rows } = await query("SELECT * FROM downloads ORDER BY created_at DESC");
   return rows;
 }
 
 export async function listProducts() {
   const { rows } = await query(
-    'SELECT * FROM products WHERE available = true ORDER BY created_at DESC'
+    "SELECT * FROM products WHERE available = true ORDER BY created_at DESC",
   );
   return rows;
 }

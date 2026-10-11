@@ -247,7 +247,9 @@ a {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at center, #000000a9 20%, #000 100%), url('/assets/games/screenshots/abbys-restless-heart/2.png');
+  background-image:
+    radial-gradient(circle at center, #000000a9 20%, #000 100%),
+    url("/assets/games/screenshots/abbys-restless-heart/2.png");
   background-size: auto;
   background-repeat: repeat;
 }
@@ -381,7 +383,6 @@ a {
   flex-direction: column;
 }
 
-
 .div-block-3 {
   display: -webkit-box;
   display: -webkit-flex;
@@ -414,11 +415,7 @@ a {
   -ms-flex-direction: column;
   flex-direction: column;
   background-color: #3f5473;
-  background-image: radial-gradient(
-    circle farthest-corner at 50% 50%,
-    #1d252e,
-    #1d252e
-  );
+  background-image: radial-gradient(circle farthest-corner at 50% 50%, #1d252e, #1d252e);
   background-position: 0px 0px;
   background-size: auto;
   font-family: "Berlin sans fb demi", sans-serif;

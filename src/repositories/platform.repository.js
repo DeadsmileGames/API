@@ -1,10 +1,16 @@
-import { pool, query } from '../config/database.js';
+import { pool, query } from "../config/database.js";
 
-export async function createSession({ userId, gameId, launcherVersion, gameVersion, platform }) {
+export async function createSession({
+  userId,
+  gameId,
+  launcherVersion,
+  gameVersion,
+  platform,
+}) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    await client.query("BEGIN");
+    await client.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [userId]);
     await client.query(
       `UPDATE game_sessions
        SET ended_at = started_at, duration_ms = 0
@@ -29,10 +35,10 @@ export async function createSession({ userId, gameId, launcherVersion, gameVersi
        RETURNING id, game_id, started_at`,
       [userId, gameId, launcherVersion || null, gameVersion || null, platform],
     );
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return rows[0] || null;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -42,18 +48,18 @@ export async function createSession({ userId, gameId, launcherVersion, gameVersi
 export async function finishSession({ userId, sessionId }) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const result = await client.query(
       `UPDATE game_sessions
        SET ended_at = now(),
            duration_ms = LEAST(86400000, GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::bigint))
        WHERE id = $1 AND user_id = $2 AND ended_at IS NULL
        RETURNING id, game_id, started_at, ended_at, duration_ms`,
-      [sessionId, userId]
+      [sessionId, userId],
     );
     const session = result.rows[0];
     if (!session) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return null;
     }
     await client.query(
@@ -96,17 +102,12 @@ export async function finishSession({ userId, sessionId }) {
           ),
 
         public = EXCLUDED.public`,
-      [
-        userId,
-        session.game_id,
-        session.duration_ms,
-        session.ended_at,
-      ],
+      [userId, session.game_id, session.duration_ms, session.ended_at],
     );
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return session;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -121,7 +122,7 @@ export async function listAchievements(userId, gameId) {
      LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = $1
      WHERE a.game_id = $2
      ORDER BY a.points, a.title`,
-    [userId, gameId]
+    [userId, gameId],
   );
   return rows;
 }
@@ -131,7 +132,7 @@ export async function findAchievement(gameId, key) {
     `SELECT id, game_id, key, title, description, icon_url, points, hidden
      FROM achievements
      WHERE game_id = $1 AND key = $2`,
-    [gameId, key]
+    [gameId, key],
   );
   return rows[0] || null;
 }
@@ -151,7 +152,7 @@ export async function gameAccess(userId, gameId) {
             END AS allowed
      FROM games g
      WHERE g.id = $2`,
-    [userId, gameId]
+    [userId, gameId],
   );
   return rows[0] || null;
 }
@@ -163,7 +164,7 @@ export async function unlockAchievement(userId, achievementId) {
      ON CONFLICT (user_id, achievement_id)
      DO UPDATE SET unlocked_at = user_achievements.unlocked_at
      RETURNING achievement_id, unlocked_at`,
-    [userId, achievementId]
+    [userId, achievementId],
   );
   return rows[0] || null;
 }
@@ -172,12 +173,19 @@ export async function findCloudSave(userId, gameId, slot) {
   const { rows } = await query(
     `SELECT slot, revision, payload, sha256, updated_at
      FROM cloud_saves WHERE user_id = $1 AND game_id = $2 AND slot = $3`,
-    [userId, gameId, slot]
+    [userId, gameId, slot],
   );
   return rows[0] || null;
 }
 
-export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, revision }) {
+export async function upsertCloudSave({
+  userId,
+  gameId,
+  slot,
+  payload,
+  sha256,
+  revision,
+}) {
   if (revision != null) {
     const { rows } = await query(
       `UPDATE cloud_saves SET payload = $4, sha256 = $5,
@@ -191,7 +199,7 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
              ))
          )
        RETURNING slot, revision, sha256, updated_at`,
-      [userId, gameId, slot, payload, sha256, revision]
+      [userId, gameId, slot, payload, sha256, revision],
     );
     return rows[0] || null;
   }
@@ -207,7 +215,7 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
        )
      ON CONFLICT (user_id, game_id, slot) DO NOTHING
      RETURNING slot, revision, sha256, updated_at`,
-    [userId, gameId, slot, payload, sha256]
+    [userId, gameId, slot, payload, sha256],
   );
   return rows[0] || null;
 }
@@ -215,17 +223,27 @@ export async function upsertCloudSave({ userId, gameId, slot, payload, sha256, r
 export async function setTelemetryConsent(userId, enabled) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query('UPDATE users SET telemetry_consent = $2, updated_at = now() WHERE id = $1', [userId, enabled]);
-    if (!enabled) await client.query('DELETE FROM telemetry_events WHERE user_id = $1', [userId]);
-    await client.query('COMMIT');
+    await client.query("BEGIN");
+    await client.query(
+      "UPDATE users SET telemetry_consent = $2, updated_at = now() WHERE id = $1",
+      [userId, enabled],
+    );
+    if (!enabled)
+      await client.query("DELETE FROM telemetry_events WHERE user_id = $1", [userId]);
+    await client.query("COMMIT");
     return { enabled };
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getTelemetryConsent(userId) {
-  const { rows } = await query('SELECT telemetry_consent FROM users WHERE id = $1', [userId]);
+  const { rows } = await query("SELECT telemetry_consent FROM users WHERE id = $1", [
+    userId,
+  ]);
   return Boolean(rows[0]?.telemetry_consent);
 }
 
@@ -238,7 +256,11 @@ export async function telemetryContext(userId, gameId, sessionId) {
     const session = rows[0];
     if (!session) return null;
     if (gameId && String(session.game_id) !== String(gameId)) return null;
-    return { gameId: gameId || session.game_id, sessionId, enabled: session.telemetry_enabled !== false };
+    return {
+      gameId: gameId || session.game_id,
+      sessionId,
+      enabled: session.telemetry_enabled !== false,
+    };
   }
   if (gameId) {
     const access = await gameAccess(userId, gameId);
@@ -248,34 +270,59 @@ export async function telemetryContext(userId, gameId, sessionId) {
   return { gameId: null, sessionId: null, enabled: true };
 }
 
-export async function insertTelemetry({ userId, gameId, sessionId, eventType, appVersion, payload }) {
+export async function insertTelemetry({
+  userId,
+  gameId,
+  sessionId,
+  eventType,
+  appVersion,
+  payload,
+}) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    const consent = await client.query('SELECT telemetry_consent FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    await client.query("BEGIN");
+    const consent = await client.query(
+      "SELECT telemetry_consent FROM users WHERE id = $1 FOR UPDATE",
+      [userId],
+    );
     let event = null;
     if (consent.rows[0]?.telemetry_consent) {
       const { rows } = await client.query(
         `INSERT INTO telemetry_events (user_id, game_id, session_id, event_type, app_version, payload)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
-        [userId, gameId || null, sessionId || null, eventType, appVersion || null, payload]);
+        [
+          userId,
+          gameId || null,
+          sessionId || null,
+          eventType,
+          appVersion || null,
+          payload,
+        ],
+      );
       event = rows[0];
     }
-    await client.query('COMMIT');
-    if (Math.random() < 0.01) query("DELETE FROM telemetry_events WHERE created_at < now() - interval '30 days'").catch(() => {});
+    await client.query("COMMIT");
+    if (Math.random() < 0.01)
+      query(
+        "DELETE FROM telemetry_events WHERE created_at < now() - interval '30 days'",
+      ).catch(() => {});
     return event;
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function statusSnapshot() {
   const started = Date.now();
-  await query('SELECT 1');
+  await query("SELECT 1");
   const { rows } = await query(
     `SELECT id, title, body, severity, status, started_at, resolved_at
      FROM service_incidents
      WHERE resolved_at IS NULL OR resolved_at > now() - interval '7 days'
-     ORDER BY started_at DESC LIMIT 20`
+     ORDER BY started_at DESC LIMIT 20`,
   );
   return { databaseLatencyMs: Date.now() - started, incidents: rows };
 }
@@ -301,7 +348,7 @@ export async function publicActivity(userId) {
      GROUP BY a.user_id, a.total_ms, a.sessions, a.last_played_at,
               g.id, g.title, g.slug, g.cover_image, g.hero_image, g.purchase_url
      ORDER BY a.last_played_at DESC LIMIT 8`,
-    [userId]
+    [userId],
   );
   return rows;
 }
@@ -321,11 +368,10 @@ export async function publicAchievements(userId) {
           AND u.share_achievements
       )
      ORDER BY ua.unlocked_at DESC LIMIT 12`,
-    [userId]
+    [userId],
   );
   return rows;
 }
-
 
 export async function listCloudSaves(userId, gameId) {
   const { rows } = await query(
@@ -333,7 +379,7 @@ export async function listCloudSaves(userId, gameId) {
      FROM cloud_saves
      WHERE user_id = $1 AND game_id = $2
      ORDER BY updated_at DESC, slot ASC`,
-    [userId, gameId]
+    [userId, gameId],
   );
   return rows;
 }
@@ -343,7 +389,7 @@ export async function deleteCloudSave(userId, gameId, slot) {
     `DELETE FROM cloud_saves
      WHERE user_id = $1 AND game_id = $2 AND slot = $3
      RETURNING slot, revision, sha256, updated_at`,
-    [userId, gameId, slot]
+    [userId, gameId, slot],
   );
   return rows[0] || null;
 }

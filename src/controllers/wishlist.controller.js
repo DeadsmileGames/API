@@ -1,6 +1,6 @@
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { sendSuccess } from '../utils/apiResponse.js';
-import * as service from '../services/wishlist.service.js';
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendSuccess } from "../utils/apiResponse.js";
+import * as service from "../services/wishlist.service.js";
 
 export const add = asyncHandler(async (req, res) => {
   const { gameId } = req.body;

@@ -1,14 +1,14 @@
-import crypto from 'node:crypto';
-import { sendError, sendSuccess } from '../utils/apiResponse.js';
-import { env } from '../config/env.js';
+import crypto from "node:crypto";
+import { sendError, sendSuccess } from "../utils/apiResponse.js";
+import { env } from "../config/env.js";
 
-const CSRF_COOKIE = 'deadsmile.csrf';
-const CSRF_HEADER = 'x-csrf-token';
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const CSRF_COOKIE = "deadsmile.csrf";
+const CSRF_HEADER = "x-csrf-token";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const CSRF_MAX_AGE = 24 * 60 * 60 * 1_000;
 
 function createToken() {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 function cookieOptions() {
@@ -17,9 +17,9 @@ function cookieOptions() {
     secure: env.isProduction,
     sameSite: env.cookieSameSite,
     maxAge: CSRF_MAX_AGE,
-    path: '/',
+    path: "/",
     signed: true,
-    partitioned: env.isProduction && env.cookieSameSite === 'none'
+    partitioned: env.isProduction && env.cookieSameSite === "none",
   };
 }
 
@@ -36,7 +36,7 @@ export function csrfCookie(req, res, next) {
 }
 
 export function csrfToken(_req, res) {
-  res.set('Cache-Control', 'no-store');
+  res.set("Cache-Control", "no-store");
   return sendSuccess(res, { token: res.locals.csrfToken });
 }
 
@@ -45,17 +45,17 @@ export function verifyCsrf(req, res, next) {
   const cookieToken = req.signedCookies?.[CSRF_COOKIE];
   const headerToken = req.get(CSRF_HEADER);
   if (
-  !cookieToken ||
-  !headerToken ||
-  !/^[a-f0-9]{64}$/i.test(cookieToken) ||
-  !/^[a-f0-9]{64}$/i.test(headerToken))
-  {
-    return sendError(res, 403, 'CSRF_VALIDATION_FAILED');
+    !cookieToken ||
+    !headerToken ||
+    !/^[a-f0-9]{64}$/i.test(cookieToken) ||
+    !/^[a-f0-9]{64}$/i.test(headerToken)
+  ) {
+    return sendError(res, 403, "CSRF_VALIDATION_FAILED");
   }
-  const a = Buffer.from(cookieToken, 'hex');
-  const b = Buffer.from(headerToken, 'hex');
+  const a = Buffer.from(cookieToken, "hex");
+  const b = Buffer.from(headerToken, "hex");
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return sendError(res, 403, 'CSRF_VALIDATION_FAILED');
+    return sendError(res, 403, "CSRF_VALIDATION_FAILED");
   }
   next();
 }

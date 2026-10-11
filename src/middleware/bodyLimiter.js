@@ -1,3 +1,3 @@
-import express from 'express';
+import express from "express";
 
-export const adminBodyLimiter = express.json({ limit: '3mb' });
+export const adminBodyLimiter = express.json({ limit: "3mb" });

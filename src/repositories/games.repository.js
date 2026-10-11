@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query } from "../config/database.js";
 
 const GAME_SUMMARY_SELECT = `
   SELECT
@@ -26,7 +26,7 @@ const GAME_SUMMARY_SELECT = `
 
 export async function listGames({ page, limit, featured, genre, platform, status }) {
   const conditions = [];
-  const params     = [];
+  const params = [];
 
   if (featured !== undefined) {
     params.push(featured);
@@ -62,12 +62,12 @@ export async function listGames({ page, limit, featured, genre, platform, status
     `);
   }
 
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const offset      = (page - 1) * limit;
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const offset = (page - 1) * limit;
 
   const countResult = await query(
     `SELECT COUNT(*)::int AS total FROM games g ${whereClause}`,
-    params
+    params,
   );
   const total = countResult.rows[0].total;
 
@@ -79,7 +79,7 @@ export async function listGames({ page, limit, featured, genre, platform, status
      ${whereClause}
      ORDER BY g.featured DESC, g.release_date DESC NULLS LAST, g.created_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
+    params,
   );
 
   return { items: dataResult.rows, total };
@@ -91,11 +91,10 @@ export async function findGameBySlug(slug) {
   if (!game) return null;
 
   const [screenshots, fullDesc] = await Promise.all([
-    query(
-      'SELECT url FROM game_screenshots WHERE game_id = $1 ORDER BY position ASC',
-      [game.id]
-    ),
-    query('SELECT description FROM games WHERE id = $1', [game.id]),
+    query("SELECT url FROM game_screenshots WHERE game_id = $1 ORDER BY position ASC", [
+      game.id,
+    ]),
+    query("SELECT description FROM games WHERE id = $1", [game.id]),
   ]);
 
   return {
@@ -119,7 +118,7 @@ export async function findRelatedGames(gameId, genreNames, limit = 4) {
        )
      ORDER BY g.featured DESC, g.release_date DESC NULLS LAST
      LIMIT $3`,
-    [gameId, genreNames, limit]
+    [gameId, genreNames, limit],
   );
 
   return rows;
@@ -132,21 +131,21 @@ export async function findGameContent(gameId, gameTitle) {
        FROM videos
        WHERE game_id = $1 OR (game_id IS NULL AND strpos(lower(title), lower($2)) > 0)
        ORDER BY published_at DESC`,
-      [gameId, gameTitle]
+      [gameId, gameTitle],
     ),
     query(
       `SELECT id, slug, title, category, excerpt, image, published_at
        FROM news
        WHERE game_id = $1 OR (game_id IS NULL AND strpos(lower(title), lower($2)) > 0)
        ORDER BY published_at DESC LIMIT 8`,
-      [gameId, gameTitle]
+      [gameId, gameTitle],
     ),
     query(
       `${GAME_SUMMARY_SELECT}
        WHERE g.id <> $1
        ORDER BY random()
        LIMIT 1`,
-      [gameId]
+      [gameId],
     ),
   ]);
   return {

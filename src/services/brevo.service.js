@@ -1,71 +1,49 @@
-import { BrevoClient } from '@getbrevo/brevo';
-import { env } from '../config/env.js';
-import { AppError } from '../utils/AppError.js';
+import { BrevoClient } from "@getbrevo/brevo";
+import { env } from "../config/env.js";
+import { AppError } from "../utils/AppError.js";
 
-const brevo = env.brevoApiKey ?
-new BrevoClient({
-  apiKey: env.brevoApiKey,
-  timeoutInSeconds: 15,
-  maxRetries: 2
-}) :
-null;
+const brevo = env.brevoApiKey
+  ? new BrevoClient({
+      apiKey: env.brevoApiKey,
+      timeoutInSeconds: 15,
+      maxRetries: 2,
+    })
+  : null;
 
-export async function sendTransactionalEmail({
-  to,
-  subject,
-  text,
-  html
-}) {
+export async function sendTransactionalEmail({ to, subject, text, html }) {
   if (!brevo) {
-    throw new AppError(
-      500,
-      'EMAIL_NOT_CONFIGURED'
-
-    );
+    throw new AppError(500, "EMAIL_NOT_CONFIGURED");
   }
 
   if (!env.brevoSenderEmail) {
-    throw new AppError(
-      500,
-      'EMAIL_NOT_CONFIGURED'
-
-    );
+    throw new AppError(500, "EMAIL_NOT_CONFIGURED");
   }
 
   if (!to) {
-    throw new AppError(
-      500,
-      'EMAIL_INVALID_RECIPIENT'
-
-    );
+    throw new AppError(500, "EMAIL_INVALID_RECIPIENT");
   }
 
   try {
-    const result =
-    await brevo.transactionalEmails.sendTransacEmail({
+    const result = await brevo.transactionalEmails.sendTransacEmail({
       subject,
       textContent: text,
       htmlContent: html,
       sender: {
         name: env.brevoSenderName,
-        email: env.brevoSenderEmail
+        email: env.brevoSenderEmail,
       },
       to: [
-      {
-        email: to
-      }]
-
+        {
+          email: to,
+        },
+      ],
     });
 
     return {
       sent: true,
-      messageId: result?.messageId ?? null
+      messageId: result?.messageId ?? null,
     };
   } catch {
-    throw new AppError(
-      502,
-      'EMAIL_SEND_FAILED'
-
-    );
+    throw new AppError(502, "EMAIL_SEND_FAILED");
   }
 }

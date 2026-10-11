@@ -1,11 +1,11 @@
-import { query } from '../config/database.js';
-import { sendError } from '../utils/apiResponse.js';
+import { query } from "../config/database.js";
+import { sendError } from "../utils/apiResponse.js";
 
 export async function requireAuth(req, res, next) {
-  res.set('Cache-Control', 'private, no-store');
+  res.set("Cache-Control", "private, no-store");
   const userId = req.session?.userId;
   if (!userId) {
-    return sendError(res, 401, 'UNAUTHENTICATED');
+    return sendError(res, 401, "UNAUTHENTICATED");
   }
 
   try {
@@ -13,22 +13,17 @@ export async function requireAuth(req, res, next) {
       `SELECT id, role, email_verified_at
       FROM users
       WHERE id = $1`,
-      [userId]
+      [userId],
     );
     const user = rows[0];
     if (!user) {
       req.session.destroy(() => {});
-      return sendError(res, 401, 'UNAUTHENTICATED');
+      return sendError(res, 401, "UNAUTHENTICATED");
     }
     if (!user.email_verified_at) {
       req.session.destroy(() => {});
 
-      return sendError(
-        res,
-        403,
-        'EMAIL_NOT_VERIFIED'
-
-      );
+      return sendError(res, 403, "EMAIL_NOT_VERIFIED");
     }
     req.auth = { userId: user.id, role: user.role };
     if (req.session.role && req.session.role !== user.role) {
@@ -62,10 +57,10 @@ export async function requireAuth(req, res, next) {
 export function requireRole(role) {
   return (req, res, next) => {
     if (!req.auth?.userId) {
-      return sendError(res, 401, 'UNAUTHENTICATED');
+      return sendError(res, 401, "UNAUTHENTICATED");
     }
     if (req.auth.role !== role) {
-      return sendError(res, 403, 'FORBIDDEN');
+      return sendError(res, 403, "FORBIDDEN");
     }
     return next();
   };
