@@ -18,9 +18,7 @@ const storeCatalog = JSON.parse(
   await readFile(new URL("./fixtures/store-catalog.json", import.meta.url), "utf8"),
 );
 const db = await PGlite.create({ extensions: { pg_trgm } });
-await db.exec(
-  await readFile(new URL("../src/database/schema.sql", import.meta.url), "utf8"),
-);
+await db.exec(await readFile(new URL("../src/database/schema.sql", import.meta.url), "utf8"));
 const socket = new PGLiteSocketServer({
   db,
   port: 0,
@@ -63,8 +61,7 @@ globalThis.fetch = async (input, options) => {
     if (ownedKeysOverride) return Response.json(ownedKeysOverride(page));
     return Response.json({
       per_page: 50,
-      owned_keys:
-        revoked || page > 2 ? [] : [{ id: 800 + page, game_id: page === 1 ? 999 : 1000 }],
+      owned_keys: revoked || page > 2 ? [] : [{ id: 800 + page, game_id: page === 1 ? 999 : 1000 }],
     });
   }
   if (url.endsWith("/data.json"))
@@ -124,10 +121,7 @@ function client() {
   let token;
   return {
     cookies,
-    async request(
-      path,
-      { method = "GET", body, csrf = true, language = "en", rawBody } = {},
-    ) {
+    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -137,9 +131,7 @@ function client() {
         headers: {
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
-          ...(body !== undefined || rawBody
-            ? { "Content-Type": "application/json" }
-            : {}),
+          ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
           ...(method !== "GET" && csrf ? { "X-CSRF-Token": token } : {}),
         },
         body: rawBody || (body !== undefined ? JSON.stringify(body) : undefined),
@@ -212,21 +204,15 @@ test("catalog exposes paid games without granting ownership and free additions a
   assert.equal(rows.rows[0].user_id, otherId);
   assert.equal(rows.rows[0].source, "free");
   assert.equal(rows.rows[0].revoked_at, null);
-  assert(
-    (await other.request("/library")).body.data.items.some((game) => game.id === msId),
-  );
-  assert(
-    !(await player.request("/library")).body.data.items.some((game) => game.id === msId),
-  );
+  assert((await other.request("/library")).body.data.items.some((game) => game.id === msId));
+  assert(!(await player.request("/library")).body.data.items.some((game) => game.id === msId));
   const forged = await other.request(`/library/${paidId}`, {
     method: "POST",
     body: { userId, owned: true, accessType: "free" },
   });
   assert.equal(forged.status, 409);
   assert.equal(forged.body.error.code, "ITCH_NOT_CONNECTED");
-  assert(
-    !(await other.request("/library")).body.data.items.some((game) => game.id === paidId),
-  );
+  assert(!(await other.request("/library")).body.data.items.some((game) => game.id === paidId));
 });
 
 test("launcher metadata uses locale-specific persistent caching and game details share the Store model", async () => {
@@ -392,8 +378,7 @@ test("newswire returns the persisted original in every interface language", asyn
     assert.equal(Object.hasOwn(original.body.data, "translation"), false);
   }
   assert.equal(
-    (await pool.query("SELECT body FROM news WHERE id=$1", [created.body.data.id]))
-      .rows[0].body,
+    (await pool.query("SELECT body FROM news WHERE id=$1", [created.body.data.id])).rows[0].body,
     "<p>English story.</p>",
   );
 });
@@ -411,10 +396,7 @@ test("itch callback reuses website CSS and ships bounded accessible connection s
     await (await originalFetch(`${origin}/styles/global.css`)).text(),
     await readFile(new URL("../public/styles/global.css", import.meta.url), "utf8"),
   );
-  assert.equal(
-    (await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status,
-    200,
-  );
+  assert.equal((await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status, 200);
   const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
   assert(script.includes("controller.abort()"));
   assert(script.includes("location.hash.slice(1)"));
@@ -453,17 +435,13 @@ test("CSRF, role checks and malicious payloads fail with localized safe errors",
   assert.equal(result.status, 403);
 });
 test("cloud saves are encrypted, scoped to the account and checked for concurrent updates", async () => {
-  const payload = Buffer.from(Array(8).fill("0".repeat(64)).join("\n")).toString(
-    "base64",
-  );
+  const payload = Buffer.from(Array(8).fill("0".repeat(64)).join("\n")).toString("base64");
   let result = await player.request(`/platform/saves/${freeId}/default`, {
     method: "PUT",
     body: { filename: "test.p8d.txt", payload },
   });
   assert.equal(result.status, 200, JSON.stringify(result.body));
-  const stored = await pool.query("SELECT payload FROM cloud_saves WHERE user_id=$1", [
-    userId,
-  ]);
+  const stored = await pool.query("SELECT payload FROM cloud_saves WHERE user_id=$1", [userId]);
   assert.match(stored.rows[0].payload, /^enc.v2./);
   assert.notEqual(stored.rows[0].payload, payload);
   result = await player.request(`/platform/saves/${freeId}/default`);
@@ -570,21 +548,17 @@ test("privacy defaults hide activity and telemetry consent rejects collection", 
     method: "PATCH",
     body: { enabled: false },
   });
+  assert.equal((await player.request("/platform/telemetry-consent")).body.data.enabled, false);
   assert.equal(
-    (await player.request("/platform/telemetry-consent")).body.data.enabled,
-    false,
-  );
-  assert.equal(
-    (await pool.query("SELECT count(*) FROM telemetry_events WHERE user_id=$1", [userId]))
-      .rows[0].count,
+    (await pool.query("SELECT count(*) FROM telemetry_events WHERE user_id=$1", [userId])).rows[0]
+      .count,
     "0",
   );
   assert.equal(
     (
-      await pool.query(
-        "SELECT telemetry_consent,share_game_activity FROM users WHERE id=$1",
-        [userId],
-      )
+      await pool.query("SELECT telemetry_consent,share_game_activity FROM users WHERE id=$1", [
+        userId,
+      ])
     ).rows[0].telemetry_consent,
     false,
   );
@@ -625,8 +599,8 @@ test("admin game create/edit preserves storefront data and public responses neve
   assert.equal(result.status, 201, JSON.stringify(result.body));
   const id = result.body.data.id;
   assert.equal(
-    (await pool.query("SELECT name,public FROM release_channels WHERE game_id=$1", [id]))
-      .rows[0].public,
+    (await pool.query("SELECT name,public FROM release_channels WHERE game_id=$1", [id])).rows[0]
+      .public,
     true,
   );
   result = await admin.request(`/admin/game/${id}`);
@@ -748,16 +722,13 @@ test("protected saves reject ciphertext tampering and another account scope", as
   });
   const parts = encrypted.split(".");
   parts[3] = Buffer.alloc(16).toString("base64url");
-  assert.throws(
-    () => decryptSecret(parts.join("."), `save:${userId}:${freeId}:default`),
-    { code: "SECRET_DECRYPT_FAILED" },
-  );
+  assert.throws(() => decryptSecret(parts.join("."), `save:${userId}:${freeId}:default`), {
+    code: "SECRET_DECRYPT_FAILED",
+  });
 });
 
 test("Store outages return labelled stale metadata and never create a launcher download link", async () => {
-  await pool.query(
-    "UPDATE microsoft_store_products SET fetched_at=now()-interval '2 hours'",
-  );
+  await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '2 hours'");
   storeOffline = true;
   const page = await guest.request("/launcher", { language: "pt-BR" });
   assert.equal(page.status, 200);
@@ -769,9 +740,7 @@ test("Store outages return labelled stale metadata and never create a launcher d
   assert.equal(install.status, 409);
   assert.equal(install.body.error.code, "GAME_RELEASE_NOT_CONFIGURED");
   assert.match(install.body.error.message, /download/);
-  await pool.query(
-    "UPDATE microsoft_store_products SET fetched_at=now()-interval '8 days'",
-  );
+  await pool.query("UPDATE microsoft_store_products SET fetched_at=now()-interval '8 days'");
   const expired = await guest.request("/launcher", { language: "pt-BR" });
   assert.equal(expired.status, 502);
   assert(!JSON.stringify(expired.body).includes("provider unavailable"));
@@ -787,10 +756,7 @@ test("free website download registers library membership and disconnecting itch 
   try {
     const response = await player.request("/games/store/download");
     assert.equal(response.status, 200);
-    assert.equal(
-      response.body.data.downloadUrl,
-      "https://downloads.example.test/free.zip",
-    );
+    assert.equal(response.body.data.downloadUrl, "https://downloads.example.test/free.zip");
     const free = (await player.request("/library")).body.data.items.find(
       (game) => game.id === msId,
     );
@@ -798,23 +764,13 @@ test("free website download registers library membership and disconnecting itch 
     assert.equal(free.accessType, "free");
     assert.equal(free.inLibrary, true);
     assert.equal((await player.request("/library/sync", { method: "POST" })).status, 200);
-    assert.equal(
-      (await player.request(`/library/${paidId}`, { method: "POST" })).status,
-      200,
-    );
-    assert(
-      (await player.request("/library")).body.data.items.some(
-        (game) => game.id === paidId,
-      ),
-    );
+    assert.equal((await player.request(`/library/${paidId}`, { method: "POST" })).status, 200);
+    assert((await player.request("/library")).body.data.items.some((game) => game.id === paidId));
     const disconnected = await player.request("/integrations/itch", { method: "DELETE" });
     assert.equal(disconnected.status, 200);
     assert.equal(
-      (
-        await pool.query("SELECT user_id FROM user_itch_accounts WHERE user_id=$1", [
-          userId,
-        ])
-      ).rows.length,
+      (await pool.query("SELECT user_id FROM user_itch_accounts WHERE user_id=$1", [userId])).rows
+        .length,
       0,
     );
     const catalog = (await player.request("/library/catalog")).body.data.items;
@@ -823,9 +779,7 @@ test("free website download registers library membership and disconnecting itch 
     const library = (await player.request("/library")).body.data.items;
     assert(!library.some((game) => game.id === paidId));
     assert(library.some((game) => game.id === msId));
-    assert(
-      (await other.request("/library")).body.data.items.some((game) => game.id === msId),
-    );
+    assert((await other.request("/library")).body.data.items.some((game) => game.id === msId));
   } finally {
     await pool.query("UPDATE games SET download_url=null WHERE id=$1", [msId]);
   }
@@ -887,10 +841,7 @@ test("installation metadata uses the configured URL and rejects an unrelated bui
     });
     assert.equal(valid.status, 200);
     assert.equal(valid.body.data.downloadUrl, configured);
-    await pool.query("UPDATE game_builds SET download_url=$2 WHERE game_id=$1", [
-      msId,
-      alternate,
-    ]);
+    await pool.query("UPDATE game_builds SET download_url=$2 WHERE game_id=$1", [msId, alternate]);
     const different = await player.request(`/library/${msId}/install-metadata`, {
       method: "POST",
     });
@@ -910,8 +861,7 @@ test("installation metadata uses the configured URL and rejects an unrelated bui
 
 test("password reset tokens are consumed once, expire safely and invalidate authenticated and pending 2FA sessions", async () => {
   const { createHash } = await import("node:crypto");
-  const { createResetToken } =
-    await import("../src/repositories/password-resets.repository.js");
+  const { createResetToken } = await import("../src/repositories/password-resets.repository.js");
   const id = "00000000-0000-4000-8000-000000000090";
   await pool.query(
     "DELETE FROM api_rate_limits WHERE scope IN ('login','reset-password','two-factor')",
@@ -941,11 +891,8 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     expiresAt: new Date(Date.now() + 60000),
   });
   const unrelatedBefore = Number(
-    (
-      await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [
-        userId,
-      ])
-    ).rows[0].count,
+    (await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [userId]))
+      .rows[0].count,
   );
   const results = await Promise.all(
     [1, 2].map(() =>
@@ -956,10 +903,7 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     ),
   );
   assert.deepEqual(results.map((item) => item.status).sort(), [200, 400]);
-  assert.equal(
-    results.find((item) => item.status === 400).body.error.code,
-    "INVALID_TOKEN",
-  );
+  assert.equal(results.find((item) => item.status === 400).body.error.code, "INVALID_TOKEN");
   assert.equal((await logged.request("/auth/me")).status, 401);
   const { default: speakeasy } = await import("speakeasy");
   const consumedChallenge = await pending.request("/auth/verify-2fa", {
@@ -968,20 +912,14 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
   });
   assert.equal(consumedChallenge.body.error.code, "TWO_FACTOR_CHALLENGE_EXPIRED");
   assert.equal(
-    (
-      await pool.query("SELECT used_at FROM password_resets WHERE token_hash=$1", [
-        tokenHash,
-      ])
-    ).rows[0].used_at !== null,
+    (await pool.query("SELECT used_at FROM password_resets WHERE token_hash=$1", [tokenHash]))
+      .rows[0].used_at !== null,
     true,
   );
   assert.equal(
     Number(
-      (
-        await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [
-          userId,
-        ])
-      ).rows[0].count,
+      (await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [userId]))
+        .rows[0].count,
     ),
     unrelatedBefore,
   );
@@ -1099,16 +1037,16 @@ test("hidden achievements keep their secret content out of the API response unti
     )
   ).rows[0].id;
   try {
-    const before = (
-      await player.request(`/platform/achievements/${msId}`)
-    ).body.data.find((item) => item.id === hidden);
+    const before = (await player.request(`/platform/achievements/${msId}`)).body.data.find(
+      (item) => item.id === hidden,
+    );
     assert.equal(before.title, null);
     assert.equal(before.description, null);
     assert.equal(before.icon_url, null);
-    await pool.query(
-      "INSERT INTO user_achievements(user_id,achievement_id) VALUES($1,$2)",
-      [userId, hidden],
-    );
+    await pool.query("INSERT INTO user_achievements(user_id,achievement_id) VALUES($1,$2)", [
+      userId,
+      hidden,
+    ]);
     const after = (await player.request(`/platform/achievements/${msId}`)).body.data.find(
       (item) => item.id === hidden,
     );
@@ -1125,8 +1063,7 @@ test("hidden achievements keep their secret content out of the API response unti
 
 test("live tickets are tied to an active session and revoked sessions cannot receive private events or reconnect", async () => {
   const { WebSocket } = await import("ws");
-  const { attachRealtimeServer, signalRealtimeEvent } =
-    await import("../src/realtime/hub.js");
+  const { attachRealtimeServer, signalRealtimeEvent } = await import("../src/realtime/hub.js");
   attachRealtimeServer(server);
   const id = "00000000-0000-4000-8000-000000000093";
   await pool.query("DELETE FROM api_rate_limits WHERE scope IN ('login','integration')");
@@ -1147,10 +1084,7 @@ test("live tickets are tied to an active session and revoked sessions cannot rec
   const received = [];
   websocket.on("message", (message) => received.push(JSON.parse(message)));
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("WebSocket connection timeout")),
-      2000,
-    );
+    const timer = setTimeout(() => reject(new Error("WebSocket connection timeout")), 2000);
     websocket.once("message", () => {
       clearTimeout(timer);
       resolve();
@@ -1196,4 +1130,95 @@ test("live tickets are tied to an active session and revoked sessions cannot rec
   });
   reused.terminate();
   await pool.query("DELETE FROM users WHERE id=$1", [id]);
+});
+
+test("Android login, library, sessions and achievements share the existing account without crossing owners", async () => {
+  const mobileId = "00000000-0000-4000-8000-000000000101";
+  const abbyId = "00000000-0000-4000-8000-000000000102";
+  await pool.query(
+    "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'android@example.test','android',$2,now())",
+    [mobileId, password],
+  );
+  await pool.query(
+    "INSERT INTO games(id,title,slug,short_description,status,access_type) VALUES($1,'Abby','abbys-restless-heart','Abby','released','free')",
+    [abbyId],
+  );
+  await pool.query(
+    "INSERT INTO achievements(game_id,key,title,description,points,hidden) VALUES($1,'first_checkpoint','Checkpoint','Reached a checkpoint',20,false),($1,'no_death_finish','Secret','Finished without deaths',150,true)",
+    [abbyId],
+  );
+  const mobile = client();
+  await mobile.login("android");
+  const account = (await mobile.request("/auth/me")).body.data;
+  assert.equal(account.id, mobileId);
+  assert.equal(account.password_hash, undefined);
+  const game = await mobile.request("/games/abbys-restless-heart");
+  assert.equal(game.status, 200);
+  assert.equal(game.body.data.id, abbyId);
+  const library = await mobile.request(`/library/${abbyId}`, { method: "POST", body: {} });
+  assert.equal(library.status, 200);
+  assert.equal(library.body.data.inLibrary, true);
+  const started = await mobile.request("/platform/sessions", {
+    method: "POST",
+    body: { gameId: abbyId, gameVersion: "0.38", platform: "android" },
+  });
+  assert.equal(started.status, 201, JSON.stringify(started.body));
+  const sessionId = started.body.data.id;
+  assert.equal(
+    (
+      await pool.query("SELECT platform,user_id,game_version FROM game_sessions WHERE id=$1", [
+        sessionId,
+      ])
+    ).rows[0].platform,
+    "android",
+  );
+  const invalid = await mobile.request("/platform/sessions", {
+    method: "POST",
+    body: { gameId: abbyId, platform: "android-forged" },
+  });
+  assert.equal(invalid.status, 400);
+  const unlockPath = `/platform/achievements/${abbyId}/first_checkpoint/unlock`;
+  const rejected = await mobile.request(unlockPath, {
+    method: "POST",
+    body: { expectedUserId: otherId },
+  });
+  assert.equal(rejected.status, 409);
+  assert.equal(rejected.body.error.code, "ACCOUNT_CHANGED");
+  const first = await mobile.request(unlockPath, {
+    method: "POST",
+    body: { expectedUserId: mobileId },
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const repeated = await mobile.request(unlockPath, {
+    method: "POST",
+    body: { expectedUserId: mobileId },
+  });
+  assert.equal(repeated.body.data.unlocked_at, first.body.data.unlocked_at);
+  const achievements = (await mobile.request(`/platform/achievements/${abbyId}`)).body.data;
+  assert(achievements.find((item) => item.key === "first_checkpoint").unlocked_at);
+  assert.equal(achievements.find((item) => item.key === "no_death_finish").description, null);
+  const another = (await other.request(`/platform/achievements/${abbyId}`)).body.data;
+  assert.equal(another.find((item) => item.key === "first_checkpoint").unlocked_at, null);
+  assert.equal(
+    (await other.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
+      .status,
+    409,
+  );
+  const ended = await mobile.request(`/platform/sessions/${sessionId}/end`, {
+    method: "POST",
+    body: {},
+  });
+  assert.equal(ended.status, 200);
+  assert(ended.body.data.duration_ms >= 0);
+  assert.equal(
+    (await mobile.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
+      .status,
+    409,
+  );
+  assert.equal(
+    (await mobile.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
+    "ITCH_NOT_CONNECTED",
+  );
+  await mobile.request("/auth/logout", { method: "POST", body: {} });
+  assert.equal((await mobile.request(`/platform/achievements/${abbyId}`)).status, 401);
 });

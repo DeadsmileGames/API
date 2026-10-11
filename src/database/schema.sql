@@ -100,7 +100,7 @@ CREATE TABLE "game_builds" (
 	"published_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "game_builds_game_id_channel_id_version_platform_architectur_key" UNIQUE("game_id","channel_id","version","platform","architecture"),
-	CONSTRAINT "game_builds_platform_check" CHECK ((platform = ANY (ARRAY['windows'::text, 'linux'::text, 'macos'::text]))),
+	CONSTRAINT "game_builds_platform_check" CHECK ((platform = ANY (ARRAY['windows'::text, 'linux'::text, 'macos'::text, 'android'::text]))),
 	CONSTRAINT "game_builds_published_source_check" CHECK (((status <> 'published'::text) OR (NULLIF(btrim(itch_channel), ''::text) IS NOT NULL) OR ((download_url IS NOT NULL) AND (sha256 IS NOT NULL) AND (size_bytes IS NOT NULL) AND (size_bytes > 0)))),
 	CONSTRAINT "game_builds_sha256_check" CHECK (((sha256 IS NULL) OR (sha256 ~ '^[a-f0-9]{64}$'::text))),
 	CONSTRAINT "game_builds_size_bytes_check" CHECK (((size_bytes IS NULL) OR (size_bytes >= 0))),
@@ -133,7 +133,7 @@ CREATE TABLE "game_sessions" (
 	"ended_at" timestamp with time zone,
 	"duration_ms" bigint,
 	CONSTRAINT "game_sessions_duration_ms_check" CHECK (((duration_ms IS NULL) OR ((duration_ms >= 0) AND (duration_ms <= 86400000)))),
-	CONSTRAINT "game_sessions_platform_check" CHECK ((platform = ANY (ARRAY['windows'::text, 'linux'::text, 'macos'::text])))
+	CONSTRAINT "game_sessions_platform_check" CHECK ((platform = ANY (ARRAY['windows'::text, 'linux'::text, 'macos'::text, 'android'::text])))
 );
 CREATE TABLE "games" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

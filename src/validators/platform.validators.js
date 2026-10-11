@@ -25,7 +25,7 @@ export const sessionStartSchema = z
     gameId: uuid,
     launcherVersion: z.string().trim().max(40).optional().nullable(),
     gameVersion: z.string().trim().max(40).optional().nullable(),
-    platform: z.enum(["windows", "linux", "macos"]).default("windows"),
+    platform: z.enum(["windows", "linux", "macos", "android"]).default("windows"),
   })
   .strict();
 
@@ -75,17 +75,12 @@ export const telemetrySchema = z
   .object({
     gameId: uuid.optional().nullable(),
     sessionId: uuid.optional().nullable(),
-    eventType: z.enum([
-      "launcher_crash",
-      "game_crash",
-      "install_failed",
-      "update_failed",
-    ]),
+    eventType: z.enum(["launcher_crash", "game_crash", "install_failed", "update_failed"]),
     appVersion: z.string().trim().max(40).optional().nullable(),
     payload: z
       .object({
         code: z.enum(Object.keys(catalog.en)).optional(),
-        platform: z.enum(["windows", "linux", "macos"]).optional(),
+        platform: z.enum(["windows", "linux", "macos", "android"]).optional(),
       })
       .strict()
       .optional()

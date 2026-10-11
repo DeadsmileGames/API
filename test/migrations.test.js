@@ -58,7 +58,7 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      13,
+      14,
     );
     await db.query(
       "UPDATE games SET download_url='https://downloads.example.test/' || repeat('x', 300) || '.zip' WHERE slug='free'",

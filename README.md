@@ -1,4 +1,4 @@
-# Deadsmile Games API 1.7.1
+# Deadsmile Games API 1.7.2
 
 Node.js 24+, Express e PostgreSQL. A API autoriza contas e jogos e disponibiliza catálogo, newswire, saves, sessões, conquistas e consentimento de diagnóstico.
 
@@ -52,7 +52,7 @@ O callback itch.io reutiliza CSS e fontes do website, com carregamento acessíve
 
 ## Produção
 
-Publique API, website e launcher 1.7.1 em conjunto e aplique as migrações antes da nova API. Configure HTTPS, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, segredos independentes, CORS, e-mail e reCAPTCHA. PostgreSQL remoto verifica TLS; use `DATABASE_SSL_CA` se houver CA privada.
+Publique a API 1.7.2 depois de aplicar as migrações. O website e o launcher 1.7.1 continuam compatíveis. Configure HTTPS, `NODE_ENV=production`, `COOKIE_SAMESITE=none`, segredos independentes, CORS, e-mail e reCAPTCHA. PostgreSQL remoto verifica TLS; use `DATABASE_SSL_CA` se houver CA privada.
 
 `render.yaml` configura Starter pago, Node 24, health check, migração antes da publicação, pool limitado e encerramento gracioso. Não modifica automaticamente um serviço existente. O plano gratuito suspende o serviço após inatividade; código e health check não eliminam essa regra. Documentação: https://render.com/docs/free e https://render.com/docs/blueprint-spec.
 
@@ -64,4 +64,12 @@ Os testes cobrem migrações, contratos HTTP, acesso pago/gratuito, preços, san
 
 Redefinições de senha consomem todos os tokens pendentes da conta na mesma transação e revogam sessões autenticadas e desafios de duas etapas. Alterações confirmadas de e-mail e exclusão da conta também revogam os desafios. Tickets WebSocket estão vinculados à sessão ativa; eventos privados e a conexão são revalidados. Conquistas ocultas não expõem conteúdo antes do desbloqueio. Nomes de usuário são comparados sem distinguir maiúsculas, e remover o avatar salva o valor nulo. O comando `db:encrypt` identifica corretamente sua execução por caminho de arquivo.
 
-A leitura itch.io preserva compras confirmadas quando uma página do provedor é inválida e aceita o objeto vazio terminal somente com o número de página correto. Os 50 testes passaram em banco isolado. Esta revisão não adiciona migrações; os 14 arquivos SQL enviados, incluindo o schema, foram preservados byte a byte.
+A leitura itch.io preserva compras confirmadas quando uma página do provedor é inválida e aceita o objeto vazio terminal somente com o número de página correto. Os 51 testes passaram em banco isolado. As migrações 001–013 foram preservadas byte a byte; a migração 014 e o schema atualizado acrescentam a plataforma Android.
+
+## Jogo Android 0.38
+
+A migração `014_android_game_sessions.sql` acrescenta `android` às plataformas permitidas em `game_sessions`. Execute `npm run db:migrate` antes de publicar esta versão. A alteração não modifica sessões existentes.
+
+O jogo utiliza o login móvel já existente, CSRF, duas etapas, biblioteca, sessões de partida e conquistas. Acesso gratuito é registrado sem itch.io; acesso pago continua exigindo comprovação. O teste de integração cobre login Android, inscrição na biblioteca, plataforma, desbloqueio idempotente, isolamento entre contas e recusa de acesso pago sem compra. Não foi feita uma chamada ao seu banco de produção.
+
+Para conferir o cadastro de Abby e as cinco conquistas, execute `npm run db:check-abby`. Para atualizar os fallbacks offline do Android após editar o catálogo mestre: `python caminho-do-projeto-android/scripts/sync-api-errors.py src/utils/errorCatalog.json`.
