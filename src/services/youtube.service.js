@@ -222,6 +222,9 @@ export async function searchSoundtrackVideos(language = "en") {
         description: details?.description || item.description,
         thumbnail: details?.thumbnail || item.thumbnail,
         publishedAt: details?.publishedAt || item.publishedAt,
+        state: details?.state || "none",
+        startsAt: details?.startsAt || null,
+        actualStartedAt: details?.actualStartedAt || null,
       };
     })
     .filter((item) => /\bsoundtracks?\b/i.test(item.title));
