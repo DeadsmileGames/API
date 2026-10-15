@@ -148,7 +148,19 @@ async function getOfficialSoundtrackChannelId() {
 export async function searchSoundtrackVideos(language = "en") {
   const locale = normalizeLanguage(language);
   const cached = soundtrackCache.get(locale);
-  if (cached && cached.expires > Date.now()) return cached.items;
+  if (cached && cached.expires > Date.now()) {
+    const details = await fetchDetails(cached.items.map((item) => item.id), locale);
+    return cached.items.map((item) => {
+      const detail = details.get(item.id);
+      if (!detail) return item;
+      return {
+        ...item,
+        state: detail.state || "none",
+        startsAt: detail.startsAt || null,
+        actualStartedAt: detail.actualStartedAt || null,
+      };
+    });
+  }
 
   if (!env.youtubeApiKey) {
     soundtrackCache.set(locale, { expires: Date.now() + SOUNDTRACK_CACHE_MS, items: [] });
