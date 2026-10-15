@@ -1,4 +1,5 @@
 import { env } from "../config/env.js";
+import { AppError } from "../utils/AppError.js";
 import { youtubeVideoId } from "../utils/youtube.js";
 
 const CACHE_MS = 60_000;
@@ -101,4 +102,74 @@ export async function findPremiere(videos, language = "en") {
       })
       .sort((a, b) => Date.parse(a.info.startsAt) - Date.parse(b.info.startsAt))[0] || null
   );
+}
+
+
+const SOUNDTRACK_CACHE_MS = 20 * 60 * 1000;
+const soundtrackCache = new Map();
+
+export async function searchSoundtrackVideos(language = "en") {
+  const locale = normalizeLanguage(language);
+  const cached = soundtrackCache.get(locale);
+  if (cached && cached.expires > Date.now()) return cached.items;
+
+  if (!env.youtubeApiKey) {
+    soundtrackCache.set(locale, { expires: Date.now() + SOUNDTRACK_CACHE_MS, items: [] });
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    part: "snippet",
+    q: "soundtrack",
+    type: "video",
+    maxResults: "50",
+    order: "relevance",
+    hl: locale,
+    relevanceLanguage: locale === "pt-BR" ? "pt" : locale,
+    key: env.youtubeApiKey,
+  });
+
+  let data;
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?${params}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!response.ok) throw new AppError(503, "YOUTUBE_UNAVAILABLE");
+    data = await response.json();
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(503, "YOUTUBE_UNAVAILABLE");
+  }
+
+  const items = (Array.isArray(data?.items) ? data.items : [])
+    .map((item) => {
+      const snippet = item?.snippet || {};
+      const id = item?.id?.videoId;
+      const thumbnails = snippet.thumbnails || {};
+      return {
+        id: typeof id === "string" ? id : "",
+        title: typeof snippet.title === "string" ? snippet.title : "",
+        description: typeof snippet.description === "string" ? snippet.description : "",
+        channelTitle: typeof snippet.channelTitle === "string" ? snippet.channelTitle : "",
+        publishedAt: snippet.publishedAt || null,
+        thumbnail:
+          thumbnails.maxres?.url ||
+          thumbnails.standard?.url ||
+          thumbnails.high?.url ||
+          thumbnails.medium?.url ||
+          thumbnails.default?.url ||
+          null,
+        watchUrl: typeof id === "string"
+          ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
+          : null,
+      };
+    })
+    .filter((item) => item.id && /\bsoundtracks?\b/i.test(item.title) && item.watchUrl);
+
+  soundtrackCache.set(locale, {
+    expires: Date.now() + SOUNDTRACK_CACHE_MS,
+    items,
+  });
+  return items;
 }
