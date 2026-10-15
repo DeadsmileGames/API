@@ -579,6 +579,21 @@ test("changing a free game to paid invalidates old free entitlements", async () 
   assert(access.rows[0].revoked_at);
 });
 
+test("game latest lists only news linked to that game and premiere stays empty without YouTube", async () => {
+  await admin.request("/admin/newsletter", {
+    method: "POST",
+    body: { title: "Unrelated story", body: "Body" },
+  });
+  let result = await guest.request("/games/free/latest");
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert(result.body.data.length > 0);
+  assert(result.body.data.every((item) => item.game_slug === "free"));
+  assert(!result.body.data.some((item) => item.title === "Unrelated story"));
+  assert.equal((await guest.request("/games/missing-game/latest")).status, 404);
+  result = await guest.request("/videos/premiere");
+  assert.deepEqual(result.body.data, { premiere: null });
+});
+
 test("admin game create/edit preserves storefront data and public responses never expose download configuration", async () => {
   const badge =
     '<a href="https://get.microsoft.com/installer/download/9P6P8284V337?referrer=appbadge">\n  <img src="https://get.microsoft.com/images/en-us%20light.svg">\n</a>';
