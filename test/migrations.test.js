@@ -58,7 +58,13 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      14,
+      15,
+    );
+    assert.equal(
+      (await db.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_game_entitlements' AND column_name = 'hidden_from_library_at') AS present",
+      )).rows[0].present,
+      true,
     );
     await db.query(
       "UPDATE games SET download_url='https://downloads.example.test/' || repeat('x', 300) || '.zip' WHERE slug='free'",
