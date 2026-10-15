@@ -14,6 +14,13 @@ export async function getNews(query) {
   return listNews(query);
 }
 
+export async function getLatestNewsByGameSlug(slug) {
+  const { findGameBySlug } = await import("../repositories/games.repository.js");
+  const game = await findGameBySlug(slug);
+  if (!game) throw new AppError(404, "GAME_NOT_FOUND");
+  return listLatestNewsByGameSlug(slug);
+}
+
 export async function getNewsBySlug(slug) {
   const item = await findNews(slug);
   if (!item) throw new AppError(404, "NEWS_NOT_FOUND");
