@@ -84,10 +84,11 @@ function soundtrackMentionsGame(video, game) {
 }
 
 export async function getSoundtracks(language = "en") {
-  const [videos, games] = await Promise.all([
-    searchSoundtrackVideos(language),
-    listSoundtrackGames(),
-  ]);
+  // First search for official-channel soundtrack videos, then associate them with catalog games.
+  const videos = await searchSoundtrackVideos(language);
+  if (!videos.length) return { groups: [], total: 0 };
+
+  const games = await listSoundtrackGames();
   const groups = new Map();
 
   for (const video of videos) {
