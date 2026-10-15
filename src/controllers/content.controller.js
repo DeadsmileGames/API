@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import * as service from "../services/content.service.js";
+import { getGameLatestNews } from "../services/games.service.js";
 
 export const news = asyncHandler(async (req, res) => {
   const data = await service.getNews(req.query);
@@ -8,7 +9,7 @@ export const news = asyncHandler(async (req, res) => {
 });
 
 export const latestNewsByGame = asyncHandler(async (req, res) => {
-  const data = await service.getLatestNewsByGameSlug(req.params.slug);
+  const data = await getGameLatestNews(req.params.slug, req.query);
   sendSuccess(res, data);
 });
 
@@ -20,6 +21,10 @@ export const newsDetails = asyncHandler(async (req, res) => {
 export const videos = asyncHandler(async (req, res) => {
   const data = await service.getVideos(req.query);
   sendSuccess(res, data);
+});
+
+export const premiere = asyncHandler(async (_req, res) => {
+  sendSuccess(res, await service.getPremiere());
 });
 
 export const videoDetails = asyncHandler(async (req, res) => {
