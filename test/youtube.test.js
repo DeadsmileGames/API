@@ -21,6 +21,7 @@ test("premiere detection keeps upcoming videos within 24 hours and live videos w
     { id: "soonsoon01", snippet: { liveBroadcastContent: "upcoming", title: "Soon" }, liveStreamingDetails: { scheduledStartTime: hours(5) } },
     { id: "farfarfar01", snippet: { liveBroadcastContent: "upcoming" }, liveStreamingDetails: { scheduledStartTime: hours(48) } },
     { id: "plainplain1", snippet: { liveBroadcastContent: "none" } },
+    { id: "transition1", snippet: { liveBroadcastContent: "upcoming", title: "Starting now" }, liveStreamingDetails: { scheduledStartTime: hours(-2 / 60) } },
     { id: "livestream1", snippet: { liveBroadcastContent: "live", title: "Live now" }, liveStreamingDetails: { actualStartTime: hours(-1) } },
   ];
   const originalFetch = globalThis.fetch;
@@ -34,7 +35,10 @@ test("premiere detection keeps upcoming videos within 24 hours and live videos w
     assert.equal(upcoming.video.id, "soonsoon01");
     assert.equal(upcoming.info.state, "upcoming");
     assert.equal(await findPremiere(videos.slice(1, 3)), null);
-    const live = await findPremiere([videos[3]]);
+    const transition = await findPremiere([videos[3]]);
+    assert.equal(transition.video.id, "transition1");
+    assert.equal(transition.info.state, "upcoming");
+    const live = await findPremiere([videos[4]]);
     assert.equal(live.video.id, "livestream1");
     assert.equal(live.info.state, "live");
     assert.equal(live.info.startsAt, live.info.actualStartedAt);
