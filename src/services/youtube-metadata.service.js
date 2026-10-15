@@ -55,6 +55,7 @@ export async function getYoutubeMetadata(values) {
             publishedAt: typeof snippet.publishedAt === "string" ? snippet.publishedAt : null,
             thumbnail,
             premiereAt: premiereTime,
+            actualStartTime,
             isPremiere: Boolean(premiereTime),
             broadcastStatus,
             expiresAt: now + CACHE_TTL_MS,
