@@ -21,18 +21,18 @@ export async function getNewsBySlug(slug) {
   return { ...item, body: sanitizeContent(item.body) };
 }
 
-export async function getVideos(query) {
-  return getYoutubeDetailsForVideos(await listVideos(query));
+export async function getVideos(query, language = "en") {
+  return getYoutubeDetailsForVideos(await listVideos(query), language);
 }
 
-export async function getVideoById(id) {
+export async function getVideoById(id, language = "en") {
   const item = await findVideo(id);
   if (!item) throw new AppError(404, "VIDEO_NOT_FOUND");
-  return { ...item, youtube: await getYoutubeDetails(item.video_url) };
+  return { ...item, youtube: await getYoutubeDetails(item.video_url, language) };
 }
 
-export async function getPremiere() {
-  const found = await findPremiere(await listVideos({ limit: 50 }));
+export async function getPremiere(language = "en") {
+  const found = await findPremiere(await listVideos({ limit: 50 }), language);
   if (!found) return { premiere: null };
   const { video, info } = found;
   return {
