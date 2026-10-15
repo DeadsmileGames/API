@@ -293,6 +293,7 @@ CREATE TABLE "user_game_entitlements" (
 	"acquired_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"last_verified_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"revoked_at" timestamp with time zone,
+	"hidden_from_library_at" timestamp with time zone,
 	CONSTRAINT "user_game_entitlements_pkey" PRIMARY KEY("user_id","game_id"),
 	CONSTRAINT "user_game_entitlements_source_check" CHECK ((source = 'itch'::text))
 );
