@@ -14,6 +14,7 @@ function toDetails(item) {
   const thumbnails = snippet.thumbnails || {};
   return {
     title: localized.title || snippet.title || "",
+    channelId: snippet.channelId || null,
     description: localized.description ?? snippet.description ?? "",
     defaultLanguage: snippet.defaultLanguage || null,
     defaultAudioLanguage: snippet.defaultAudioLanguage || null,
@@ -107,6 +108,42 @@ export async function findPremiere(videos, language = "en") {
 
 const SOUNDTRACK_CACHE_MS = 20 * 60 * 1000;
 const soundtrackCache = new Map();
+const OFFICIAL_SOUNDTRACK_HANDLE = "@DeadsmileGames";
+const OFFICIAL_CHANNEL_CACHE_MS = 6 * 60 * 60 * 1000;
+let officialChannelCache = { id: null, expires: 0 };
+let officialChannelRequest = null;
+
+async function getOfficialSoundtrackChannelId() {
+  if (officialChannelCache.expires > Date.now()) return officialChannelCache.id;
+  if (officialChannelRequest) return officialChannelRequest;
+
+  officialChannelRequest = (async () => {
+    const params = new URLSearchParams({
+      part: "snippet",
+      forHandle: OFFICIAL_SOUNDTRACK_HANDLE,
+      key: env.youtubeApiKey,
+    });
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?${params}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!response.ok) throw new AppError(503, "YOUTUBE_UNAVAILABLE");
+
+    const data = await response.json();
+    const id = data?.items?.[0]?.id || null;
+    officialChannelCache = {
+      id,
+      expires: Date.now() + (id ? OFFICIAL_CHANNEL_CACHE_MS : 5 * 60 * 1000),
+    };
+    return id;
+  })();
+
+  try {
+    return await officialChannelRequest;
+  } finally {
+    officialChannelRequest = null;
+  }
+}
 
 export async function searchSoundtrackVideos(language = "en") {
   const locale = normalizeLanguage(language);
@@ -118,10 +155,17 @@ export async function searchSoundtrackVideos(language = "en") {
     return [];
   }
 
+  const channelId = await getOfficialSoundtrackChannelId();
+  if (!channelId) {
+    soundtrackCache.set(locale, { expires: Date.now() + SOUNDTRACK_CACHE_MS, items: [] });
+    return [];
+  }
+
   const params = new URLSearchParams({
     part: "snippet",
     q: "soundtrack",
     type: "video",
+    channelId,
     maxResults: "50",
     order: "relevance",
     hl: locale,
@@ -149,6 +193,7 @@ export async function searchSoundtrackVideos(language = "en") {
       const thumbnails = snippet.thumbnails || {};
       return {
         id: typeof id === "string" ? id : "",
+        channelId: typeof snippet.channelId === "string" ? snippet.channelId : "",
         title: typeof snippet.title === "string" ? snippet.title : "",
         description: typeof snippet.description === "string" ? snippet.description : "",
         channelTitle: typeof snippet.channelTitle === "string" ? snippet.channelTitle : "",
@@ -165,7 +210,7 @@ export async function searchSoundtrackVideos(language = "en") {
           : null,
       };
     })
-    .filter((item) => item.id && item.watchUrl);
+    .filter((item) => item.id && item.watchUrl && item.channelId === channelId && /\\bsoundtracks?\\b/i.test(item.title));
 
   // Search results truncate descriptions; fetch the full snippets before matching games.
   const fullDetails = await fetchDetails(searchItems.map((item) => item.id), locale);
