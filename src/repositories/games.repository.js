@@ -154,3 +154,24 @@ export async function findGameContent(gameId, gameTitle) {
     recommended: recommended.rows[0] || null,
   };
 }
+
+export async function listNewsByGameSlug(slug, { limit = 12, offset = 0 } = {}) {
+  const game = (
+    await query("SELECT id, title, slug FROM games WHERE slug = $1", [slug])
+  ).rows[0];
+  if (!game) return null;
+  const { rows } = await query(
+    `SELECT id, slug, category, title, excerpt, image, published_at
+     FROM news
+     WHERE game_id = $1
+     ORDER BY published_at DESC
+     LIMIT $2 OFFSET $3`,
+    [game.id, limit, offset],
+  );
+  return rows.map((row) => ({
+    ...row,
+    game_id: game.id,
+    game_title: game.title,
+    game_slug: game.slug,
+  }));
+}
