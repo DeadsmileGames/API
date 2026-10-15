@@ -8,11 +8,14 @@ const cache = new Map();
 
 function toDetails(item) {
   const snippet = item.snippet || {};
+  const localized = snippet.localized || {};
   const live = item.liveStreamingDetails || {};
   const thumbnails = snippet.thumbnails || {};
   return {
-    title: snippet.title || "",
-    description: snippet.description || "",
+    title: localized.title || snippet.title || "",
+    description: localized.description ?? snippet.description ?? "",
+    defaultLanguage: snippet.defaultLanguage || null,
+    defaultAudioLanguage: snippet.defaultAudioLanguage || null,
     publishedAt: snippet.publishedAt || null,
     thumbnail:
       thumbnails.maxres?.url ||
@@ -27,17 +30,24 @@ function toDetails(item) {
   };
 }
 
-async function fetchDetails(ids) {
+function normalizeLanguage(language) {
+  return ["pt-BR", "es", "en"].includes(language) ? language : "en";
+}
+
+async function fetchDetails(ids, language = "en") {
+  const locale = normalizeLanguage(language);
   const uniqueIds = [...new Set(ids.filter(Boolean))].slice(0, 50);
   if (!env.youtubeApiKey || !uniqueIds.length) return new Map();
+  const cacheKey = (id) => `${locale}:${id}`;
   const now = Date.now();
-  const missing = uniqueIds.filter((id) => !(cache.get(id)?.expires > now));
+  const missing = uniqueIds.filter((id) => !(cache.get(cacheKey(id))?.expires > now));
   if (missing.length) {
     const entries = new Map(missing.map((id) => [id, null]));
     try {
       const params = new URLSearchParams({
         part: "snippet,liveStreamingDetails",
         id: missing.join(","),
+        hl: locale,
         key: env.youtubeApiKey,
       });
       const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params}`, {
@@ -50,28 +60,28 @@ async function fetchDetails(ids) {
       }
     } catch {}
     const expires = Date.now() + CACHE_MS;
-    for (const [id, value] of entries) cache.set(id, { expires, value });
+    for (const [id, value] of entries) cache.set(cacheKey(id), { expires, value });
   }
-  return new Map(uniqueIds.map((id) => [id, cache.get(id)?.value ?? null]));
+  return new Map(uniqueIds.map((id) => [id, cache.get(cacheKey(id))?.value ?? null]));
 }
 
-export async function getYoutubeDetails(videoUrl) {
+export async function getYoutubeDetails(videoUrl, language = "en") {
   const id = youtubeVideoId(videoUrl);
-  return id ? (await fetchDetails([id])).get(id) ?? null : null;
+  return id ? (await fetchDetails([id], language)).get(id) ?? null : null;
 }
 
-export async function getYoutubeDetailsForVideos(videos) {
+export async function getYoutubeDetailsForVideos(videos, language = "en") {
   const ids = videos.map((video) => youtubeVideoId(video.video_url));
-  const details = await fetchDetails(ids);
+  const details = await fetchDetails(ids, language);
   return videos.map((video, index) => ({
     ...video,
     youtube: ids[index] ? details.get(ids[index]) ?? null : null,
   }));
 }
 
-export async function findPremiere(videos) {
+export async function findPremiere(videos, language = "en") {
   const ids = videos.map((video) => youtubeVideoId(video.video_url));
-  const details = await fetchDetails(ids);
+  const details = await fetchDetails(ids, language);
   const now = Date.now();
   return (
     videos
