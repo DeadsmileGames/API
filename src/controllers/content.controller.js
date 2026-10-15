@@ -13,16 +13,16 @@ export const newsDetails = asyncHandler(async (req, res) => {
 });
 
 export const videos = asyncHandler(async (req, res) => {
-  const data = await service.getVideos(req.query);
+  const data = await service.getVideos(req.query, res.locals.locale);
   sendSuccess(res, data);
 });
 
 export const premiere = asyncHandler(async (_req, res) => {
-  sendSuccess(res, await service.getPremiere());
+  sendSuccess(res, await service.getPremiere(res.locals.locale));
 });
 
 export const videoDetails = asyncHandler(async (req, res) => {
-  const data = await service.getVideoById(req.params.id);
+  const data = await service.getVideoById(req.params.id, res.locals.locale);
   sendSuccess(res, data);
 });
 
