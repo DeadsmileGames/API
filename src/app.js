@@ -186,6 +186,7 @@ export function createApp() {
   app.use("/api/integrations/itch", itchIntegrationRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/platform", platformRouter);
+  app.use("/api", gameNewsRouter);
   app.use("/api", notFoundHandler);
   app.use(errorHandler);
 
