@@ -79,8 +79,7 @@ export async function findPremiere(videos) {
         if (!info?.startsAt || !Number.isFinite(Date.parse(info.startsAt))) return false;
         const scheduled = Date.parse(info.startsAt);
         if (info.state === "upcoming") {
-          const difference = scheduled - now;
-          return difference <= PREMIERE_WINDOW_MS && difference > -PREMIERE_WINDOW_MS;
+          return scheduled > now && scheduled - now <= PREMIERE_WINDOW_MS;
         }
         if (info.state === "live") {
           const started = Date.parse(info.actualStartedAt || info.startsAt);
