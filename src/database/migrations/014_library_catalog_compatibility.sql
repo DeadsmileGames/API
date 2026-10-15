@@ -43,7 +43,7 @@ ALTER TABLE user_game_entitlements
 UPDATE user_game_entitlements e
 SET revoked_at = now()
 FROM games g
-WHERE g.id = e.game_id AND g.access_type = 'paid' AND e.source = 'free';
+WHERE g.id = e.game_id AND g.access_type = 'paid' AND e.source = 'free' AND e.revoked_at IS NULL;
 
 CREATE OR REPLACE FUNCTION invalidate_free_entitlements() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
