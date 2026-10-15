@@ -26,6 +26,7 @@ import {
   videosRouter,
   downloadsRouter,
   productsRouter,
+  soundtracksRouter,
 } from "./routes/content.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { itchIntegrationRouter } from "./routes/itch-integration.routes.js";
@@ -179,6 +180,7 @@ export function createApp() {
   app.use("/api/newswire", newsRouter);
   app.use("/api/news", newsRouter);
   app.use("/api/videos", videosRouter);
+  app.use("/api/soundtracks", soundtracksRouter);
   app.use("/api/downloads", downloadsRouter);
   app.use("/api/products", productsRouter);
   app.use("/api/wishlist", wishlistRouter);
