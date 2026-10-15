@@ -107,9 +107,15 @@ export function createApp() {
     next();
   });
 
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", async (_req, res) => {
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
+    try {
+      // Readiness includes the database, not just the HTTP process.
+      await pool.query("SELECT 1");
+      res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
+    } catch {
+      res.status(503).json({ status: "unavailable", service: "Deadsmile Games API" });
+    }
   });
 
   app.use(express.static(path.join(__dirname, "../public"), { index: false }));
