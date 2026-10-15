@@ -1,15 +1,9 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import * as service from "../services/content.service.js";
-import { getGameLatestNews } from "../services/games.service.js";
 
 export const news = asyncHandler(async (req, res) => {
   const data = await service.getNews(req.query);
-  sendSuccess(res, data);
-});
-
-export const latestNewsByGame = asyncHandler(async (req, res) => {
-  const data = await getGameLatestNews(req.params.slug, req.query);
   sendSuccess(res, data);
 });
 
