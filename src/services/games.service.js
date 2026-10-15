@@ -4,6 +4,7 @@ import {
   findGameBySlug,
   findRelatedGames,
   findGameContent,
+  listNewsByGameSlug,
 } from "../repositories/games.repository.js";
 
 import { toClientGame } from "../utils/clientGame.js";
@@ -84,4 +85,10 @@ export async function getGameDownload(slug, userId) {
     throw new AppError(409, "GAME_RELEASE_NOT_CONFIGURED");
   if (userId && game.access_type === "free") await addGameToLibrary(userId, game.id);
   return { downloadUrl: game.download_url };
+}
+
+export async function getGameLatestNews(slug, pagination) {
+  const items = await listNewsByGameSlug(slug, pagination);
+  if (!items) throw new AppError(404, "GAME_NOT_FOUND");
+  return items;
 }

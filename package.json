@@ -1,7 +1,7 @@
 {
-  "name": "deadsmile-games-backend",
+  "name": "API",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/app.js",

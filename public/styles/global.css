@@ -294,6 +294,12 @@ fieldset {
   text-transform: uppercase;
   color: #bbb;
 }
+.premiere-shell {
+  position: relative;
+}
+.premiere-shell .site-header {
+  top: auto;
+}
 .site-header__link.is-active {
   color: #fff;
 }
@@ -3207,4 +3213,95 @@ input[type="file"]::file-selector-button {
 .game-meta__item {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.game-hero__background iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+.premiere-banner {
+  position: relative;
+  z-index: 60;
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 20px;
+  border: 0;
+  overflow: hidden;
+  background: #0f0f0f;
+  text-align: center;
+}
+.premiere-banner__background {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.premiere-banner__background img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+}
+.premiere-banner__text {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 18px;
+  text-shadow: 0 1px 8px #000;
+}
+.video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  overflow-y: auto;
+  background: #0f0f0f;
+}
+.video-overlay__background {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  filter: blur(18px);
+}
+.video-overlay__content {
+  position: relative;
+  width: min(1240px, 100% - 40px);
+  margin: 0 auto;
+  padding: 70px 0 60px;
+}
+.video-overlay__player {
+  background: #000;
+  border-radius: 10px;
+}
+.video-overlay__details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 60px;
+  margin-top: 40px;
+}
+.video-overlay__details h2 {
+  font-size: clamp(30px, 4vw, 52px);
+  margin-bottom: 10px;
+}
+.video-overlay__description {
+  color: #d8d8d8;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .video-overlay__details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .premiere-banner__text {
+    font-size: 15px;
+  }
+}
+.video-overlay .dialog-close {
+  position: fixed;
+  z-index: 1;
 }

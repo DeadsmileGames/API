@@ -13,6 +13,7 @@ newsRouter.get("/:slug", validate(contentSlugSchema, "params"), controller.newsD
 
 export const videosRouter = Router();
 videosRouter.get("/", validate(contentListSchema, "query"), controller.videos);
+videosRouter.get("/premiere", controller.premiere);
 videosRouter.get("/:id", validate(contentIdSchema, "params"), controller.videoDetails);
 
 export const downloadsRouter = Router();

@@ -53,3 +53,11 @@ export async function listProducts() {
   );
   return rows;
 }
+
+export async function listGameScreenshots(gameId) {
+  const { rows } = await query(
+    "SELECT url FROM game_screenshots WHERE game_id = $1 ORDER BY position ASC LIMIT 6",
+    [gameId],
+  );
+  return rows.map((row) => row.url);
+}

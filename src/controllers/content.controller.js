@@ -17,6 +17,10 @@ export const videos = asyncHandler(async (req, res) => {
   sendSuccess(res, data);
 });
 
+export const premiere = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.getPremiere());
+});
+
 export const videoDetails = asyncHandler(async (req, res) => {
   const data = await service.getVideoById(req.params.id);
   sendSuccess(res, data);
