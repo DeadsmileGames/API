@@ -7,6 +7,11 @@ export const news = asyncHandler(async (req, res) => {
   sendSuccess(res, data);
 });
 
+export const latestNewsByGame = asyncHandler(async (req, res) => {
+  const data = await service.getLatestNewsByGameSlug(req.params.slug);
+  sendSuccess(res, data);
+});
+
 export const newsDetails = asyncHandler(async (req, res) => {
   const data = await service.getNewsBySlug(req.params.slug);
   sendSuccess(res, data);
