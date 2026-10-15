@@ -142,7 +142,7 @@ export async function searchSoundtrackVideos(language = "en") {
     throw new AppError(503, "YOUTUBE_UNAVAILABLE");
   }
 
-  const items = (Array.isArray(data?.items) ? data.items : [])
+  const searchItems = (Array.isArray(data?.items) ? data.items : [])
     .map((item) => {
       const snippet = item?.snippet || {};
       const id = item?.id?.videoId;
@@ -165,7 +165,21 @@ export async function searchSoundtrackVideos(language = "en") {
           : null,
       };
     })
-    .filter((item) => item.id && /\bsoundtracks?\b/i.test(item.title) && item.watchUrl);
+    .filter((item) => item.id && item.watchUrl);
+
+  // Search results truncate descriptions; fetch the full snippets before matching games.
+  const fullDetails = await fetchDetails(searchItems.map((item) => item.id), locale);
+  const items = searchItems
+    .map((item) => {
+      const details = fullDetails.get(item.id);
+      return {
+        ...item,
+        description: details?.description || item.description,
+        thumbnail: details?.thumbnail || item.thumbnail,
+        publishedAt: details?.publishedAt || item.publishedAt,
+      };
+    })
+    .filter((item) => /\bsoundtracks?\b/i.test(item.title));
 
   soundtrackCache.set(locale, {
     expires: Date.now() + SOUNDTRACK_CACHE_MS,
