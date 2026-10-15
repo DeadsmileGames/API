@@ -4,6 +4,7 @@ import {
   getGamesList,
   getGameDetails,
   getGameDownload,
+  getGameLatestNews,
 } from "../services/games.service.js";
 
 export const list = asyncHandler(async (req, res) => {
@@ -19,4 +20,8 @@ export const details = asyncHandler(async (req, res) => {
 export const download = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
   sendSuccess(res, await getGameDownload(req.params.slug, req.session?.userId));
+});
+
+export const latestNews = asyncHandler(async (req, res) => {
+  sendSuccess(res, await getGameLatestNews(req.params.slug, req.query));
 });
