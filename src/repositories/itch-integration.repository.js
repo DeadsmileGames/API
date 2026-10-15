@@ -162,12 +162,35 @@ export async function revokeEntitlement(userId, gameId) {
   );
 }
 
+export async function hideLibraryEntry(userId, gameId) {
+  const { rowCount } = await query(
+    `UPDATE user_game_entitlements
+     SET hidden_from_library_at = now(), last_verified_at = now()
+     WHERE user_id = $1 AND game_id = $2 AND revoked_at IS NULL
+       AND hidden_from_library_at IS NULL
+       AND source IN ('itch', 'free')`,
+    [userId, gameId],
+  );
+  return rowCount > 0;
+}
+
+export async function restoreLibraryEntry(userId, gameId) {
+  const { rowCount } = await query(
+    `UPDATE user_game_entitlements
+     SET hidden_from_library_at = NULL, last_verified_at = now()
+     WHERE user_id = $1 AND game_id = $2 AND revoked_at IS NULL
+       AND source IN ('itch', 'free')`,
+    [userId, gameId],
+  );
+  return rowCount > 0;
+}
+
 export async function listEntitlements(userId, includeCatalog = false) {
   const { rows } = await query(
     `SELECT
        e.acquired_at, e.last_verified_at,
        (g.access_type = 'free' OR (e.user_id IS NOT NULL AND e.source = 'itch')) AS owned,
-       (e.user_id IS NOT NULL AND ((g.access_type = 'free' AND e.source = 'free') OR (g.access_type = 'paid' AND e.source = 'itch'))) AS in_library,
+       (e.user_id IS NOT NULL AND ((g.access_type = 'free' AND e.source = 'free') OR (g.access_type = 'paid' AND e.source = 'itch')) AND e.hidden_from_library_at IS NULL) AS in_library,
        g.id, g.title, g.slug, g.short_description, g.status, g.release_date,
        g.hero_image, g.cover_image, g.trailer_url, g.purchase_url, g.download_url,
        g.access_type, g.itch_url, g.microsoft_product_id, g.microsoft_badge_image,
@@ -184,7 +207,7 @@ export async function listEntitlements(userId, includeCatalog = false) {
        SELECT gp.game_id, array_agg(pl.name ORDER BY pl.name) AS platforms
        FROM game_platforms gp JOIN platforms pl ON pl.id = gp.platform_id GROUP BY gp.game_id
      ) platform_agg ON platform_agg.game_id = g.id
-     WHERE $2::boolean OR (e.user_id = $1 AND ((g.access_type = 'free' AND e.source = 'free') OR (g.access_type = 'paid' AND e.source = 'itch')))
+     WHERE $2::boolean OR (e.user_id = $1 AND ((g.access_type = 'free' AND e.source = 'free') OR (g.access_type = 'paid' AND e.source = 'itch')) AND e.hidden_from_library_at IS NULL)
      ORDER BY e.acquired_at DESC NULLS LAST, g.title`,
     [userId, includeCatalog],
   );
