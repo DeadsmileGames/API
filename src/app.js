@@ -26,6 +26,7 @@ import {
   videosRouter,
   downloadsRouter,
   productsRouter,
+  gameNewsRouter,
 } from "./routes/content.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { itchIntegrationRouter } from "./routes/itch-integration.routes.js";
