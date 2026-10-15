@@ -210,7 +210,7 @@ export async function searchSoundtrackVideos(language = "en") {
           : null,
       };
     })
-    .filter((item) => item.id && item.watchUrl && item.channelId === channelId && /\\bsoundtracks?\\b/i.test(item.title));
+    .filter((item) => item.id && item.watchUrl && item.channelId === channelId && /\bsoundtracks?\b/i.test(item.title));
 
   // Search results truncate descriptions; fetch the full snippets before matching games.
   const fullDetails = await fetchDetails(searchItems.map((item) => item.id), locale);
