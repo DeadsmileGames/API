@@ -21,7 +21,7 @@ function toDetails(item) {
       thumbnails.default?.url ||
       null,
     state: snippet.liveBroadcastContent || "none",
-    startsAt: live.scheduledStartTime || null,
+    startsAt: live.scheduledStartTime || live.actualStartTime || null,
     actualStartedAt: live.actualStartTime || null,
   };
 }
