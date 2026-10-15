@@ -1,25 +1,18 @@
 import { sanitizeContent } from "../utils/contentHtml.js";
 import { AppError } from "../utils/AppError.js";
-import { findGameBySlug } from "../repositories/games.repository.js";
-import { getYoutubeVideoId, getYoutubeMetadata } from "./youtube-metadata.service.js";
 import {
   listNews,
-  listLatestNewsByGameSlug,
   findNews,
   listVideos,
   findVideo,
   listDownloads,
   listProducts,
+  listGameScreenshots,
 } from "../repositories/content.repository.js";
+import { findPremiere, getYoutubeDetails, getYoutubeDetailsForVideos } from "./youtube.service.js";
 
 export async function getNews(query) {
   return listNews(query);
-}
-
-export async function getLatestNewsByGameSlug(slug) {
-  const game = await findGameBySlug(slug);
-  if (!game) throw new AppError(404, "GAME_NOT_FOUND");
-  return listLatestNewsByGameSlug(slug);
 }
 
 export async function getNewsBySlug(slug) {
@@ -28,34 +21,38 @@ export async function getNewsBySlug(slug) {
   return { ...item, body: sanitizeContent(item.body) };
 }
 
-async function enrichVideos(items) {
-  const metadata = await getYoutubeMetadata(items.map((item) => item.video_url));
-  return items.map((item) => {
-    const youtubeId = getYoutubeVideoId(item.video_url);
-    const video = youtubeId ? metadata.get(youtubeId) || {} : {};
-    return {
-      ...item,
-      youtube_id: youtubeId,
-      youtube_title: video.title || null,
-      youtube_description: video.description || null,
-      youtube_published_at: video.publishedAt || null,
-      youtube_thumbnail: video.thumbnail || null,
-      premiere_at: video.premiereAt || null,
-      actual_start_time: video.actualStartTime || null,
-      is_premiere: Boolean(video.isPremiere),
-      broadcast_status: video.broadcastStatus || "none",
-    };
-  });
-}
-
 export async function getVideos(query) {
-  return enrichVideos(await listVideos(query));
+  return getYoutubeDetailsForVideos(await listVideos(query));
 }
 
 export async function getVideoById(id) {
   const item = await findVideo(id);
   if (!item) throw new AppError(404, "VIDEO_NOT_FOUND");
-  return (await enrichVideos([item]))[0];
+  return { ...item, youtube: await getYoutubeDetails(item.video_url) };
+}
+
+export async function getPremiere() {
+  const found = await findPremiere(await listVideos({ limit: 50 }));
+  if (!found) return { premiere: null };
+  const { video, info } = found;
+  return {
+    premiere: {
+      id: video.id,
+      title: info.title || video.title,
+      category: video.category,
+      video_url: video.video_url,
+      thumbnail: info.thumbnail || video.thumbnail,
+      description: info.description || "",
+      published_at: info.publishedAt || video.published_at,
+      state: info.state,
+      starts_at: info.startsAt,
+      actual_started_at: info.actualStartedAt,
+      game_id: video.game_id,
+      game_title: video.game_title,
+      game_slug: video.game_slug,
+      screenshots: video.game_id ? await listGameScreenshots(video.game_id) : [],
+    },
+  };
 }
 
 export async function getDownloads() {
