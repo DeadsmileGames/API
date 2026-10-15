@@ -35,3 +35,9 @@ export const products = asyncHandler(async (req, res) => {
   const data = await service.getProducts();
   sendSuccess(res, data);
 });
+
+
+export const soundtracks = asyncHandler(async (_req, res) => {
+  const data = await service.getSoundtracks(res.locals.locale);
+  sendSuccess(res, data);
+});
