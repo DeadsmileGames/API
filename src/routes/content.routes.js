@@ -21,3 +21,7 @@ downloadsRouter.get("/", controller.downloads);
 
 export const productsRouter = Router();
 productsRouter.get("/", controller.products);
+
+
+export const soundtracksRouter = Router();
+soundtracksRouter.get("/", controller.soundtracks);
