@@ -83,3 +83,14 @@ export async function listGameScreenshots(gameId) {
   );
   return rows.map((row) => row.url);
 }
+
+
+export async function listSoundtrackGames() {
+  const { rows } = await query(
+    `SELECT id, title, slug, cover_image, hero_image
+     FROM games
+     WHERE title IS NOT NULL AND btrim(title) <> ''
+     ORDER BY length(title) DESC, title ASC`,
+  );
+  return rows;
+}
