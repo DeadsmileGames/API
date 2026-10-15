@@ -2,6 +2,7 @@ import { sanitizeContent } from "../utils/contentHtml.js";
 import { AppError } from "../utils/AppError.js";
 import {
   listNews,
+  listLatestNewsByGameSlug,
   findNews,
   listVideos,
   findVideo,
