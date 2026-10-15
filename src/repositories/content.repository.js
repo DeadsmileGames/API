@@ -13,20 +13,6 @@ export async function listNews({ limit = 12, offset = 0 } = {}) {
   return rows;
 }
 
-export async function listLatestNewsByGameSlug(slug) {
-  const { rows } = await query(
-    `SELECT n.id, n.slug, n.category, n.title, n.excerpt, n.image, n.published_at,
-            linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug
-     FROM news n
-     JOIN games linked ON linked.id = n.game_id
-     WHERE linked.slug = $1
-     ORDER BY n.published_at DESC
-     LIMIT 50`,
-    [slug],
-  );
-  return rows;
-}
-
 export async function findNews(slug) {
   const { rows } = await query(
     `SELECT n.*, g.title AS game_title, g.slug AS game_slug, g.cover_image AS game_cover_image
@@ -66,4 +52,12 @@ export async function listProducts() {
     "SELECT * FROM products WHERE available = true ORDER BY created_at DESC",
   );
   return rows;
+}
+
+export async function listGameScreenshots(gameId) {
+  const { rows } = await query(
+    "SELECT url FROM game_screenshots WHERE game_id = $1 ORDER BY position ASC LIMIT 6",
+    [gameId],
+  );
+  return rows.map((row) => row.url);
 }
