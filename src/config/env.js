@@ -77,4 +77,5 @@ export const env = {
   itchRedirectUri: process.env.ITCH_REDIRECT_URI || "",
   githubGameRepository: process.env.GITHUB_GAMES_REPO || "",
   githubGameToken: process.env.GITHUB_GAMES_TOKEN || "",
+  youtubeApiKey: process.env.YOUTUBE_API_KEY || "",
 };
