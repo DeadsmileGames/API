@@ -3,6 +3,7 @@ import { youtubeVideoId } from "../utils/youtube.js";
 
 const CACHE_MS = 60_000;
 const PREMIERE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const PREMIERE_START_GRACE_MS = 10 * 60 * 1000;
 const cache = new Map();
 
 function toDetails(item) {
@@ -79,7 +80,8 @@ export async function findPremiere(videos) {
         if (!info?.startsAt || !Number.isFinite(Date.parse(info.startsAt))) return false;
         const scheduled = Date.parse(info.startsAt);
         if (info.state === "upcoming") {
-          return scheduled > now && scheduled - now <= PREMIERE_WINDOW_MS;
+          const difference = scheduled - now;
+          return difference <= PREMIERE_WINDOW_MS && difference >= -PREMIERE_START_GRACE_MS;
         }
         if (info.state === "live") {
           const started = Date.parse(info.actualStartedAt || info.startsAt);
