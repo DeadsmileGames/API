@@ -7,6 +7,13 @@ import {
 } from "../validators/content.validators.js";
 import * as controller from "../controllers/content.controller.js";
 
+export const gameNewsRouter = Router();
+gameNewsRouter.get(
+  "/:slug/latest",
+  validate(contentSlugSchema, "params"),
+  controller.latestNewsByGame,
+);
+
 export const newsRouter = Router();
 newsRouter.get("/", validate(contentListSchema, "query"), controller.news);
 newsRouter.get("/:slug", validate(contentSlugSchema, "params"), controller.newsDetails);
