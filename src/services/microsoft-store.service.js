@@ -17,7 +17,7 @@ async function requestJson(url) {
   });
   if (
     !response.ok ||
-    !/application\\/json/i.test(response.headers.get("content-type") || "")
+    !String(response.headers.get("content-type") || "").toLowerCase().includes("application/json")
   )
     throw new AppError(502, "MICROSOFT_STORE_UNAVAILABLE");
   const reader = response.body.getReader();
