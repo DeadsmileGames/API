@@ -74,18 +74,40 @@ test("English Store result is used as-is when no localized result exists", () =>
 });
 
 test("complete localized metadata does not require English enrichment", () => {
-  assert.equal(
-    needsMicrosoftProductFallback({
-      title: "Localized title",
-      description: "Description",
-      developer: "Developer",
-      publisher: "Publisher",
-      images: [{ url: "image" }],
-      screenshots: [{ url: "screen" }],
-      version: "1.0.0.0",
-      requirements: [{ title: "Minimum", items: [{ name: "OS", value: "Windows" }] }],
-      releaseNotes: ["Changes"],
-    }),
-    false,
-  );
+  const completeProduct = {
+    title: "Localized title",
+    description: "Description",
+    developer: "Developer",
+    publisher: "Publisher",
+    category: "Games",
+    categories: ["Games"],
+    images: [{ url: "image" }],
+    screenshots: [{ url: "screen" }],
+    trailers: [{ url: "trailer" }],
+    version: "1.0.0.0",
+    packages: [{ version: "1.0.0.0" }],
+    downloadSizeBytes: 100,
+    installSizeBytes: 200,
+    languages: ["English"],
+    platforms: ["PC"],
+    architectures: ["x64"],
+    features: ["Single player"],
+    releaseNotes: ["Changes"],
+    requirements: [{ title: "Minimum", items: [{ name: "OS", value: "Windows" }] }],
+    permissions: ["Internet"],
+    capabilities: ["Gamepad"],
+    hasInAppPurchases: false,
+    averageRating: 4.5,
+    ratingCount: 100,
+    copyright: "Copyright",
+    licenseTerms: "Terms",
+    installationTerms: "Installation terms",
+    privacyUrl: "https://example.com/privacy",
+    publisherUrl: "https://example.com",
+    supportUrl: "https://example.com/support",
+    releaseDate: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-02-01T00:00:00.000Z",
+    listingModifiedAt: "2025-02-02T00:00:00.000Z",
+  };
+  assert.equal(needsMicrosoftProductFallback(completeProduct), false);
 });
