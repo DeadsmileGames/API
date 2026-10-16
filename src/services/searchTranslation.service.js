@@ -122,7 +122,7 @@ export async function expandSearchQueries(query, language = "en") {
       translated &&
       translated.toLocaleLowerCase("en") === original.toLocaleLowerCase("en"),
   );
-  if (language === "en" || !translations.some(Boolean) || hasEnglishEquivalent) add(original, language);
+  if (language === "en" || !translations[0] || hasEnglishEquivalent) add(original, language);
   return variants;
 }
 
