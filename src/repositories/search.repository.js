@@ -22,9 +22,10 @@ export async function searchSite({ q, page, limit }) {
         NULL::text AS thumbnail_pt_br,
         NULL::text AS thumbnail_es,
         CASE
-          WHEN g.title ILIKE $2 ESCAPE '\\' THEN 0
-          WHEN g.title ILIKE $3 ESCAPE '\\' THEN 1
-          ELSE 2
+          WHEN g.title ILIKE $1 ESCAPE '\\' THEN 0
+          WHEN g.title ILIKE $2 ESCAPE '\\' THEN 1
+          WHEN g.title ILIKE $3 ESCAPE '\\' THEN 2
+          ELSE 3
         END::int AS relevance
       FROM games g
       WHERE g.title ILIKE $3 ESCAPE '\\'
@@ -61,9 +62,10 @@ export async function searchSite({ q, page, limit }) {
         NULL::text AS thumbnail_pt_br,
         NULL::text AS thumbnail_es,
         CASE
-          WHEN n.title ILIKE $2 ESCAPE '\\' THEN 0
-          WHEN n.title ILIKE $3 ESCAPE '\\' THEN 1
-          ELSE 2
+          WHEN n.title ILIKE $1 ESCAPE '\\' THEN 0
+          WHEN n.title ILIKE $2 ESCAPE '\\' THEN 1
+          WHEN n.title ILIKE $3 ESCAPE '\\' THEN 2
+          ELSE 3
         END::int AS relevance
       FROM news n
       WHERE n.title ILIKE $3 ESCAPE '\\'
@@ -87,9 +89,10 @@ export async function searchSite({ q, page, limit }) {
         v.thumbnail_pt_br::text AS thumbnail_pt_br,
         v.thumbnail_es::text AS thumbnail_es,
         CASE
-          WHEN v.title ILIKE $2 ESCAPE '\\' THEN 0
-          WHEN v.title ILIKE $3 ESCAPE '\\' THEN 1
-          ELSE 2
+          WHEN v.title ILIKE $1 ESCAPE '\\' THEN 0
+          WHEN v.title ILIKE $2 ESCAPE '\\' THEN 1
+          WHEN v.title ILIKE $3 ESCAPE '\\' THEN 2
+          ELSE 3
         END::int AS relevance
       FROM videos v
       WHERE v.title ILIKE $3 ESCAPE '\\'
@@ -98,7 +101,7 @@ export async function searchSite({ q, page, limit }) {
     )
   `;
 
-  const params = [normalizedQuery, startsWithTerm, containsTerm];
+  const params = [escapedQuery, startsWithTerm, containsTerm];
   const countResult = await query(
     `${candidates} SELECT COUNT(*)::int AS total FROM candidates`,
     params,
