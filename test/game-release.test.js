@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getEffectiveGameStatus, hasReleaseDateArrived } from "../src/utils/gameRelease.js";
+import { toClientGame } from "../src/utils/clientGame.js";
 
 test("a game stays in development until midnight in Sao Paulo on its release date", () => {
   assert.equal(
@@ -38,4 +39,23 @@ test("announced games are not auto-released, and missing dates do not change sta
     getEffectiveGameStatus({ status: "in_development", release_date: null }),
     "in_development",
   );
+});
+
+test("a scheduled game becomes launchable through the public game response once its date arrives", () => {
+  const game = toClientGame({
+    id: "00000000-0000-4000-8000-000000000001",
+    title: "Scheduled",
+    slug: "scheduled",
+    short_description: "A scheduled game",
+    status: "in_development",
+    release_date: "2020-01-01",
+    access_type: "free",
+    download_url: "https://cdn.example.test/scheduled.zip",
+    genres: [],
+    platforms: [],
+  });
+
+  assert.equal(game.status, "released");
+  assert.equal(game.downloadAvailable, true);
+  assert.equal(game.launcherAvailable, true);
 });
