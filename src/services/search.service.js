@@ -31,8 +31,8 @@ function toClientResult(row) {
   return item;
 }
 
-export async function performSearch({ q, page, limit }) {
-  const { items, total } = await searchSite({ q, page, limit });
+export async function performSearch({ q, page, limit, language = "en" }) {
+  const { items, total } = await searchSite({ q, page, limit, language });
   return {
     items: items.map(toClientResult),
     pagination: {
