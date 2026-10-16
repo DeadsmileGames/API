@@ -76,7 +76,7 @@ test("caches translations for repeated search requests", async () => {
   try {
     await expandSearchQueries("palavra cache", "pt-BR");
     await expandSearchQueries("palavra cache", "pt-BR");
-    assert.equal(requests, 2);
+    assert.equal(requests, 1);
   } finally {
     globalThis.fetch = originalFetch;
     clearSearchTranslationCache();
