@@ -102,3 +102,48 @@ test("keeps search usable when translation is unavailable", async () => {
     clearSearchTranslationCache();
   }
 });
+
+test("English, Portuguese and Spanish equivalents share an English query variant", async () => {
+  clearSearchTranslationCache();
+  const originalFetch = globalThis.fetch;
+  const translations = {
+    "pt|en": {
+      "October 16th": "October 16",
+      "16 de outubro": "October 16",
+      "16 de octubre": "October 16",
+      shooting: "shooting",
+      tiro: "shot",
+      disparo: "shot",
+    },
+    "es|en": {
+      "October 16th": "October 16",
+      "16 de outubro": "October 16",
+      "16 de octubre": "October 16",
+      shooting: "shooting",
+      tiro: "shot",
+      disparo: "shot",
+    },
+  };
+  globalThis.fetch = mockTranslationApi(translations);
+
+  try {
+    const dateQueries = await Promise.all([
+      expandSearchQueries("October 16th", "en"),
+      expandSearchQueries("16 de outubro", "pt-BR"),
+      expandSearchQueries("16 de octubre", "es"),
+    ]);
+    assert.ok(dateQueries.every((variants) => variants[0]?.query === "October 16"));
+
+    const wordQueries = await Promise.all([
+      expandSearchQueries("shooting", "en"),
+      expandSearchQueries("tiro", "pt-BR"),
+      expandSearchQueries("disparo", "es"),
+    ]);
+    assert.ok(wordQueries.every((variants) => variants[0]?.query === "shooting" || variants[0]?.query === "shot"));
+    assert.equal(wordQueries[1][0].query, "shot");
+    assert.equal(wordQueries[2][0].query, "shot");
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearSearchTranslationCache();
+  }
+});
