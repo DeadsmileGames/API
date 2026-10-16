@@ -32,6 +32,7 @@ import { adminRouter } from "./routes/admin.routes.js";
 import { itchIntegrationRouter } from "./routes/itch-integration.routes.js";
 import { libraryRouter } from "./routes/library.routes.js";
 import { platformRouter } from "./routes/platform.routes.js";
+import { linkPreviewRouter } from "./routes/link-preview.routes.js";
 import { createServer } from "node:http";
 import { attachRealtimeServer } from "./realtime/hub.js";
 
@@ -194,6 +195,7 @@ export function createApp() {
   app.use("/api/integrations/itch", itchIntegrationRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/platform", platformRouter);
+  app.use("/api/link-preview", linkPreviewRouter);
   app.use("/api", notFoundHandler);
   app.use(errorHandler);
 
