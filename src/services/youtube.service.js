@@ -9,7 +9,9 @@ const LIVE_CHAT_DEFAULT_POLL_MS = 15_000;
 const liveChatCache = new Map();
 const PREMIERE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREMIERE_START_GRACE_MS = 10 * 60 * 1000;
+const MAX_DETAILS_CACHE_ENTRIES = 1_000;
 const cache = new Map();
+const detailsRequests = new Map();
 
 function toDetails(item) {
   const snippet = item.snippet || {};
@@ -49,27 +51,57 @@ async function fetchDetails(ids, language = "en", { force = false } = {}) {
   const cacheKey = (id) => `${locale}:${id}`;
   const now = Date.now();
   const missing = uniqueIds.filter((id) => force || !(cache.get(cacheKey(id))?.expires > now));
+
   if (missing.length) {
-    const entries = new Map(missing.map((id) => [id, null]));
+    const requestKey = `${locale}:${[...missing].sort().join(",")}`;
+    let pending = detailsRequests.get(requestKey);
+
+    if (!pending) {
+      pending = (async () => {
+        const entries = new Map(missing.map((id) => [id, null]));
+        try {
+          const params = new URLSearchParams({
+            part: "snippet,liveStreamingDetails",
+            id: missing.join(","),
+            hl: locale,
+            key: env.youtubeApiKey,
+          });
+          const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params}`, {
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (response.ok) {
+            for (const item of (await response.json()).items || []) {
+              entries.set(item.id, toDetails(item));
+            }
+          }
+        } catch {}
+        return entries;
+      })();
+      detailsRequests.set(requestKey, pending);
+    }
+
+    let entries;
     try {
-      const params = new URLSearchParams({
-        part: "snippet,liveStreamingDetails",
-        id: missing.join(","),
-        hl: locale,
-        key: env.youtubeApiKey,
-      });
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params}`, {
-        signal: AbortSignal.timeout(8_000),
-      });
-      if (response.ok) {
-        for (const item of (await response.json()).items || []) {
-          entries.set(item.id, toDetails(item));
+      entries = await pending;
+    } finally {
+      if (detailsRequests.get(requestKey) === pending) detailsRequests.delete(requestKey);
+    }
+
+    const expires = Date.now() + CACHE_MS;
+    for (const [id, value] of entries) {
+      if (!cache.has(cacheKey(id)) && cache.size >= MAX_DETAILS_CACHE_ENTRIES) {
+        for (const [key, cached] of cache) {
+          if (cached.expires <= Date.now()) cache.delete(key);
+          if (cache.size < MAX_DETAILS_CACHE_ENTRIES) break;
+        }
+        while (cache.size >= MAX_DETAILS_CACHE_ENTRIES) {
+          cache.delete(cache.keys().next().value);
         }
       }
-    } catch {}
-    const expires = Date.now() + CACHE_MS;
-    for (const [id, value] of entries) cache.set(cacheKey(id), { expires, value });
+      cache.set(cacheKey(id), { expires, value });
+    }
   }
+
   return new Map(uniqueIds.map((id) => [id, cache.get(cacheKey(id))?.value ?? null]));
 }
 
