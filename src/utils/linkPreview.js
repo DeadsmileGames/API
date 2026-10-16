@@ -224,6 +224,12 @@ function requestHtml(url, addresses) {
       },
     );
 
+    const deadline = setTimeout(
+      () => request.destroy(new Error("External request timed out")),
+      REQUEST_TIMEOUT_MS,
+    );
+    deadline.unref?.();
+    request.on("close", () => clearTimeout(deadline));
     request.setTimeout(REQUEST_TIMEOUT_MS, () => request.destroy(new Error("External request timed out")));
     request.on("error", reject);
     request.end();
