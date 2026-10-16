@@ -93,6 +93,7 @@ async function translateCached(query, source) {
 export async function expandSearchQueries(query, language = "en") {
   const original = String(query || "").trim().slice(0, 80);
   if (!original) return [];
+  if (language === "en") return [{ query: original, language: "en" }];
 
   const orderedSources = [...SOURCE_LANGUAGES].sort((a, b) => {
     const priority = (entry) => entry.locale === language ? 0 : 1;
