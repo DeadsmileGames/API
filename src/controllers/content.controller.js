@@ -26,6 +26,12 @@ export const videoDetails = asyncHandler(async (req, res) => {
   sendSuccess(res, data);
 });
 
+export const videoLiveChat = asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const data = await service.getVideoLiveChat(req.params.id, res.locals.locale);
+  sendSuccess(res, data);
+});
+
 export const downloads = asyncHandler(async (req, res) => {
   const data = await service.getDownloads();
   sendSuccess(res, data);
