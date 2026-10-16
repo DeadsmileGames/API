@@ -3312,3 +3312,14 @@ input[type="file"]::file-selector-button {
   position: fixed;
   z-index: 1;
 }
+
+
+@media (max-width: 760px) {
+  .video-overlay__details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .premiere-banner__text {
+    font-size: 15px;
+  }
+}
