@@ -63,6 +63,7 @@ export async function getPremiere(language = "en") {
       game_id: video.game_id,
       game_title: video.game_title,
       game_slug: video.game_slug,
+      game_cover_image: video.game_cover_image || null,
       screenshots: video.game_id ? await listGameScreenshots(video.game_id) : [],
     },
   };
