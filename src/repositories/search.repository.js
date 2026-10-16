@@ -6,7 +6,7 @@ const NORMALIZED_CHARS = "aaaaaeeeeiiiiooooouuuucnyy";
 const FUZZY_THRESHOLD = 0.45;
 
 function normalizedDocumentSql(expression, normalizeMonths) {
-  let normalized = `translate(lower(${expression}), $4, $5)`;
+  let normalized = `translate(lower(${expression}), $3, $4)`;
   if (!normalizeMonths) return normalized;
   for (const { canonical, names } of SEARCH_MONTHS) {
     const pattern = String.raw`\m(${names.join("|")})\M`;
@@ -16,17 +16,40 @@ function normalizedDocumentSql(expression, normalizeMonths) {
   return `regexp_replace(${normalized}, '${ordinalPattern}', '\\1', 'gi')`;
 }
 
-export async function searchSite({ q, page, limit, language = "en" }) {
-  const { normalizedQuery, terms } = normalizeSearchQuery(q, language);
-  const normalizeMonths = SEARCH_MONTHS.some(({ canonical }) => terms.includes(canonical));
+export async function searchSite({ q, page, limit, language = "en", queryVariants = [] }) {
+  const inputs = queryVariants.length ? queryVariants : [{ query: q, language }];
+  const variants = [];
+  const seenVariants = new Set();
 
-  if (!terms.length) {
-    return { items: [], total: 0 };
+  for (const input of inputs) {
+    const normalized = normalizeSearchQuery(input.query, input.language || language);
+    if (!normalized.terms.length) continue;
+    const key = JSON.stringify([normalized.normalizedQuery, normalized.terms]);
+    if (seenVariants.has(key)) continue;
+    seenVariants.add(key);
+    variants.push({
+      normalizedQuery: normalized.normalizedQuery,
+      terms: normalized.terms,
+      priority: variants.length,
+    });
   }
+
+  if (!variants.length) return { items: [], total: 0 };
+
+  const normalizeMonths = variants.some(({ terms }) =>
+    SEARCH_MONTHS.some(({ canonical }) => terms.includes(canonical)),
+  );
 
   const offset = (page - 1) * limit;
   const candidates = `
-    WITH candidates_raw AS (
+    WITH query_variants AS (
+      SELECT
+        variant->>'normalizedQuery' AS normalized_query,
+        ARRAY(SELECT jsonb_array_elements_text(variant->'terms')) AS terms,
+        (variant->>'priority')::int AS priority
+      FROM jsonb_array_elements($1::jsonb) AS variant
+    ),
+    candidates_raw AS (
       SELECT
         'game'::text AS type,
         g.id::text AS id,
@@ -106,34 +129,52 @@ export async function searchSite({ q, page, limit, language = "en" }) {
     scored AS (
       SELECT
         candidates.*,
-        CASE
-          WHEN normalized_title = $1 THEN 0
-          WHEN strpos(normalized_title, $1) = 1 THEN 1
-          WHEN strpos(normalized_title, $1) > 0 THEN 2
-          ELSE 3
-        END::int AS phrase_relevance,
-        CASE
-          WHEN type = 'video' AND EXISTS (
-            SELECT 1 FROM unnest($2::text[]) AS token(term)
-            WHERE term IN ('trailer', 'trailers', 'video', 'videos')
-          ) THEN 0
-          WHEN type = 'game' AND EXISTS (
-            SELECT 1 FROM unnest($2::text[]) AS token(term)
-            WHERE term IN ('game', 'games')
-          ) THEN 0
-          WHEN type = 'news' AND EXISTS (
-            SELECT 1 FROM unnest($2::text[]) AS token(term)
-            WHERE term IN ('news', 'article', 'articles')
-          ) THEN 0
-          ELSE 1
-        END::int AS intent_relevance,
-        (
+        matched.priority AS matched_query_priority,
+        matched.phrase_relevance,
+        matched.intent_relevance,
+        matched.title_term_count
+      FROM candidates
+      CROSS JOIN LATERAL (
+        SELECT
+          query_variants.priority,
+          CASE
+            WHEN normalized_title = query_variants.normalized_query THEN 0
+            WHEN strpos(normalized_title, query_variants.normalized_query) = 1 THEN 1
+            WHEN strpos(normalized_title, query_variants.normalized_query) > 0 THEN 2
+            ELSE 3
+          END::int AS phrase_relevance,
+          CASE
+            WHEN type = 'video' AND EXISTS (
+              SELECT 1 FROM unnest(query_variants.terms) AS token(term)
+              WHERE term IN ('trailer', 'trailers', 'video', 'videos')
+            ) THEN 0
+            WHEN type = 'game' AND EXISTS (
+              SELECT 1 FROM unnest(query_variants.terms) AS token(term)
+              WHERE term IN ('game', 'games')
+            ) THEN 0
+            WHEN type = 'news' AND EXISTS (
+              SELECT 1 FROM unnest(query_variants.terms) AS token(term)
+              WHERE term IN ('news', 'article', 'articles')
+            ) THEN 0
+            ELSE 1
+          END::int AS intent_relevance,
+          (
+            SELECT COUNT(*)::int
+            FROM unnest(query_variants.terms) AS token(term)
+            WHERE strpos(normalized_title, term) > 0
+               OR (
+                 char_length(term) >= 4
+                 AND word_similarity(term, normalized_title) >= $2
+               )
+          ) AS title_term_count
+        FROM query_variants
+        WHERE (
           SELECT COUNT(*)::int
-          FROM unnest($2::text[]) AS token(term)
+          FROM unnest(query_variants.terms) AS token(term)
           WHERE strpos(normalized_search_document, term) > 0
              OR (
                char_length(term) >= 4
-               AND word_similarity(term, normalized_search_document) >= $3
+               AND word_similarity(term, normalized_search_document) >= $2
              )
              OR (
                type = 'video'
@@ -141,23 +182,19 @@ export async function searchSite({ q, page, limit, language = "en" }) {
              )
              OR (type = 'game' AND term IN ('game', 'games'))
              OR (type = 'news' AND term IN ('news', 'article', 'articles'))
-        ) AS matched_term_count,
-        (
-          SELECT COUNT(*)::int
-          FROM unnest($2::text[]) AS token(term)
-          WHERE strpos(normalized_title, term) > 0
-             OR (
-               char_length(term) >= 4
-               AND word_similarity(term, normalized_title) >= $3
-             )
-        ) AS title_term_count
-      FROM candidates
+        ) = cardinality(query_variants.terms)
+        ORDER BY
+          query_variants.priority ASC,
+          title_term_count DESC,
+          intent_relevance ASC,
+          phrase_relevance ASC
+        LIMIT 1
+      ) AS matched
     )
   `;
 
   const params = [
-    normalizedQuery,
-    terms,
+    JSON.stringify(variants),
     FUZZY_THRESHOLD,
     ACCENT_CHARS,
     NORMALIZED_CHARS,
@@ -167,7 +204,7 @@ export async function searchSite({ q, page, limit, language = "en" }) {
     `${candidates}
      SELECT COUNT(*)::int AS total
      FROM scored
-     WHERE matched_term_count = cardinality($2::text[])`,
+     `,
     params,
   );
   const total = countResult.rows[0]?.total ?? 0;
@@ -178,15 +215,16 @@ export async function searchSite({ q, page, limit, language = "en" }) {
        type, id, title, slug, description, image, status, published_at,
        thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es
      FROM scored
-     WHERE matched_term_count = cardinality($2::text[])
+     
      ORDER BY
+       matched_query_priority ASC,
        title_term_count DESC,
        intent_relevance ASC,
        phrase_relevance ASC,
        published_at DESC NULLS LAST,
        title ASC,
        type ASC
-     LIMIT $6 OFFSET $7`,
+     LIMIT $5 OFFSET $6`,
     [...params, limit, offset],
   );
 
