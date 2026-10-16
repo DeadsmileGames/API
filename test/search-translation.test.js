@@ -137,6 +137,18 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       ),
     );
 
+    const detectedDates = await Promise.all([
+      expandSearchQueries("16 de outubro", "en"),
+      expandSearchQueries("16 de octubre", "pt-BR"),
+    ]);
+    assert.ok(
+      detectedDates.every(
+        (variants) =>
+          normalizeSearchQuery(variants[0]?.query, variants[0]?.language).normalizedQuery ===
+          "october 16",
+      ),
+    );
+
     const wordQueries = await Promise.all([
       expandSearchQueries("shot", "en"),
       expandSearchQueries("tiro", "pt-BR"),
