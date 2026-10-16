@@ -116,7 +116,13 @@ export async function expandSearchQueries(query, language = "en") {
   for (const translated of translations) {
     if (translated) add(translated, "en");
   }
-  add(original, language);
+
+  const hasEnglishEquivalent = translations.some(
+    (translated) =>
+      translated &&
+      translated.toLocaleLowerCase("en") === original.toLocaleLowerCase("en"),
+  );
+  if (!translations.some(Boolean) || hasEnglishEquivalent) add(original, language);
   return variants;
 }
 
