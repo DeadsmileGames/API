@@ -35,7 +35,20 @@ export async function listGames({ page, limit, featured, genre, platform, status
 
   if (status) {
     params.push(status);
-    conditions.push(`g.status = $${params.length}`);
+    const statusPlaceholder = "$" + params.length;
+    const releaseDateInStudioTimeZone = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date";
+
+    if (status === "released") {
+      conditions.push(
+        "(g.status = " + statusPlaceholder + " OR (g.status = 'in_development' AND g.release_date <= " + releaseDateInStudioTimeZone + "))",
+      );
+    } else if (status === "in_development") {
+      conditions.push(
+        "(g.status = " + statusPlaceholder + " AND (g.release_date IS NULL OR g.release_date > " + releaseDateInStudioTimeZone + "))",
+      );
+    } else {
+      conditions.push("g.status = " + statusPlaceholder);
+    }
   }
 
   if (genre) {
