@@ -200,3 +200,33 @@ test("preserves the source query if its preferred translation fails", async () =
     clearSearchTranslationCache();
   }
 });
+
+test("maps Portuguese and Spanish watch commands to the same English video intent", async () => {
+  clearSearchTranslationCache();
+  const originalFetch = globalThis.fetch;
+  let translationRequests = 0;
+  globalThis.fetch = async () => {
+    translationRequests += 1;
+    throw new Error("Canonical video terms must not depend on machine translation");
+  };
+
+  try {
+    const queries = await Promise.all([
+      expandSearchQueries("assista", "en"),
+      expandSearchQueries("assista", "pt-BR"),
+      expandSearchQueries("assistir", "pt-BR"),
+      expandSearchQueries("assista aos vídeos", "en"),
+      expandSearchQueries("watch", "en"),
+      expandSearchQueries("watch videos", "en"),
+      expandSearchQueries("mira los vídeos", "es"),
+    ]);
+
+    for (const variants of queries) {
+      assert.deepEqual(variants, [{ query: "watch", language: "en" }]);
+    }
+    assert.equal(translationRequests, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearSearchTranslationCache();
+  }
+});
