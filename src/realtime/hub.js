@@ -48,7 +48,7 @@ function verifyLiveTicket(ticket) {
 }
 
 function originAllowed(origin, authenticated) {
-  if (origin === env.frontendUrl || origin === "deadsmile-app://launcher") return true;
+  if (env.frontendOrigins.includes(origin) || origin === "deadsmile-app://launcher") return true;
   if (
     !env.isProduction &&
     ["http://localhost:5173", "http://localhost:8081"].includes(origin)
