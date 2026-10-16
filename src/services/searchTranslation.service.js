@@ -87,7 +87,7 @@ const CANONICAL_WATCH_QUERIES = new Set([
   "mira el video",
   "mira los videos",
   "mira los vídeos",
-]);
+].map(normalizeCanonicalQuery));
 
 function normalizeCanonicalQuery(value) {
   return String(value || "")
