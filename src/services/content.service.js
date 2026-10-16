@@ -42,13 +42,19 @@ export async function getPremiere(language = "en") {
   const found = await findPremiere(await listVideos({ limit: 50 }), language);
   if (!found) return { premiere: null };
   const { video, info } = found;
+  const localizedThumbnail =
+    language === "pt-BR"
+      ? video.thumbnail_pt_br
+      : language === "es"
+        ? video.thumbnail_es
+        : video.thumbnail_en;
   return {
     premiere: {
       id: video.id,
       title: info.title || video.title,
       category: video.category,
       video_url: video.video_url,
-      thumbnail: info.thumbnail || video.thumbnail,
+      thumbnail: localizedThumbnail || info.thumbnail || video.thumbnail,
       description: info.description || "",
       published_at: info.publishedAt || video.published_at,
       state: info.state,
