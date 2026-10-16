@@ -65,10 +65,12 @@ async function requestTranslation(query, source) {
 
   const translated = decodeTranslation(payload?.responseData?.translatedText);
   const confidence = Number(payload?.responseData?.match);
+  const unchangedLowConfidence =
+    translated.toLocaleLowerCase("en") === String(query).toLocaleLowerCase("en") &&
+    (!Number.isFinite(confidence) || confidence < 0.5);
   if (
     !translated ||
-    !Number.isFinite(confidence) ||
-    confidence < 0.5 ||
+    unchangedLowConfidence ||
     translated.length > 320 ||
     /^(?:PLEASE SELECT|INVALID SOURCE LANGUAGE|INVALID TARGET LANGUAGE|MYMEMORY WARNING)/iu.test(translated)
   ) {
