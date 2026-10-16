@@ -17,8 +17,8 @@
     "ui:sync": "node scripts/sync-website-ui.js"
   },
   "dependencies": {
-    "@getbrevo/brevo": "^6.0.3",
-    "argon2": "^0.41.1",
+    "@getbrevo/brevo": "^6.1.0",
+    "argon2": "^0.45.1",
     "connect-pg-simple": "^9.0.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -29,12 +29,12 @@
     "express-session": "^1.19.0",
     "helmet": "^7.2.0",
     "hpp": "^0.2.3",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "qrcode": "^1.5.4",
-    "resend": "^6.26.0",
+    "resend": "^6.32.1",
     "sanitize-html": "^2.18.0",
     "speakeasy": "^2.0.0",
-    "ws": "^8.21.3",
+    "ws": "^8.22.0",
     "zod": "^3.25.76"
   },
   "overrides": {
@@ -44,8 +44,8 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "@electric-sql/pglite-socket": "^0.2.11"
+    "@electric-sql/pglite": "^0.5.9",
+    "@electric-sql/pglite-socket": "^0.2.12"
   },
   "license": "UNLICENSED"
 }
