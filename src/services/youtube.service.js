@@ -107,7 +107,7 @@ async function fetchDetails(ids, language = "en", { force = false } = {}) {
 
 export async function getYoutubeDetails(videoUrl, language = "en") {
   const id = youtubeVideoId(videoUrl);
-  return id ? (await fetchDetails([id], language, { force: true })).get(id) ?? null : null;
+  return id ? (await fetchDetails([id], language)).get(id) ?? null : null;
 }
 
 function chatPayload(entry) {
