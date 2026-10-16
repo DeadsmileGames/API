@@ -1,15 +1,17 @@
 import { storeBadgeFromRow } from "./storeBadge.js";
 import { isHttpsUrl } from "./url.js";
+import { getEffectiveGameStatus } from "./gameRelease.js";
 
 export function toClientGame(row, { includeDownload = false } = {}) {
   const free = row.access_type === "free";
-  const downloadable = row.status === "released" && isHttpsUrl(row.download_url);
+  const status = getEffectiveGameStatus(row);
+  const downloadable = status === "released" && isHttpsUrl(row.download_url);
   return {
     id: row.id,
     title: row.title,
     slug: row.slug,
     shortDescription: row.short_description,
-    status: row.status,
+    status,
     releaseDate: row.release_date,
     heroImage: row.hero_image,
     coverImage: row.cover_image,
