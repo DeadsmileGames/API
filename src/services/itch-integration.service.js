@@ -416,9 +416,7 @@ export async function getLauncherCatalog(userId) {
 }
 
 export async function addGameToLibrary(userId, gameId) {
-  const game = await findItchGame(gameId);
-  if (!game) throw new AppError(404, "GAME_NOT_FOUND");
-  if (game.status !== "released") throw new AppError(409, "GAME_NOT_RELEASED");
+  // verifyGameOwnership rejects unreleased titles before granting or restoring membership.
   const ownership = await verifyGameOwnership(userId, gameId);
   if (!ownership.owned) throw new AppError(403, "GAME_NOT_OWNED");
   if (ownership.accessType === "free")
