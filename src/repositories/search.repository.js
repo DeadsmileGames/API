@@ -205,7 +205,7 @@ export async function searchSite({ q, page, limit, language = "en", queryVariant
      SELECT
        type, id, title, slug, description, image, status, published_at,
        thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es,
-       COUNT(*) OVER()::int AS total
+       (COUNT(*) OVER())::int AS total
      FROM scored
      ORDER BY
        matched_query_priority ASC,
