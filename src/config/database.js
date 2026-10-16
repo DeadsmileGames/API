@@ -72,7 +72,7 @@ function handlePoolError(label) {
   return (error) => {
     console.error(label, {
       code: error?.code || "UNKNOWN",
-      message: error?.message || "Unexpected database error",
+      name: error?.name || "DatabaseError",
     });
   };
 }
