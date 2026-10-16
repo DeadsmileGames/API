@@ -16,17 +16,6 @@ function normalizeSearchText(value) {
 }
 
 const SEARCH_SYNONYMS = {
-  fr: {
-    jeu: "game", jeux: "games", video: "videos", videos: "videos",
-    actualite: "news", actualites: "news", nouvelle: "news", nouvelles: "news",
-    bande: "trailer", annonce: "trailer", annonces: "trailers",
-    musique: "soundtrack", musiques: "soundtracks",
-  },
-  de: {
-    spiel: "game", spiele: "games", videofilm: "video", videos: "videos",
-    nachricht: "news", nachrichten: "news", neuigkeit: "news", neuigkeiten: "news",
-    vorschau: "trailer", trailer: "trailer", musik: "soundtrack", soundtracks: "soundtracks",
-  },
   es: {
     juego: "game", juegos: "games", video: "videos", videos: "videos",
     noticia: "news", noticias: "news", articulo: "article", articulos: "articles",
