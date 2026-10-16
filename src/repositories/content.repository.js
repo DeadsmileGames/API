@@ -22,7 +22,7 @@ export async function findNews(slug) {
   return rows[0] || null;
 }
 
-export async function listVideos({ limit = 12 } = {}) {
+export async function listVideos({ limit = 12, offset = 0 } = {}) {
   const { rows } = await query(
     `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug,
             screenshot.url AS game_screenshot
@@ -37,8 +37,8 @@ export async function listVideos({ limit = 12 } = {}) {
        WHERE gs.game_id = linked.id
        ORDER BY gs.position ASC LIMIT 1
      ) screenshot ON true
-     ORDER BY v.published_at DESC LIMIT $1`,
-    [limit],
+     ORDER BY v.published_at DESC LIMIT $1 OFFSET $2`,
+    [limit, offset],
   );
   return rows;
 }
