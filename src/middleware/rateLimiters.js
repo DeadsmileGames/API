@@ -22,15 +22,23 @@ function requestIp(req) {
   return direct || "unknown";
 }
 
-function keyHash(req) {
+function hashRateLimitKey(value) {
   return crypto
     .createHmac("sha256", env.sessionSecret)
-    .update(requestIp(req))
+    .update(value)
     .digest("hex");
 }
 
-function databaseLimiter({ scope, windowMs, limit }) {
+function keyHash(req) {
+  return hashRateLimitKey(requestIp(req));
+}
+
+function databaseLimiter({ scope, windowMs, limit, keyFor = null }) {
   return async function persistentRateLimiter(req, res, next) {
+    const key = keyFor ? keyFor(req) : requestIp(req);
+    if (typeof key !== "string" || !key) return next();
+
+    const hashedKey = keyFor ? hashRateLimitKey(key) : keyHash(req);
     const now = Date.now();
     const startMs = Math.floor(now / windowMs) * windowMs;
     const windowStart = new Date(startMs);
@@ -43,7 +51,7 @@ function databaseLimiter({ scope, windowMs, limit }) {
            hits = api_rate_limits.hits + 1,
            expires_at = EXCLUDED.expires_at
          RETURNING hits`,
-        [scope, keyHash(req), windowStart, expiresAt],
+        [scope, hashedKey, windowStart, expiresAt],
       );
       const hits = Number(rows[0]?.hits || 1);
       const remaining = Math.max(0, limit - hits);
@@ -74,6 +82,15 @@ export const twoFactorLimiter = databaseLimiter({
   scope: "two-factor",
   windowMs: 15 * 60_000,
   limit: 10,
+});
+export const twoFactorAccountLimiter = databaseLimiter({
+  scope: "two-factor-account",
+  windowMs: 15 * 60_000,
+  limit: 10,
+  keyFor: (req) => {
+    const userId = req.session?.pendingTwoFactorUserId;
+    return typeof userId === "string" && userId ? `account:${userId}` : null;
+  },
 });
 export const registerLimiter = databaseLimiter({
   scope: "register",
