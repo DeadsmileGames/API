@@ -24,7 +24,7 @@ services:
       - key: DATA_ENCRYPTION_KEY
         sync: false
       - key: FRONTEND_URL
-        value: https://deadsmilegames.vercel.app
+        value: https://deadsmilegames.onrender.com
       - key: BACKEND_URL
         value: https://api-ust8.onrender.com
       - key: COOKIE_SAMESITE
