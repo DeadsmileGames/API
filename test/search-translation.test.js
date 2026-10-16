@@ -35,17 +35,14 @@ test("adds canonical English translations for Portuguese and Spanish queries", a
 
   try {
     const variants = await expandSearchQueries("16 de outubro", "pt-BR");
-    assert.deepEqual(variants, [
-      { query: "October 16", language: "en" },
-      { query: "16 de outubro", language: "pt-BR" },
-    ]);
+    assert.deepEqual(variants, [{ query: "October 16", language: "en" }]);
   } finally {
     globalThis.fetch = originalFetch;
     clearSearchTranslationCache();
   }
 });
 
-test("keeps the original query while translating an arbitrary word", async () => {
+test("uses the shared English term for a translated word", async () => {
   clearSearchTranslationCache();
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mockTranslationApi({
@@ -56,7 +53,6 @@ test("keeps the original query while translating an arbitrary word", async () =>
   try {
     assert.deepEqual(await expandSearchQueries("tiro", "pt-BR"), [
       { query: "shot", language: "en" },
-      { query: "tiro", language: "pt-BR" },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -111,7 +107,7 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       "October 16th": "October 16",
       "16 de outubro": "October 16",
       "16 de octubre": "October 16",
-      shooting: "shooting",
+      shot: "shot",
       tiro: "shot",
       disparo: "shot",
     },
@@ -119,7 +115,7 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       "October 16th": "October 16",
       "16 de outubro": "October 16",
       "16 de octubre": "October 16",
-      shooting: "shooting",
+      shot: "shot",
       tiro: "shot",
       disparo: "shot",
     },
@@ -135,13 +131,11 @@ test("English, Portuguese and Spanish equivalents share an English query variant
     assert.ok(dateQueries.every((variants) => variants[0]?.query === "October 16"));
 
     const wordQueries = await Promise.all([
-      expandSearchQueries("shooting", "en"),
+      expandSearchQueries("shot", "en"),
       expandSearchQueries("tiro", "pt-BR"),
       expandSearchQueries("disparo", "es"),
     ]);
-    assert.ok(wordQueries.every((variants) => variants[0]?.query === "shooting" || variants[0]?.query === "shot"));
-    assert.equal(wordQueries[1][0].query, "shot");
-    assert.equal(wordQueries[2][0].query, "shot");
+    assert.ok(wordQueries.every((variants) => variants[0]?.query === "shot"));
   } finally {
     globalThis.fetch = originalFetch;
     clearSearchTranslationCache();
