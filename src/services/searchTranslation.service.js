@@ -8,6 +8,9 @@ const SOURCE_LANGUAGES = Object.freeze([
   { locale: "es", source: "es" },
 ]);
 
+const PORTUGUESE_MARKERS = /[ãõç]|\b(?:outubro|janeiro|fevereiro|março|maio|junho|julho|setembro|dezembro|jogo|jogos|lançamento|jogabilidade|trilha|edição|promoção|notícia|notícias)\b/iu;
+const SPANISH_MARKERS = /[ñ¿¡]|\b(?:octubre|enero|febrero|marzo|mayo|junio|julio|septiembre|diciembre|juego|juegos|lanzamiento|jugabilidad|disparo|artículo|artículos|año|niño)\b/iu;
+
 const cache = new Map();
 const inFlight = new Map();
 let providerUnavailableUntil = 0;
@@ -34,6 +37,18 @@ function remember(key, value, ttl = CACHE_TTL_MS) {
   }
 }
 
+function detectQueryLanguage(query, fallbackLanguage) {
+  const text = String(query || "").toLocaleLowerCase("pt-BR");
+  const portugueseMatches = (text.match(new RegExp(PORTUGUESE_MARKERS.source, "giu")) || []).length;
+  const spanishMatches = (text.match(new RegExp(SPANISH_MARKERS.source, "giu")) || []).length;
+
+  if (portugueseMatches > spanishMatches) return "pt-BR";
+  if (spanishMatches > portugueseMatches) return "es";
+  return fallbackLanguage === "pt-BR" || fallbackLanguage === "es"
+    ? fallbackLanguage
+    : "pt-BR";
+}
+
 async function requestTranslation(query, source) {
   const params = new URLSearchParams({
     q: query,
@@ -50,8 +65,11 @@ async function requestTranslation(query, source) {
   if (Number(payload?.responseStatus) !== 200) return null;
 
   const translated = decodeTranslation(payload?.responseData?.translatedText);
+  const confidence = Number(payload?.responseData?.match);
   if (
     !translated ||
+    !Number.isFinite(confidence) ||
+    confidence < 0.5 ||
     translated.length > 320 ||
     /^(?:PLEASE SELECT|INVALID SOURCE LANGUAGE|INVALID TARGET LANGUAGE|MYMEMORY WARNING)/iu.test(translated)
   ) {
@@ -95,13 +113,19 @@ export async function expandSearchQueries(query, language = "en") {
   if (!original) return [];
   if (language === "en") return [{ query: original, language: "en" }];
 
-  const orderedSources = [...SOURCE_LANGUAGES].sort((a, b) => {
-    const priority = (entry) => entry.locale === language ? 0 : 1;
-    return priority(a) - priority(b);
-  });
-  const translations = await Promise.all(
-    orderedSources.map(({ source }) => translateCached(original, source)),
+  const detectedLanguage = detectQueryLanguage(original, language);
+  const primarySource = SOURCE_LANGUAGES.find(
+    ({ locale }) => locale === detectedLanguage,
+  ) || SOURCE_LANGUAGES[0];
+  const fallbackSource = SOURCE_LANGUAGES.find(
+    ({ locale }) => locale !== primarySource.locale,
   );
+
+  const primaryTranslation = await translateCached(original, primarySource.source);
+  const fallbackTranslation = primaryTranslation
+    ? null
+    : await translateCached(original, fallbackSource.source);
+  const translations = [primaryTranslation, fallbackTranslation];
 
   const variants = [];
   const seen = new Set();
@@ -115,7 +139,10 @@ export async function expandSearchQueries(query, language = "en") {
   };
 
   for (const translated of translations) {
-    if (translated) add(translated, "en");
+    if (translated) {
+      add(translated, "en");
+      break;
+    }
   }
 
   const hasEnglishEquivalent = translations.some(
@@ -123,7 +150,7 @@ export async function expandSearchQueries(query, language = "en") {
       translated &&
       translated.toLocaleLowerCase("en") === original.toLocaleLowerCase("en"),
   );
-  if (language === "en" || !translations[0] || hasEnglishEquivalent) add(original, language);
+  if (!translations[0] || hasEnglishEquivalent) add(original, language);
   return variants;
 }
 
