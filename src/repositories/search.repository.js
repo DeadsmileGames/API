@@ -15,9 +15,34 @@ function normalizeSearchText(value) {
     .replace(/\s+/g, " ");
 }
 
-export async function searchSite({ q, page, limit }) {
+const SEARCH_SYNONYMS = {
+  fr: {
+    jeu: "game", jeux: "games", video: "videos", videos: "videos",
+    actualite: "news", actualites: "news", nouvelle: "news", nouvelles: "news",
+    bande: "trailer", annonce: "trailer", annonces: "trailers",
+    musique: "soundtrack", musiques: "soundtracks",
+  },
+  de: {
+    spiel: "game", spiele: "games", videofilm: "video", videos: "videos",
+    nachricht: "news", nachrichten: "news", neuigkeit: "news", neuigkeiten: "news",
+    vorschau: "trailer", trailer: "trailer", musik: "soundtrack", soundtracks: "soundtracks",
+  },
+  es: {
+    juego: "game", juegos: "games", video: "videos", videos: "videos",
+    noticia: "news", noticias: "news", articulo: "article", articulos: "articles",
+    avance: "trailer", avances: "trailers", musica: "soundtrack", bandas: "soundtracks",
+  },
+  "pt-BR": {
+    jogo: "game", jogos: "games", video: "videos", videos: "videos",
+    noticia: "news", noticias: "news", artigo: "article", artigos: "articles",
+    trailer: "trailer", trailers: "trailers", musica: "soundtrack", trilha: "soundtrack", sonoras: "soundtracks",
+  },
+};
+
+export async function searchSite({ q, page, limit, language = "en" }) {
   const normalizedQuery = normalizeSearchText(q);
-  const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean))];
+  const synonyms = SEARCH_SYNONYMS[language] || {};
+  const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean).map((term) => synonyms[term] || term))];
 
   if (!terms.length) {
     return { items: [], total: 0 };
