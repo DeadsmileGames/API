@@ -5,8 +5,9 @@ const ACCENT_CHARS = "áàâãäéèêëíìîïóòôõöúùûüçñýÿ";
 const NORMALIZED_CHARS = "aaaaaeeeeiiiiooooouuuucnyy";
 const FUZZY_THRESHOLD = 0.45;
 
-function normalizedDocumentSql(expression) {
+function normalizedDocumentSql(expression, normalizeMonths) {
   let normalized = `translate(lower(${expression}), $4, $5)`;
+  if (!normalizeMonths) return normalized;
   for (const { canonical, names } of SEARCH_MONTHS) {
     const pattern = String.raw`\m(${names.join("|")})\M`;
     normalized = `regexp_replace(${normalized}, '${pattern}', '${canonical}', 'g')`;
@@ -17,6 +18,7 @@ function normalizedDocumentSql(expression) {
 
 export async function searchSite({ q, page, limit, language = "en" }) {
   const { normalizedQuery, terms } = normalizeSearchQuery(q, language);
+  const normalizeMonths = SEARCH_MONTHS.some(({ canonical }) => terms.includes(canonical));
 
   if (!terms.length) {
     return { items: [], total: 0 };
@@ -97,8 +99,8 @@ export async function searchSite({ q, page, limit, language = "en" }) {
     candidates AS (
       SELECT
         candidates_raw.*,
-        ${normalizedDocumentSql("search_document")} AS normalized_search_document,
-        ${normalizedDocumentSql("title")} AS normalized_title
+        ${normalizedDocumentSql("search_document", normalizeMonths)} AS normalized_search_document,
+        ${normalizedDocumentSql("title", normalizeMonths)} AS normalized_title
       FROM candidates_raw
     ),
     scored AS (
