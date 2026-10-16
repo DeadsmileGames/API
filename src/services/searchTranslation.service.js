@@ -8,8 +8,8 @@ const SOURCE_LANGUAGES = Object.freeze([
   { locale: "es", source: "es" },
 ]);
 
-const PORTUGUESE_MARKERS = /[ãõç]|\b(?:outubro|janeiro|fevereiro|março|maio|junho|julho|setembro|dezembro|jogo|jogos|lançamento|jogabilidade|trilha|edição|promoção|notícia|notícias|tiro)\b/iu;
-const SPANISH_MARKERS = /[ñ¿¡]|\b(?:octubre|enero|febrero|marzo|mayo|junio|julio|septiembre|diciembre|juego|juegos|lanzamiento|jugabilidad|disparo|artículo|artículos|año|niño|tiro)\b/iu;
+const PORTUGUESE_MARKERS = /[ãõç]|\b(?:janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jogo|jogos|cachorro|cachorros|cão|cães|gato|gatos|carro|casa|lançamento|jogabilidade|trilha|edição|promoção|notícia|notícias|noticia|noticias|suporte|ajuda|pesquisa|busca|hoje|amanhã|ontem|filme|data|tiro|computador|tela|biblioteca|novidades|você|vocês)\b/iu;
+const SPANISH_MARKERS = /[ñ¿¡]|\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|juego|juegos|perro|perros|gato|gatos|carro|casa|lanzamiento|jugabilidad|disparo|artículo|artículos|noticia|noticias|fecha|ayuda|soporte|búsqueda|busqueda|hoy|mañana|ayer|película|peliculas|estreno|ordenador|pantalla|novedades|computadora|tiro)\b/iu;
 
 const cache = new Map();
 const inFlight = new Map();
