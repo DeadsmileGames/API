@@ -1,5 +1,5 @@
 import { searchSite } from "../repositories/search.repository.js";
-import { translateSearchQuery } from "./searchTranslation.service.js";
+import { expandSearchQueries } from "./searchTranslation.service.js";
 
 function toClientResult(row) {
   const item = {
@@ -33,12 +33,13 @@ function toClientResult(row) {
 }
 
 export async function performSearch({ q, page, limit, language = "en" }) {
-  const translation = await translateSearchQuery(q, language);
+  const queryVariants = await expandSearchQueries(q, language);
   const { items, total } = await searchSite({
-    q: translation.query,
+    q,
+    queryVariants,
     page,
     limit,
-    language: translation.translated ? "en" : language,
+    language,
   });
   return {
     items: items.map(toClientResult),
