@@ -1,13 +1,31 @@
 import { query } from "../config/database.js";
 
+const ACCENT_CHARS = "áàâãäéèêëíìîïóòôõöúùûüçñýÿ";
+const NORMALIZED_CHARS = "aaaaaeeeeiiiiooooouuuucnyy";
+const FUZZY_THRESHOLD = 0.45;
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/['’]s\b/gu, " ")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export async function searchSite({ q, page, limit }) {
-  const normalizedQuery = String(q || "").trim();
-  const escapedQuery = normalizedQuery.replace(/[\\%_]/g, "\\$&");
-  const startsWithTerm = `${escapedQuery}%`;
-  const containsTerm = `%${escapedQuery}%`;
+  const normalizedQuery = normalizeSearchText(q);
+  const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean))];
+
+  if (!terms.length) {
+    return { items: [], total: 0 };
+  }
+
   const offset = (page - 1) * limit;
   const candidates = `
-    WITH candidates AS (
+    WITH candidates_raw AS (
       SELECT
         'game'::text AS type,
         g.id::text AS id,
@@ -21,30 +39,25 @@ export async function searchSite({ q, page, limit }) {
         NULL::text AS thumbnail_en,
         NULL::text AS thumbnail_pt_br,
         NULL::text AS thumbnail_es,
-        CASE
-          WHEN g.title ILIKE $1 ESCAPE '\\' THEN 0
-          WHEN g.title ILIKE $2 ESCAPE '\\' THEN 1
-          WHEN g.title ILIKE $3 ESCAPE '\\' THEN 2
-          ELSE 3
-        END::int AS relevance
+        concat_ws(
+          ' ',
+          g.title,
+          g.short_description,
+          g.description,
+          (
+            SELECT string_agg(gn.name, ' ')
+            FROM game_genres gg
+            JOIN genres gn ON gn.id = gg.genre_id
+            WHERE gg.game_id = g.id
+          ),
+          (
+            SELECT string_agg(pl.name, ' ')
+            FROM game_platforms gp
+            JOIN platforms pl ON pl.id = gp.platform_id
+            WHERE gp.game_id = g.id
+          )
+        ) AS search_document
       FROM games g
-      WHERE g.title ILIKE $3 ESCAPE '\\'
-         OR COALESCE(g.short_description, '') ILIKE $3 ESCAPE '\\'
-         OR COALESCE(g.description, '') ILIKE $3 ESCAPE '\\'
-         OR EXISTS (
-           SELECT 1
-           FROM game_genres gg
-           JOIN genres gn ON gn.id = gg.genre_id
-           WHERE gg.game_id = g.id
-             AND gn.name ILIKE $3 ESCAPE '\\'
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM game_platforms gp
-           JOIN platforms pl ON pl.id = gp.platform_id
-           WHERE gp.game_id = g.id
-             AND pl.name ILIKE $3 ESCAPE '\\'
-         )
 
       UNION ALL
 
@@ -61,17 +74,8 @@ export async function searchSite({ q, page, limit }) {
         NULL::text AS thumbnail_en,
         NULL::text AS thumbnail_pt_br,
         NULL::text AS thumbnail_es,
-        CASE
-          WHEN n.title ILIKE $1 ESCAPE '\\' THEN 0
-          WHEN n.title ILIKE $2 ESCAPE '\\' THEN 1
-          WHEN n.title ILIKE $3 ESCAPE '\\' THEN 2
-          ELSE 3
-        END::int AS relevance
+        concat_ws(' ', n.title, n.excerpt, n.body, n.category) AS search_document
       FROM news n
-      WHERE n.title ILIKE $3 ESCAPE '\\'
-         OR COALESCE(n.excerpt, '') ILIKE $3 ESCAPE '\\'
-         OR COALESCE(n.body, '') ILIKE $3 ESCAPE '\\'
-         OR COALESCE(n.category, '') ILIKE $3 ESCAPE '\\'
 
       UNION ALL
 
@@ -88,31 +92,100 @@ export async function searchSite({ q, page, limit }) {
         v.thumbnail_en::text AS thumbnail_en,
         v.thumbnail_pt_br::text AS thumbnail_pt_br,
         v.thumbnail_es::text AS thumbnail_es,
-        CASE
-          WHEN v.title ILIKE $1 ESCAPE '\\' THEN 0
-          WHEN v.title ILIKE $2 ESCAPE '\\' THEN 1
-          WHEN v.title ILIKE $3 ESCAPE '\\' THEN 2
-          ELSE 3
-        END::int AS relevance
+        concat_ws(' ', v.title, v.category) AS search_document
       FROM videos v
-      WHERE v.title ILIKE $3 ESCAPE '\\'
-         OR COALESCE(v.category, '') ILIKE $3 ESCAPE '\\'
+    ),
+    candidates AS (
+      SELECT
+        candidates_raw.*,
+        translate(lower(search_document), $4, $5) AS normalized_search_document,
+        translate(lower(title), $4, $5) AS normalized_title
+      FROM candidates_raw
+    ),
+    scored AS (
+      SELECT
+        candidates.*,
+        CASE
+          WHEN normalized_title = $1 THEN 0
+          WHEN strpos(normalized_title, $1) = 1 THEN 1
+          WHEN strpos(normalized_title, $1) > 0 THEN 2
+          ELSE 3
+        END::int AS phrase_relevance,
+        CASE
+          WHEN type = 'video' AND EXISTS (
+            SELECT 1 FROM unnest($2::text[]) AS token(term)
+            WHERE term IN ('trailer', 'trailers', 'video', 'videos')
+          ) THEN 0
+          WHEN type = 'game' AND EXISTS (
+            SELECT 1 FROM unnest($2::text[]) AS token(term)
+            WHERE term IN ('game', 'games')
+          ) THEN 0
+          WHEN type = 'news' AND EXISTS (
+            SELECT 1 FROM unnest($2::text[]) AS token(term)
+            WHERE term IN ('news', 'article', 'articles')
+          ) THEN 0
+          ELSE 1
+        END::int AS intent_relevance,
+        (
+          SELECT COUNT(*)::int
+          FROM unnest($2::text[]) AS token(term)
+          WHERE strpos(normalized_search_document, term) > 0
+             OR (
+               char_length(term) >= 4
+               AND word_similarity(term, normalized_search_document) >= $3
+             )
+             OR (
+               type = 'video'
+               AND term IN ('trailer', 'trailers', 'video', 'videos')
+             )
+             OR (type = 'game' AND term IN ('game', 'games'))
+             OR (type = 'news' AND term IN ('news', 'article', 'articles'))
+        ) AS matched_term_count,
+        (
+          SELECT COUNT(*)::int
+          FROM unnest($2::text[]) AS token(term)
+          WHERE strpos(normalized_title, term) > 0
+             OR (
+               char_length(term) >= 4
+               AND word_similarity(term, normalized_title) >= $3
+             )
+        ) AS title_term_count
+      FROM candidates
     )
   `;
 
-  const params = [escapedQuery, startsWithTerm, containsTerm];
+  const params = [
+    normalizedQuery,
+    terms,
+    FUZZY_THRESHOLD,
+    ACCENT_CHARS,
+    NORMALIZED_CHARS,
+  ];
+
   const countResult = await query(
-    `${candidates} SELECT COUNT(*)::int AS total FROM candidates`,
+    `${candidates}
+     SELECT COUNT(*)::int AS total
+     FROM scored
+     WHERE matched_term_count = cardinality($2::text[])`,
     params,
   );
   const total = countResult.rows[0]?.total ?? 0;
 
   const dataResult = await query(
     `${candidates}
-     SELECT *
-     FROM candidates
-     ORDER BY relevance ASC, published_at DESC NULLS LAST, title ASC, type ASC
-     LIMIT $4 OFFSET $5`,
+     SELECT
+       type, id, title, slug, description, image, status, published_at,
+       thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es
+     FROM scored
+     WHERE matched_term_count = cardinality($2::text[])
+     ORDER BY
+       title_term_count DESC,
+       intent_relevance ASC,
+       phrase_relevance ASC,
+       published_at DESC NULLS LAST,
+       title ASC,
+       type ASC
+     LIMIT $6 OFFSET $7`,
     [...params, limit, offset],
   );
 
