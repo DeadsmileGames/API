@@ -10,7 +10,7 @@ import {
   listGameScreenshots,
   listSoundtrackGames,
 } from "../repositories/content.repository.js";
-import { findPremiere, getYoutubeDetails, getYoutubeDetailsForVideos, searchSoundtrackVideos } from "./youtube.service.js";
+import { findPremiere, getYoutubeDetails, getYoutubeDetailsForVideos, getYoutubeLiveChat, searchSoundtrackVideos } from "./youtube.service.js";
 
 export async function getNews(query) {
   return listNews(query);
@@ -30,6 +30,12 @@ export async function getVideoById(id, language = "en") {
   const item = await findVideo(id);
   if (!item) throw new AppError(404, "VIDEO_NOT_FOUND");
   return { ...item, youtube: await getYoutubeDetails(item.video_url, language) };
+}
+
+export async function getVideoLiveChat(id, language = "en") {
+  const item = await findVideo(id);
+  if (!item) throw new AppError(404, "VIDEO_NOT_FOUND");
+  return getYoutubeLiveChat(item.video_url, language);
 }
 
 export async function getPremiere(language = "en") {
