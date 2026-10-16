@@ -146,7 +146,7 @@ export async function searchSite({ q, page, limit, language = "en", queryVariant
           CASE
             WHEN type = 'video' AND EXISTS (
               SELECT 1 FROM unnest(query_variants.terms) AS token(term)
-              WHERE term IN ('trailer', 'trailers', 'video', 'videos')
+              WHERE term IN ('trailer', 'trailers', 'video', 'videos', 'watch', 'watching', 'view', 'viewing')
             ) THEN 0
             WHEN type = 'game' AND EXISTS (
               SELECT 1 FROM unnest(query_variants.terms) AS token(term)
@@ -178,7 +178,7 @@ export async function searchSite({ q, page, limit, language = "en", queryVariant
              )
              OR (
                type = 'video'
-               AND term IN ('trailer', 'trailers', 'video', 'videos')
+               AND term IN ('trailer', 'trailers', 'video', 'videos', 'watch', 'watching', 'view', 'viewing')
              )
              OR (type = 'game' AND term IN ('game', 'games'))
              OR (type = 'news' AND term IN ('news', 'article', 'articles'))
