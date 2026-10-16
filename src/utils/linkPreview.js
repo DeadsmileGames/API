@@ -9,6 +9,7 @@ const MAX_REDIRECTS = 3;
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 const MAX_CACHE_ENTRIES = 500;
 const cache = new Map();
+const requests = new Map();
 
 function ipv4Parts(address) {
   if (net.isIP(address) !== 4) return null;
@@ -184,7 +185,7 @@ function requestHtml(url, addresses) {
         headers: {
           Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
           "Accept-Encoding": "identity",
-          "User-Agent": "DeadsmileGames-LinkTitle/1.0 (+https://deadsmilegames.vercel.app)",
+          "User-Agent": "DeadsmileGames-LinkTitle/1.0 (+https://deadsmilegames.onrender.com)",
         },
       },
       (response) => {
@@ -242,7 +243,7 @@ function setCache(key, value) {
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-export async function getPageTitle(rawUrl) {
+async function fetchPageTitle(rawUrl) {
   const original = normalizePreviewUrl(rawUrl);
   if (!original) throw new TypeError("Invalid external URL");
 
@@ -281,4 +282,23 @@ export async function getPageTitle(rawUrl) {
   const value = { url: original.href, title };
   setCache(cacheKey, value);
   return value;
+}
+
+
+export function getPageTitle(rawUrl) {
+  const original = normalizePreviewUrl(rawUrl);
+  if (!original) return Promise.reject(new TypeError("Invalid external URL"));
+
+  const cached = cache.get(original.href);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.value);
+  if (cached) cache.delete(original.href);
+
+  const existing = requests.get(original.href);
+  if (existing) return existing;
+
+  const pending = fetchPageTitle(original.href).finally(() => {
+    if (requests.get(original.href) === pending) requests.delete(original.href);
+  });
+  requests.set(original.href, pending);
+  return pending;
 }
