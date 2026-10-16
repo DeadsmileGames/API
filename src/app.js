@@ -47,7 +47,7 @@ function cspDirectives() {
     scriptSrc: ["'self'"],
     styleSrc: ["'self'"],
     fontSrc: ["'self'", "data:"],
-    connectSrc: ["'self'", env.frontendUrl],
+    connectSrc: ["'self'", ...env.frontendOrigins],
     mediaSrc: ["'self'", "blob:", "https:"],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
@@ -111,9 +111,9 @@ export function createApp() {
   app.use(express.static(path.join(__dirname, "../public"), { index: false }));
 
   const allowedOrigins = env.isProduction
-    ? [env.frontendUrl]
+    ? env.frontendOrigins
     : [
-        env.frontendUrl,
+        ...env.frontendOrigins,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
