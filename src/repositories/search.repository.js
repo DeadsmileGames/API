@@ -96,7 +96,6 @@ export async function searchSite({ q, page, limit }) {
         END::int AS relevance
       FROM videos v
       WHERE v.title ILIKE $3 ESCAPE '\\'
-         OR COALESCE(v.description, '') ILIKE $3 ESCAPE '\\'
          OR COALESCE(v.category, '') ILIKE $3 ESCAPE '\\'
     )
   `;
