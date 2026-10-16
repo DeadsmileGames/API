@@ -100,7 +100,7 @@ function normalizeLiveChatMessage(item) {
   if (!message) return null;
   const rawPhoto = typeof author.profileImageUrl === "string" ? author.profileImageUrl : "";
   const authorPhoto =
-    /^https:\/\/(?:yt3[.]ggpht[.]com|lh3[.]googleusercontent[.]com)\//i.test(rawPhoto)
+    /^https:\/\/(?:yt3[.]ggpht[.]com|yt3[.]googleusercontent[.]com|lh3[.]googleusercontent[.]com)\//i.test(rawPhoto)
       ? rawPhoto
       : null;
   return {
@@ -143,7 +143,7 @@ export async function getYoutubeLiveChat(videoUrl, language = "en") {
     const details = (await fetchDetails([videoId], language, { force: true })).get(videoId);
     const state = details?.state || "none";
     const liveChatId = details?.activeLiveChatId || null;
-    if (state !== "live" || !liveChatId) {
+    if (!["live", "upcoming"].includes(state) || !liveChatId) {
       const delay = state === "upcoming" ? LIVE_CHAT_DEFAULT_POLL_MS : 30_000;
       entry = {
         state,
