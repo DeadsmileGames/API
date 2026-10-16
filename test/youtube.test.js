@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 process.env.DATABASE_URL = "postgres://localhost/unused";
 process.env.SESSION_SECRET = "isolated-test-session-key-".repeat(2);
 process.env.YOUTUBE_API_KEY = "test-key";
-const { findPremiere } = await import("../src/services/youtube.service.js");
+const { findPremiere, getYoutubeDetails } = await import("../src/services/youtube.service.js");
 const { youtubeVideoId } = await import("../src/utils/youtube.js");
 
 test("YouTube links resolve to a video id and anything else is rejected", () => {
@@ -42,6 +42,35 @@ test("premiere detection keeps upcoming videos within 24 hours and live videos w
     assert.equal(live.video.id, "livestream1");
     assert.equal(live.info.state, "live");
     assert.equal(live.info.startsAt, live.info.actualStartedAt);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test("completed YouTube broadcasts expose their absolute end timestamp", async () => {
+  const videoId = "abcdefghijk";
+  const endedAt = new Date(Date.now() - 6_000).toISOString();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    assert.equal(new URL(url).searchParams.get("id"), videoId);
+    return Response.json({
+      items: [
+        {
+          id: videoId,
+          snippet: { liveBroadcastContent: "none", title: "Finished premiere" },
+          liveStreamingDetails: {
+            actualStartTime: new Date(Date.now() - 60_000).toISOString(),
+            actualEndTime: endedAt,
+          },
+        },
+      ],
+    });
+  };
+  try {
+    const details = await getYoutubeDetails(`https://youtu.be/${videoId}`);
+    assert.equal(details.state, "none");
+    assert.equal(details.actualEndedAt, endedAt);
   } finally {
     globalThis.fetch = originalFetch;
   }
