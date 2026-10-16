@@ -42,6 +42,18 @@ export function csrfToken(_req, res) {
 
 export function verifyCsrf(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
+
+  if (req.get("sec-fetch-site")?.toLowerCase() === "cross-site") {
+    const origin = req.get("origin");
+    let trustedOrigin = false;
+    try {
+      trustedOrigin = Boolean(origin) && new URL(origin).origin === env.frontendUrl;
+    } catch {
+      trustedOrigin = false;
+    }
+    if (!trustedOrigin) return sendError(res, 403, "CSRF_VALIDATION_FAILED");
+  }
+
   const cookieToken = req.signedCookies?.[CSRF_COOKIE];
   const headerToken = req.get(CSRF_HEADER);
   if (
