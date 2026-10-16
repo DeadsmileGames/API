@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { validate } from "../middleware/validate.js";
+import { searchLimiter } from "../middleware/rateLimiters.js";
 import {
   contentIdSchema,
   contentListSchema,
@@ -14,6 +15,12 @@ newsRouter.get("/:slug", validate(contentSlugSchema, "params"), controller.newsD
 export const videosRouter = Router();
 videosRouter.get("/", validate(contentListSchema, "query"), controller.videos);
 videosRouter.get("/premiere", controller.premiere);
+videosRouter.get(
+  "/:id/live-chat",
+  searchLimiter,
+  validate(contentIdSchema, "params"),
+  controller.videoLiveChat,
+);
 videosRouter.get("/:id", validate(contentIdSchema, "params"), controller.videoDetails);
 
 export const downloadsRouter = Router();
@@ -21,3 +28,7 @@ downloadsRouter.get("/", controller.downloads);
 
 export const productsRouter = Router();
 productsRouter.get("/", controller.products);
+
+
+export const soundtracksRouter = Router();
+soundtracksRouter.get("/", controller.soundtracks);

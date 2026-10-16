@@ -29,3 +29,5 @@ services:
         value: https://api-ust8.onrender.com
       - key: COOKIE_SAMESITE
         value: none
+      - key: YOUTUBE_API_KEY
+        sync: false

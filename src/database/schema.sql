@@ -293,6 +293,7 @@ CREATE TABLE "user_game_entitlements" (
 	"acquired_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"last_verified_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"revoked_at" timestamp with time zone,
+	"hidden_from_library_at" timestamp with time zone,
 	CONSTRAINT "user_game_entitlements_pkey" PRIMARY KEY("user_id","game_id"),
 	CONSTRAINT "user_game_entitlements_source_check" CHECK ((source = 'itch'::text))
 );
@@ -345,6 +346,9 @@ CREATE TABLE "videos" (
 	"title" text NOT NULL,
 	"category" text NOT NULL,
 	"thumbnail" text,
+	"thumbnail_en" text,
+	"thumbnail_pt_br" text,
+	"thumbnail_es" text,
 	"video_url" text,
 	"duration_seconds" integer,
 	"published_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -427,6 +431,7 @@ CREATE INDEX "telemetry_events_created_idx" ON "telemetry_events" ("created_at")
 CREATE INDEX "telemetry_events_user_created_idx" ON "telemetry_events" ("user_id","created_at");
 
 CREATE INDEX "user_game_entitlements_active_idx" ON "user_game_entitlements" ("user_id","revoked_at");
+CREATE INDEX "user_game_entitlements_library_visibility_idx" ON "user_game_entitlements" ("user_id","hidden_from_library_at") WHERE "revoked_at" IS NULL;
 
 
 

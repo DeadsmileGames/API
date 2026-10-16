@@ -43,14 +43,27 @@ export async function createVideo({
   title,
   category,
   thumbnail,
+  thumbnailEn,
+  thumbnailPtBr,
+  thumbnailEs,
   videoUrl,
   durationSeconds,
 }) {
   const { rows } = await pool.query(
-    `INSERT INTO videos (title, category, thumbnail, video_url, duration_seconds)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO videos
+       (title, category, thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es, video_url, duration_seconds)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [title, category, thumbnail || null, videoUrl || null, durationSeconds ?? null],
+    [
+      title,
+      category,
+      thumbnail || null,
+      thumbnailEn || null,
+      thumbnailPtBr || null,
+      thumbnailEs || null,
+      videoUrl || null,
+      durationSeconds ?? null,
+    ],
   );
   return rows[0];
 }
@@ -169,18 +182,31 @@ export async function updateNews(id, { title, excerpt, body, image, gameId }) {
 
 export async function updateVideo(
   id,
-  { title, category, thumbnail, videoUrl, durationSeconds },
+  { title, category, thumbnail, thumbnailEn, thumbnailPtBr, thumbnailEs, videoUrl, durationSeconds },
 ) {
   const { rows } = await pool.query(
     `UPDATE videos
          SET title = $2,
              category = $3,
              thumbnail = $4,
-             video_url = $5,
-             duration_seconds = $6
+             thumbnail_en = $5,
+             thumbnail_pt_br = $6,
+             thumbnail_es = $7,
+             video_url = $8,
+             duration_seconds = $9
          WHERE id = $1
          RETURNING *`,
-    [id, title, category, thumbnail || null, videoUrl || null, durationSeconds ?? null],
+    [
+      id,
+      title,
+      category,
+      thumbnail || null,
+      thumbnailEn || null,
+      thumbnailPtBr || null,
+      thumbnailEs || null,
+      videoUrl || null,
+      durationSeconds ?? null,
+    ],
   );
 
   return rows[0] || null;

@@ -24,13 +24,19 @@ export async function findNews(slug) {
 
 export async function listVideos({ limit = 12 } = {}) {
   const { rows } = await query(
-    `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug
+    `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug,
+            screenshot.url AS game_screenshot
      FROM videos v
      LEFT JOIN LATERAL (
        SELECT g.id, g.title, g.slug FROM games g
        WHERE g.id = v.game_id OR (v.game_id IS NULL AND lower(v.title) LIKE '%' || lower(g.title) || '%')
        ORDER BY (g.id = v.game_id) DESC, length(g.title) DESC LIMIT 1
      ) linked ON true
+     LEFT JOIN LATERAL (
+       SELECT gs.url FROM game_screenshots gs
+       WHERE gs.game_id = linked.id
+       ORDER BY gs.position ASC LIMIT 1
+     ) screenshot ON true
      ORDER BY v.published_at DESC LIMIT $1`,
     [limit],
   );
@@ -38,7 +44,23 @@ export async function listVideos({ limit = 12 } = {}) {
 }
 
 export async function findVideo(id) {
-  const { rows } = await query("SELECT * FROM videos WHERE id = $1 LIMIT 1", [id]);
+  const { rows } = await query(
+    `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug,
+            screenshot.url AS game_screenshot
+     FROM videos v
+     LEFT JOIN LATERAL (
+       SELECT g.id, g.title, g.slug FROM games g
+       WHERE g.id = v.game_id OR (v.game_id IS NULL AND lower(v.title) LIKE '%' || lower(g.title) || '%')
+       ORDER BY (g.id = v.game_id) DESC, length(g.title) DESC LIMIT 1
+     ) linked ON true
+     LEFT JOIN LATERAL (
+       SELECT gs.url FROM game_screenshots gs
+       WHERE gs.game_id = linked.id
+       ORDER BY gs.position ASC LIMIT 1
+     ) screenshot ON true
+     WHERE v.id = $1 LIMIT 1`,
+    [id],
+  );
   return rows[0] || null;
 }
 
@@ -60,4 +82,15 @@ export async function listGameScreenshots(gameId) {
     [gameId],
   );
   return rows.map((row) => row.url);
+}
+
+
+export async function listSoundtrackGames() {
+  const { rows } = await query(
+    `SELECT id, title, slug, cover_image, hero_image
+     FROM games
+     WHERE title IS NOT NULL AND btrim(title) <> ''
+     ORDER BY length(title) DESC, title ASC`,
+  );
+  return rows;
 }

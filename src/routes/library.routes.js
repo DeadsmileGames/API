@@ -17,6 +17,12 @@ libraryRouter.post(
   validate(libraryGameSchema, "params"),
   controller.add,
 );
+libraryRouter.delete(
+  "/:gameId",
+  integrationLimiter,
+  validate(libraryGameSchema, "params"),
+  controller.remove,
+);
 libraryRouter.post(
   "/:gameId/verify",
   integrationLimiter,

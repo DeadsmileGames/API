@@ -26,6 +26,7 @@ import {
   videosRouter,
   downloadsRouter,
   productsRouter,
+  soundtracksRouter,
 } from "./routes/content.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { itchIntegrationRouter } from "./routes/itch-integration.routes.js";
@@ -106,11 +107,6 @@ export function createApp() {
     next();
   });
 
-  app.get("/api/health", (_req, res) => {
-    res.set("Cache-Control", "no-store");
-    res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
-  });
-
   app.use(express.static(path.join(__dirname, "../public"), { index: false }));
 
   const allowedOrigins = env.isProduction
@@ -132,6 +128,18 @@ export function createApp() {
   };
   app.options("*", cors(corsOptions));
   app.use(cors(corsOptions));
+
+  app.get("/api/health", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      // Readiness includes the database, not just the HTTP process.
+      await pool.query("SELECT 1");
+      res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
+    } catch {
+      res.status(503).json({ status: "unavailable", service: "Deadsmile Games API" });
+    }
+  });
+
   app.use(hpp());
 
   const standardJson = express.json({ limit: "2mb", strict: true });
@@ -179,6 +187,7 @@ export function createApp() {
   app.use("/api/newswire", newsRouter);
   app.use("/api/news", newsRouter);
   app.use("/api/videos", videosRouter);
+  app.use("/api/soundtracks", soundtracksRouter);
   app.use("/api/downloads", downloadsRouter);
   app.use("/api/products", productsRouter);
   app.use("/api/wishlist", wishlistRouter);

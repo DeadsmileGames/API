@@ -5,6 +5,7 @@ import {
   getLibrary,
   getLauncherCatalog,
   addGameToLibrary,
+  removeGameFromLibrary,
   syncItchLibrary,
   verifyGameOwnership,
 } from "../services/itch-integration.service.js";
@@ -34,4 +35,8 @@ export const catalog = asyncHandler(async (req, res) => {
 
 export const add = asyncHandler(async (req, res) => {
   sendSuccess(res, await addGameToLibrary(req.session.userId, req.params.gameId));
+});
+
+export const remove = asyncHandler(async (req, res) => {
+  sendSuccess(res, await removeGameFromLibrary(req.session.userId, req.params.gameId));
 });
