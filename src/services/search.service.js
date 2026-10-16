@@ -1,4 +1,5 @@
 import { searchSite } from "../repositories/search.repository.js";
+import { translateSearchQuery } from "./searchTranslation.service.js";
 
 function toClientResult(row) {
   const item = {
@@ -32,7 +33,13 @@ function toClientResult(row) {
 }
 
 export async function performSearch({ q, page, limit, language = "en" }) {
-  const { items, total } = await searchSite({ q, page, limit, language });
+  const translation = await translateSearchQuery(q, language);
+  const { items, total } = await searchSite({
+    q: translation.query,
+    page,
+    limit,
+    language: translation.translated ? "en" : language,
+  });
   return {
     items: items.map(toClientResult),
     pagination: {
