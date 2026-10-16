@@ -107,7 +107,10 @@ async function translateCached(query, source) {
 export async function expandSearchQueries(query, language = "en") {
   const original = String(query || "").trim().slice(0, 80);
   if (!original) return [];
-  if (language === "en") return [{ query: original, language: "en" }];
+  const hasPortugueseMarker = PORTUGUESE_MARKERS.test(original);
+  const hasSpanishMarker = SPANISH_MARKERS.test(original);
+  if (language === "en" && !hasPortugueseMarker && !hasSpanishMarker)
+    return [{ query: original, language: "en" }];
 
   const detectedLanguage = detectQueryLanguage(original, language);
   const primarySource = SOURCE_LANGUAGES.find(
