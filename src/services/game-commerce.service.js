@@ -1,6 +1,7 @@
 import sanitizeHtml from "sanitize-html";
 import { isHttpsUrl, isItchHttpsUrl } from "../utils/url.js";
 import { storeBadgeFromRow } from "../utils/storeBadge.js";
+import { getEffectiveGameStatus } from "../utils/gameRelease.js";
 
 const prices = new Map();
 const pending = new Map();
@@ -114,7 +115,7 @@ export async function gameOffers(game, microsoftStore, itchPrice) {
             }
           : null,
     });
-  if (free && game.status === "released" && isHttpsUrl(game.download_url))
+  if (free && getEffectiveGameStatus(game) === "released" && isHttpsUrl(game.download_url))
     offers.push({ provider: "direct", href: null, price: null });
   return offers;
 }
