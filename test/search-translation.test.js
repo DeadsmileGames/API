@@ -141,3 +141,28 @@ test("English, Portuguese and Spanish equivalents share an English query variant
     clearSearchTranslationCache();
   }
 });
+
+test("preserves the source query if its preferred translation fails", async () => {
+  clearSearchTranslationCache();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.searchParams.get("langpair") === "pt|en") {
+      return Response.json({ responseStatus: 403 }, { status: 403 });
+    }
+    return Response.json({
+      responseStatus: 200,
+      responseData: { translatedText: "shot", match: 1 },
+    });
+  };
+
+  try {
+    assert.deepEqual(await expandSearchQueries("tiro", "pt-BR"), [
+      { query: "shot", language: "en" },
+      { query: "tiro", language: "pt-BR" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearSearchTranslationCache();
+  }
+});
