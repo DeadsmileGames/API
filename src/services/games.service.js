@@ -11,6 +11,7 @@ import { toClientGame } from "../utils/clientGame.js";
 import { getMicrosoftProduct } from "./microsoft-store.service.js";
 import { verifyGameOwnership, addGameToLibrary } from "./itch-integration.service.js";
 import { isHttpsUrl } from "../utils/url.js";
+import { getEffectiveGameStatus } from "../utils/gameRelease.js";
 import { getItchPrice, gameOffers } from "./game-commerce.service.js";
 
 export async function getGamesList({ page, limit, featured, genre, platform, status }) {
@@ -78,7 +79,7 @@ export async function getGameDetails(slug, locale = "en") {
 export async function getGameDownload(slug, userId) {
   const game = await findGameBySlug(slug);
   if (!game) throw new AppError(404, "GAME_NOT_FOUND");
-  if (game.status !== "released") throw new AppError(409, "GAME_NOT_RELEASED");
+  if (getEffectiveGameStatus(game) !== "released") throw new AppError(409, "GAME_NOT_RELEASED");
   if (game.access_type !== "free") {
     if (!userId) throw new AppError(401, "UNAUTHENTICATED");
     if (!(await verifyGameOwnership(userId, game.id)).owned)
