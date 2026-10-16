@@ -13,7 +13,6 @@ const SPANISH_MARKERS = /[ñ¿¡]|\b(?:octubre|enero|febrero|marzo|mayo|junio|ju
 
 const cache = new Map();
 const inFlight = new Map();
-let providerUnavailableUntil = 0;
 
 function normalizedCacheKey(query, source) {
   return `${source}:${String(query).trim().toLocaleLowerCase("en")}`;
@@ -84,7 +83,6 @@ async function translateCached(query, source) {
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   if (cached) cache.delete(key);
 
-  if (providerUnavailableUntil > Date.now()) return null;
   if (inFlight.has(key)) return inFlight.get(key);
 
   const pending = requestTranslation(query, source)
@@ -92,13 +90,11 @@ async function translateCached(query, source) {
       if (value) {
         remember(key, value);
       } else {
-        providerUnavailableUntil = Date.now() + FAILURE_CACHE_TTL_MS;
         remember(key, null, FAILURE_CACHE_TTL_MS);
       }
       return value;
     })
     .catch(() => {
-      providerUnavailableUntil = Date.now() + FAILURE_CACHE_TTL_MS;
       remember(key, null, FAILURE_CACHE_TTL_MS);
       return null;
     })
@@ -157,5 +153,4 @@ export async function expandSearchQueries(query, language = "en") {
 export function clearSearchTranslationCache() {
   cache.clear();
   inFlight.clear();
-  providerUnavailableUntil = 0;
 }
