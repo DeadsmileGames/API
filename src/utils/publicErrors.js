@@ -15,6 +15,8 @@ export function resolveLocale(value) {
   for (const { tag } of requested) {
     if (tag === "pt" || tag.startsWith("pt-")) return "pt-BR";
     if (tag === "es" || tag.startsWith("es-")) return "es";
+    if (tag === "fr" || tag.startsWith("fr-")) return "fr";
+    if (tag === "de" || tag.startsWith("de-")) return "de";
     if (tag === "en" || tag.startsWith("en-")) return "en";
   }
   return "en";
