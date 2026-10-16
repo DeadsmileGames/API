@@ -111,6 +111,9 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       shot: "shot",
       tiro: "shot",
       disparo: "shot",
+      dog: "dog",
+      cachorro: "dog",
+      perro: "dog",
     },
     "es|en": {
       "October 16th": "October 16",
@@ -119,6 +122,9 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       shot: "shot",
       tiro: "shot",
       disparo: "shot",
+      dog: "dog",
+      cachorro: "dog",
+      perro: "dog",
     },
   };
   globalThis.fetch = mockTranslationApi(translations);
@@ -155,6 +161,15 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       expandSearchQueries("disparo", "es"),
     ]);
     assert.ok(wordQueries.every((variants) => variants[0]?.query === "shot"));
+
+    const petQueries = await Promise.all([
+      expandSearchQueries("dog", "en"),
+      expandSearchQueries("cachorro", "en"),
+      expandSearchQueries("perro", "en"),
+      expandSearchQueries("cachorro", "pt-BR"),
+      expandSearchQueries("perro", "es"),
+    ]);
+    assert.ok(petQueries.every((variants) => variants[0]?.query === "dog"));
   } finally {
     globalThis.fetch = originalFetch;
     clearSearchTranslationCache();
