@@ -1,5 +1,5 @@
 import { query } from "../config/database.js";
-import { resolveLocale } from "../utils/publicErrors.js";
+import { microsoftStoreRegion } from "../utils/microsoftStoreRegion.js";
 import { AppError } from "../utils/AppError.js";
 import { normalizeMicrosoftProduct } from "../utils/microsoftProduct.js";
 
@@ -8,11 +8,6 @@ const TTL = 60 * 60 * 1000;
 const STALE_LIMIT = 7 * 24 * TTL;
 const pending = new Map();
 const retries = new Map();
-const regions = {
-  "pt-BR": { market: "BR", locale: "pt-BR" },
-  en: { market: "US", locale: "en-US" },
-  es: { market: "ES", locale: "es-ES" },
-};
 
 async function requestJson(url) {
   const response = await fetch(url, {
@@ -22,7 +17,7 @@ async function requestJson(url) {
   });
   if (
     !response.ok ||
-    !/application\/json/i.test(response.headers.get("content-type") || "")
+    !/application\\/json/i.test(response.headers.get("content-type") || "")
   )
     throw new AppError(502, "MICROSOFT_STORE_UNAVAILABLE");
   const reader = response.body.getReader();
@@ -54,7 +49,7 @@ export async function getMicrosoftProduct(
 ) {
   if (!/^[A-Z0-9]{12}$/.test(productId || ""))
     throw new AppError(400, "VALIDATION_ERROR");
-  const region = regions[resolveLocale(language)];
+  const region = microsoftStoreRegion(language);
   const key = `${productId}:${region.market}:${region.locale}`;
   const cached = (
     await query(
