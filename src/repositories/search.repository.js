@@ -200,22 +200,13 @@ export async function searchSite({ q, page, limit, language = "en", queryVariant
     NORMALIZED_CHARS,
   ];
 
-  const countResult = await query(
-    `${candidates}
-     SELECT COUNT(*)::int AS total
-     FROM scored
-     `,
-    params,
-  );
-  const total = countResult.rows[0]?.total ?? 0;
-
   const dataResult = await query(
     `${candidates}
      SELECT
        type, id, title, slug, description, image, status, published_at,
-       thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es
+       thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es,
+       COUNT(*) OVER()::int AS total
      FROM scored
-     
      ORDER BY
        matched_query_priority ASC,
        title_term_count DESC,
@@ -228,5 +219,17 @@ export async function searchSite({ q, page, limit, language = "en", queryVariant
     [...params, limit, offset],
   );
 
-  return { items: dataResult.rows, total };
+  let total = dataResult.rows[0]?.total ?? 0;
+  if (dataResult.rows.length === 0 && offset > 0) {
+    const countResult = await query(
+      `${candidates}
+       SELECT COUNT(*)::int AS total
+       FROM scored`,
+      params,
+    );
+    total = countResult.rows[0]?.total ?? 0;
+  }
+
+  const items = dataResult.rows.map(({ total: _total, ...item }) => item);
+  return { items, total };
 }
