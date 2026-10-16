@@ -1,5 +1,3 @@
--- The active-library query and remove/restore routes require this membership state.
--- Older production databases applied access-control migrations before this column existed.
 ALTER TABLE user_game_entitlements
   ADD COLUMN IF NOT EXISTS hidden_from_library_at timestamptz;
 

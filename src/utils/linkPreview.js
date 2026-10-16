@@ -48,8 +48,6 @@ export function isPublicAddress(address) {
 
   if (family === 6) {
     const normalized = address.toLowerCase().split("%")[0];
-    // Only global unicast (2000::/3) is eligible. Local, mapped, and reserved
-    // IPv6 addresses are deliberately excluded from external page lookups.
     if (normalized.startsWith("::ffff:")) return false;
     const firstHextet = Number.parseInt(normalized.split(":")[0] || "0", 16);
     if (firstHextet < 0x2000 || firstHextet > 0x3fff) return false;
@@ -277,8 +275,6 @@ export async function getPageTitle(rawUrl) {
       break;
     }
   } catch {
-    // A preview is optional. A remote site's refusal or timeout must not
-    // prevent the original link from being displayed or opened.
     title = null;
   }
 

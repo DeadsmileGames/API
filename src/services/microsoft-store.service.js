@@ -119,7 +119,6 @@ export async function getMicrosoftProduct(
   try {
     localized = await getRegionalProduct(productId, region, { requireFresh });
   } catch {
-    // Continue with English metadata if the selected Store region has no usable listing.
   }
 
   if (
@@ -130,7 +129,6 @@ export async function getMicrosoftProduct(
     try {
       english = await getRegionalProduct(productId, englishRegion, { requireFresh });
     } catch {
-      // Keep any localized data already available if the English Store is also unavailable.
     }
 
     if (!localized && english) {

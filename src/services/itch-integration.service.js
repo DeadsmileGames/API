@@ -416,7 +416,6 @@ export async function getLauncherCatalog(userId) {
 }
 
 export async function addGameToLibrary(userId, gameId) {
-  // verifyGameOwnership rejects unreleased titles before granting or restoring membership.
   const ownership = await verifyGameOwnership(userId, gameId);
   if (!ownership.owned) throw new AppError(403, "GAME_NOT_OWNED");
   if (ownership.accessType === "free")

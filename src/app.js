@@ -133,7 +133,6 @@ export function createApp() {
   app.get("/api/health", async (_req, res) => {
     res.set("Cache-Control", "no-store");
     try {
-      // Readiness includes the database, not just the HTTP process.
       await pool.query("SELECT 1");
       res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
     } catch {

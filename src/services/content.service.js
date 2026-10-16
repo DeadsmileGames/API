@@ -96,7 +96,6 @@ function soundtrackMentionsGame(video, game) {
 }
 
 export async function getSoundtracks(language = "en") {
-  // First search for official-channel soundtrack videos, then associate them with catalog games.
   const videos = await searchSoundtrackVideos(language);
   if (!videos.length) return { groups: [], total: 0 };
 
