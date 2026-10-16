@@ -25,10 +25,10 @@ export async function findNews(slug) {
 export async function listVideos({ limit = 12, offset = 0 } = {}) {
   const { rows } = await query(
     `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug,
-            screenshot.url AS game_screenshot
+            linked.cover_image AS game_cover_image, screenshot.url AS game_screenshot
      FROM videos v
      LEFT JOIN LATERAL (
-       SELECT g.id, g.title, g.slug FROM games g
+       SELECT g.id, g.title, g.slug, g.cover_image FROM games g
        WHERE g.id = v.game_id OR (v.game_id IS NULL AND lower(v.title) LIKE '%' || lower(g.title) || '%')
        ORDER BY (g.id = v.game_id) DESC, length(g.title) DESC LIMIT 1
      ) linked ON true
@@ -46,10 +46,10 @@ export async function listVideos({ limit = 12, offset = 0 } = {}) {
 export async function findVideo(id) {
   const { rows } = await query(
     `SELECT v.*, linked.id AS game_id, linked.title AS game_title, linked.slug AS game_slug,
-            screenshot.url AS game_screenshot
+            linked.cover_image AS game_cover_image, screenshot.url AS game_screenshot
      FROM videos v
      LEFT JOIN LATERAL (
-       SELECT g.id, g.title, g.slug FROM games g
+       SELECT g.id, g.title, g.slug, g.cover_image FROM games g
        WHERE g.id = v.game_id OR (v.game_id IS NULL AND lower(v.title) LIKE '%' || lower(g.title) || '%')
        ORDER BY (g.id = v.game_id) DESC, length(g.title) DESC LIMIT 1
      ) linked ON true
