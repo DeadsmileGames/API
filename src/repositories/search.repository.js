@@ -6,13 +6,13 @@ const NORMALIZED_CHARS = "aaaaaeeeeiiiiooooouuuucnyy";
 const FUZZY_THRESHOLD = 0.45;
 
 function normalizedDocumentSql(expression) {
-  let normalized = \`translate(lower(\${expression}), $4, $5)\`;
+  let normalized = `translate(lower(${expression}), $4, $5)`;
   for (const { canonical, names } of SEARCH_MONTHS) {
-    const pattern = String.raw\`\m(\${names.join("|")})\M\`;
-    normalized = \`regexp_replace(\${normalized}, '\${pattern}', '\${canonical}', 'g')\`;
+    const pattern = String.raw`\m(${names.join("|")})\M`;
+    normalized = `regexp_replace(${normalized}, '${pattern}', '${canonical}', 'g')`;
   }
-  const ordinalPattern = String.raw\`\m([0-9]{1,2})(st|nd|rd|th)\M\`;
-  return \`regexp_replace(\${normalized}, '\${ordinalPattern}', '\\1', 'gi')\`;
+  const ordinalPattern = String.raw`\m([0-9]{1,2})(st|nd|rd|th)\M`;
+  return `regexp_replace(${normalized}, '${ordinalPattern}', '\\1', 'gi')`;
 }
 
 export async function searchSite({ q, page, limit, language = "en" }) {
