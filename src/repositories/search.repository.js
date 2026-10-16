@@ -80,7 +80,7 @@ export async function searchSite({ q, page, limit }) {
         v.id::text AS id,
         v.title,
         NULL::text AS slug,
-        COALESCE(v.description, '') AS description,
+        ''::text AS description,
         COALESCE(v.thumbnail_pt_br, v.thumbnail_en, v.thumbnail_es, v.thumbnail) AS image,
         NULL::text AS status,
         v.published_at::timestamptz AS published_at,
