@@ -2,7 +2,11 @@ import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 import { youtubeVideoId } from "../utils/youtube.js";
 
-const CACHE_MS = 60_000;
+const CACHE_MS = 15_000;
+const LIVE_CHAT_MAX_MESSAGES = 80;
+const LIVE_CHAT_MIN_POLL_MS = 5_000;
+const LIVE_CHAT_DEFAULT_POLL_MS = 15_000;
+const liveChatCache = new Map();
 const PREMIERE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREMIERE_START_GRACE_MS = 10 * 60 * 1000;
 const cache = new Map();
@@ -29,6 +33,7 @@ function toDetails(item) {
     state: snippet.liveBroadcastContent || "none",
     startsAt: live.scheduledStartTime || live.actualStartTime || null,
     actualStartedAt: live.actualStartTime || null,
+    activeLiveChatId: live.activeLiveChatId || null,
   };
 }
 
@@ -36,13 +41,13 @@ function normalizeLanguage(language) {
   return ["pt-BR", "es", "en"].includes(language) ? language : "en";
 }
 
-async function fetchDetails(ids, language = "en") {
+async function fetchDetails(ids, language = "en", { force = false } = {}) {
   const locale = normalizeLanguage(language);
   const uniqueIds = [...new Set(ids.filter(Boolean))].slice(0, 50);
   if (!env.youtubeApiKey || !uniqueIds.length) return new Map();
   const cacheKey = (id) => `${locale}:${id}`;
   const now = Date.now();
-  const missing = uniqueIds.filter((id) => !(cache.get(cacheKey(id))?.expires > now));
+  const missing = uniqueIds.filter((id) => force || !(cache.get(cacheKey(id))?.expires > now));
   if (missing.length) {
     const entries = new Map(missing.map((id) => [id, null]));
     try {
@@ -70,6 +75,153 @@ async function fetchDetails(ids, language = "en") {
 export async function getYoutubeDetails(videoUrl, language = "en") {
   const id = youtubeVideoId(videoUrl);
   return id ? (await fetchDetails([id], language)).get(id) ?? null : null;
+}
+
+function chatPayload(entry) {
+  return {
+    state: entry.state || "none",
+    available: Boolean(entry.available),
+    messages: Array.isArray(entry.messages) ? entry.messages : [],
+    pollingIntervalMillis: entry.pollingIntervalMillis || LIVE_CHAT_DEFAULT_POLL_MS,
+    updatedAt: entry.updatedAt || null,
+    messageCode: entry.messageCode || null,
+  };
+}
+
+function normalizeLiveChatMessage(item) {
+  const snippet = item?.snippet || {};
+  const author = item?.authorDetails || {};
+  const rawMessage =
+    snippet.displayMessage ||
+    snippet.textMessageDetails?.messageText ||
+    snippet.superChatDetails?.userComment ||
+    "";
+  const message = String(rawMessage).slice(0, 800).trim();
+  if (!message) return null;
+  const rawPhoto = typeof author.profileImageUrl === "string" ? author.profileImageUrl : "";
+  const authorPhoto =
+    /^https:\/\/(?:yt3[.]ggpht[.]com|lh3[.]googleusercontent[.]com)\//i.test(rawPhoto)
+      ? rawPhoto
+      : null;
+  return {
+    id: String(item?.id || ""),
+    authorName: String(author.displayName || "YouTube user").slice(0, 100),
+    authorPhoto,
+    message,
+    publishedAt: snippet.publishedAt || null,
+    type: String(snippet.type || "textMessageEvent").slice(0, 50),
+  };
+}
+
+function storeLiveChatCache(videoId, entry) {
+  if (liveChatCache.size >= 128 && !liveChatCache.has(videoId)) {
+    liveChatCache.delete(liveChatCache.keys().next().value);
+  }
+  liveChatCache.set(videoId, entry);
+}
+
+export async function getYoutubeLiveChat(videoUrl, language = "en") {
+  const videoId = youtubeVideoId(videoUrl);
+  if (!videoId) {
+    return { state: "none", available: false, messages: [], pollingIntervalMillis: 30_000 };
+  }
+  if (!env.youtubeApiKey) {
+    return {
+      state: "unavailable",
+      available: false,
+      messages: [],
+      pollingIntervalMillis: 30_000,
+      messageCode: "YOUTUBE_API_UNAVAILABLE",
+    };
+  }
+
+  const now = Date.now();
+  let entry = liveChatCache.get(videoId);
+  if (entry && entry.nextPollAt > now) return chatPayload(entry);
+
+  if (!entry?.liveChatId || entry.state !== "live") {
+    const details = (await fetchDetails([videoId], language, { force: true })).get(videoId);
+    const state = details?.state || "none";
+    const liveChatId = details?.activeLiveChatId || null;
+    if (state !== "live" || !liveChatId) {
+      const delay = state === "upcoming" ? LIVE_CHAT_DEFAULT_POLL_MS : 30_000;
+      entry = {
+        state,
+        liveChatId: null,
+        available: false,
+        messages: entry?.messages || [],
+        pollingIntervalMillis: delay,
+        nextPollAt: Date.now() + delay,
+        updatedAt: new Date().toISOString(),
+      };
+      storeLiveChatCache(videoId, entry);
+      return chatPayload(entry);
+    }
+    if (entry?.liveChatId !== liveChatId) {
+      entry = { messages: [], nextPageToken: null };
+    }
+    entry = {
+      ...entry,
+      state: "live",
+      liveChatId,
+      available: false,
+      pollingIntervalMillis: LIVE_CHAT_DEFAULT_POLL_MS,
+      nextPollAt: 0,
+    };
+  }
+
+  try {
+    const params = new URLSearchParams({
+      liveChatId: entry.liveChatId,
+      part: "snippet,authorDetails",
+      maxResults: "200",
+      key: env.youtubeApiKey,
+    });
+    if (entry.nextPageToken) params.set("pageToken", entry.nextPageToken);
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/liveChat/messages?${params}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(data?.error?.errors?.[0]?.reason || "YOUTUBE_CHAT_UNAVAILABLE"));
+
+    const incoming = (Array.isArray(data.items) ? data.items : [])
+      .map(normalizeLiveChatMessage)
+      .filter(Boolean);
+    const combined = new Map((entry.messages || []).map((message) => [message.id, message]));
+    incoming.forEach((message) => combined.set(message.id, message));
+    const messages = [...combined.values()].slice(-LIVE_CHAT_MAX_MESSAGES);
+    const requestedDelay = Number(data.pollingIntervalMillis);
+    const delay = Math.min(
+      30_000,
+      Math.max(LIVE_CHAT_MIN_POLL_MS, Number.isFinite(requestedDelay) ? requestedDelay : LIVE_CHAT_DEFAULT_POLL_MS),
+    );
+    entry = {
+      ...entry,
+      state: data.offlineAt ? "completed" : "live",
+      available: !data.offlineAt,
+      messages,
+      nextPageToken: data.nextPageToken || entry.nextPageToken || null,
+      pollingIntervalMillis: delay,
+      nextPollAt: Date.now() + delay,
+      updatedAt: new Date().toISOString(),
+      messageCode: data.offlineAt ? "YOUTUBE_CHAT_ENDED" : null,
+    };
+  } catch {
+    const delay = 15_000;
+    entry = {
+      ...entry,
+      state: entry.state || "live",
+      available: Boolean(entry.messages?.length),
+      pollingIntervalMillis: delay,
+      nextPollAt: Date.now() + delay,
+      updatedAt: new Date().toISOString(),
+      messageCode: "YOUTUBE_CHAT_UNAVAILABLE",
+    };
+  }
+
+  storeLiveChatCache(videoId, entry);
+  return chatPayload(entry);
 }
 
 export async function getYoutubeDetailsForVideos(videos, language = "en") {
