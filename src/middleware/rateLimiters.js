@@ -5,6 +5,9 @@ import { query } from "../config/database.js";
 import { env } from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
 
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
+let lastRateLimitCleanupAt = 0;
+
 function rateLimitHandler(_req, res) {
   return sendError(res, 429, "RATE_LIMITED");
 }
@@ -63,7 +66,8 @@ function databaseLimiter({ scope, windowMs, limit, keyFor = null }) {
         res.setHeader("Retry-After", String(resetSeconds));
         return rateLimitHandler(req, res);
       }
-      if (Math.random() < 0.01) {
+      if (now - lastRateLimitCleanupAt >= RATE_LIMIT_CLEANUP_INTERVAL_MS) {
+        lastRateLimitCleanupAt = now;
         query("DELETE FROM api_rate_limits WHERE expires_at < now()").catch(() => {});
       }
       return next();
