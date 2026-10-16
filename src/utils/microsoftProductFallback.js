@@ -43,17 +43,7 @@ function hasValue(value) {
 
 export function needsMicrosoftProductFallback(product) {
   if (!product) return true;
-  return [
-    "title",
-    "description",
-    "developer",
-    "publisher",
-    "images",
-    "screenshots",
-    "version",
-    "requirements",
-    "releaseNotes",
-  ].some((key) => !hasValue(product[key]));
+  return FALLBACK_FIELDS.some((key) => !hasValue(product[key]));
 }
 
 export function mergeMicrosoftProductFallback(primary, englishFallback) {
