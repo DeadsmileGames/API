@@ -27,9 +27,7 @@ test("normalizes Spanish and French month names", () => {
 test("normalizes English ordinal suffixes for numeric dates", () => {
   assert.deepEqual(
     normalizeSearchQuery("October 2nd", "en"),
-    normalizeSearchQuery("2 de outubro", "pt-BR").normalizedQuery === "october 2"
-      ? normalizeSearchQuery("2 de outubro", "pt-BR")
-      : {},
+    normalizeSearchQuery("2 de outubro", "pt-BR"),
   );
 });
 
