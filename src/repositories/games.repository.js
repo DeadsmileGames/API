@@ -127,7 +127,7 @@ export async function findRelatedGames(gameId, genreNames, limit = 4) {
 export async function findGameContent(gameId, gameTitle) {
   const [videos, news, recommended] = await Promise.all([
     query(
-      `SELECT id, title, category, thumbnail, video_url, duration_seconds, published_at
+      `SELECT id, title, category, thumbnail, thumbnail_en, thumbnail_pt_br, thumbnail_es, video_url, duration_seconds, published_at
        FROM videos
        WHERE game_id = $1 OR (game_id IS NULL AND strpos(lower(title), lower($2)) > 0)
        ORDER BY published_at DESC`,
