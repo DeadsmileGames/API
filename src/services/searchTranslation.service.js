@@ -118,7 +118,7 @@ export async function expandSearchQueries(query, language = "en") {
   const hasSpanishMarker = SPANISH_MARKERS.test(original);
   let translations;
 
-  if (language === "en" && !hasPortugueseMarker && !hasSpanishMarker) {
+  if (language === "en" && ((!hasPortugueseMarker && !hasSpanishMarker) || (hasPortugueseMarker && hasSpanishMarker))) {
     const candidates = await Promise.all(
       SOURCE_LANGUAGES.map(({ source }) => translateCached(original, source)),
     );
