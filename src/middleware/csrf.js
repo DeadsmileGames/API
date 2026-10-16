@@ -47,7 +47,7 @@ export function verifyCsrf(req, res, next) {
     const origin = req.get("origin");
     let trustedOrigin = false;
     try {
-      trustedOrigin = Boolean(origin) && new URL(origin).origin === env.frontendUrl;
+      trustedOrigin = Boolean(origin) && env.frontendOrigins.includes(new URL(origin).origin);
     } catch {
       trustedOrigin = false;
     }
