@@ -46,8 +46,15 @@ if (process.env.DATA_ENCRYPTION_KEY && process.env.DATA_ENCRYPTION_KEY.length < 
 
 const frontendUrl = validAppUrl(
   "FRONTEND_URL",
-  process.env.FRONTEND_URL || "https://deadsmilegames.vercel.app",
+  process.env.FRONTEND_URL || "https://deadsmilegames.onrender.com",
 );
+const frontendOrigins = [
+  ...new Set([
+    frontendUrl,
+    "https://deadsmilegames.onrender.com",
+    "https://deadsmilegames.vercel.app",
+  ]),
+];
 const backendUrl = validAppUrl(
   "BACKEND_URL",
   process.env.BACKEND_URL || "https://api-ust8.onrender.com",
@@ -60,6 +67,7 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   databaseUrlUnpooled: process.env.DATABASE_URL_UNPOOLED || "",
   frontendUrl,
+  frontendOrigins,
   backendUrl,
   resendApiKey: process.env.RESEND_API_KEY,
   notifyEmail: process.env.NOTIFY_EMAIL,
