@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { normalizeSearchQuery } from "../src/utils/searchNormalization.js";
 import {
   clearSearchTranslationCache,
   expandSearchQueries,
@@ -128,7 +129,13 @@ test("English, Portuguese and Spanish equivalents share an English query variant
       expandSearchQueries("16 de outubro", "pt-BR"),
       expandSearchQueries("16 de octubre", "es"),
     ]);
-    assert.ok(dateQueries.every((variants) => variants[0]?.query === "October 16"));
+    assert.ok(
+      dateQueries.every(
+        (variants) =>
+          normalizeSearchQuery(variants[0]?.query, variants[0]?.language).normalizedQuery ===
+          "october 16",
+      ),
+    );
 
     const wordQueries = await Promise.all([
       expandSearchQueries("shot", "en"),
