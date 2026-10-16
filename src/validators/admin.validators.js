@@ -56,6 +56,9 @@ export const videoPostSchema = z
     title: z.string().trim().min(2).max(180),
     category: z.string().trim().min(1).max(80),
     thumbnail: imageUrl,
+    thumbnailEn: imageUrl,
+    thumbnailPtBr: imageUrl,
+    thumbnailEs: imageUrl,
     videoUrl: httpsUrl,
     durationSeconds: z.coerce.number().int().min(0).max(86_400).optional().nullable(),
   })
