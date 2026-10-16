@@ -8,8 +8,8 @@ const SOURCE_LANGUAGES = Object.freeze([
   { locale: "es", source: "es" },
 ]);
 
-const PORTUGUESE_MARKERS = /[ãõç]|\b(?:outubro|janeiro|fevereiro|março|maio|junho|julho|setembro|dezembro|jogo|jogos|lançamento|jogabilidade|trilha|edição|promoção|notícia|notícias)\b/iu;
-const SPANISH_MARKERS = /[ñ¿¡]|\b(?:octubre|enero|febrero|marzo|mayo|junio|julio|septiembre|diciembre|juego|juegos|lanzamiento|jugabilidad|disparo|artículo|artículos|año|niño)\b/iu;
+const PORTUGUESE_MARKERS = /[ãõç]|\b(?:outubro|janeiro|fevereiro|março|maio|junho|julho|setembro|dezembro|jogo|jogos|lançamento|jogabilidade|trilha|edição|promoção|notícia|notícias|tiro)\b/iu;
+const SPANISH_MARKERS = /[ñ¿¡]|\b(?:octubre|enero|febrero|marzo|mayo|junio|julio|septiembre|diciembre|juego|juegos|lanzamiento|jugabilidad|disparo|artículo|artículos|año|niño|tiro)\b/iu;
 
 const cache = new Map();
 const inFlight = new Map();
@@ -76,7 +76,11 @@ async function requestTranslation(query, source) {
   ) {
     return null;
   }
-  return translated;
+
+  return {
+    text: translated,
+    confidence: Number.isFinite(confidence) ? confidence : 0,
+  };
 }
 
 async function translateCached(query, source) {
@@ -109,24 +113,39 @@ async function translateCached(query, source) {
 export async function expandSearchQueries(query, language = "en") {
   const original = String(query || "").trim().slice(0, 80);
   if (!original) return [];
+
   const hasPortugueseMarker = PORTUGUESE_MARKERS.test(original);
   const hasSpanishMarker = SPANISH_MARKERS.test(original);
-  if (language === "en" && !hasPortugueseMarker && !hasSpanishMarker)
-    return [{ query: original, language: "en" }];
+  let translations;
 
-  const detectedLanguage = detectQueryLanguage(original, language);
-  const primarySource = SOURCE_LANGUAGES.find(
-    ({ locale }) => locale === detectedLanguage,
-  ) || SOURCE_LANGUAGES[0];
-  const fallbackSource = SOURCE_LANGUAGES.find(
-    ({ locale }) => locale !== primarySource.locale,
-  );
+  if (language === "en" && !hasPortugueseMarker && !hasSpanishMarker) {
+    const candidates = await Promise.all(
+      SOURCE_LANGUAGES.map(({ source }) => translateCached(original, source)),
+    );
+    const translatedCandidates = candidates.filter(Boolean);
+    const changedCandidates = translatedCandidates.filter(
+      ({ text }) => text.toLocaleLowerCase("en") !== original.toLocaleLowerCase("en"),
+    );
+    const rankedCandidates = changedCandidates.length
+      ? changedCandidates
+      : translatedCandidates;
+    rankedCandidates.sort((a, b) => b.confidence - a.confidence);
+    translations = [rankedCandidates[0] || null, null];
+  } else {
+    const detectedLanguage = detectQueryLanguage(original, language);
+    const primarySource = SOURCE_LANGUAGES.find(
+      ({ locale }) => locale === detectedLanguage,
+    ) || SOURCE_LANGUAGES[0];
+    const fallbackSource = SOURCE_LANGUAGES.find(
+      ({ locale }) => locale !== primarySource.locale,
+    );
 
-  const primaryTranslation = await translateCached(original, primarySource.source);
-  const fallbackTranslation = primaryTranslation
-    ? null
-    : await translateCached(original, fallbackSource.source);
-  const translations = [primaryTranslation, fallbackTranslation];
+    const primaryTranslation = await translateCached(original, primarySource.source);
+    const fallbackTranslation = primaryTranslation
+      ? null
+      : await translateCached(original, fallbackSource.source);
+    translations = [primaryTranslation, fallbackTranslation];
+  }
 
   const variants = [];
   const seen = new Set();
@@ -139,17 +158,13 @@ export async function expandSearchQueries(query, language = "en") {
     variants.push({ query: text, language: queryLanguage });
   };
 
-  for (const translated of translations) {
-    if (translated) {
-      add(translated, "en");
-      break;
-    }
-  }
+  const translated = translations.find(Boolean);
+  if (translated) add(translated.text, "en");
 
   const hasEnglishEquivalent = translations.some(
-    (translated) =>
-      translated &&
-      translated.toLocaleLowerCase("en") === original.toLocaleLowerCase("en"),
+    (candidate) =>
+      candidate &&
+      candidate.text.toLocaleLowerCase("en") === original.toLocaleLowerCase("en"),
   );
   if (!translations[0] || hasEnglishEquivalent) add(original, language);
   return variants;
