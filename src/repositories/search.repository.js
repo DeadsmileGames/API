@@ -1,37 +1,22 @@
 import { query } from "../config/database.js";
+import { normalizeSearchQuery, SEARCH_MONTHS } from "../utils/searchNormalization.js";
 
 const ACCENT_CHARS = "áàâãäéèêëíìîïóòôõöúùûüçñýÿ";
 const NORMALIZED_CHARS = "aaaaaeeeeiiiiooooouuuucnyy";
 const FUZZY_THRESHOLD = 0.45;
 
-function normalizeSearchText(value) {
-  return String(value || "")
-    .toLocaleLowerCase("pt-BR")
-    .replace(/['’]s\b/gu, " ")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
+function normalizedDocumentSql(expression) {
+  let normalized = \`translate(lower(\${expression}), $4, $5)\`;
+  for (const { canonical, names } of SEARCH_MONTHS) {
+    const pattern = String.raw\`\m(\${names.join("|")})\M\`;
+    normalized = \`regexp_replace(\${normalized}, '\${pattern}', '\${canonical}', 'g')\`;
+  }
+  const ordinalPattern = String.raw\`\m([0-9]{1,2})(st|nd|rd|th)\M\`;
+  return \`regexp_replace(\${normalized}, '\${ordinalPattern}', '\\1', 'gi')\`;
 }
 
-const SEARCH_SYNONYMS = {
-  es: {
-    juego: "game", juegos: "games", video: "videos", videos: "videos",
-    noticia: "news", noticias: "news", articulo: "article", articulos: "articles",
-    avance: "trailer", avances: "trailers", musica: "soundtrack", bandas: "soundtracks",
-  },
-  "pt-BR": {
-    jogo: "game", jogos: "games", video: "videos", videos: "videos",
-    noticia: "news", noticias: "news", artigo: "article", artigos: "articles",
-    trailer: "trailer", trailers: "trailers", musica: "soundtrack", trilha: "soundtrack", sonoras: "soundtracks",
-  },
-};
-
 export async function searchSite({ q, page, limit, language = "en" }) {
-  const normalizedQuery = normalizeSearchText(q);
-  const synonyms = SEARCH_SYNONYMS[language] || {};
-  const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean).map((term) => synonyms[term] || term))];
+  const { normalizedQuery, terms } = normalizeSearchQuery(q, language);
 
   if (!terms.length) {
     return { items: [], total: 0 };
@@ -112,8 +97,8 @@ export async function searchSite({ q, page, limit, language = "en" }) {
     candidates AS (
       SELECT
         candidates_raw.*,
-        translate(lower(search_document), $4, $5) AS normalized_search_document,
-        translate(lower(title), $4, $5) AS normalized_title
+        ${normalizedDocumentSql("search_document")} AS normalized_search_document,
+        ${normalizedDocumentSql("title")} AS normalized_title
       FROM candidates_raw
     ),
     scored AS (
