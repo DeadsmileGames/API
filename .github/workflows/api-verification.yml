@@ -1,0 +1,45 @@
+name: API verification
+
+on:
+  push:
+    branches: [main, Beta]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "test/**"
+      - "package.json"
+      - "package-lock.json"
+      - "render.yaml"
+      - ".env.example"
+      - ".github/workflows/api-verification.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "test/**"
+      - "package.json"
+      - "package-lock.json"
+      - "render.yaml"
+      - ".env.example"
+      - ".github/workflows/api-verification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
