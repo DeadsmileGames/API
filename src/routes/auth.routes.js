@@ -4,6 +4,7 @@ import {
   loginLimiter,
   registerLimiter,
   twoFactorLimiter,
+  twoFactorAccountLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
   publicEmailLimiter,
@@ -63,6 +64,7 @@ authRouter.get("/me", requireAuth, me);
 authRouter.post(
   "/verify-2fa",
   twoFactorLimiter,
+  twoFactorAccountLimiter,
   validate(totpTokenSchema),
   verifyTwoFactor,
 );
