@@ -12,7 +12,7 @@ const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
 
-async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug, token, locale }) {
+async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, coverImage, slug, token, locale }) {
  const confirmUrl = `${env.frontendUrl}/games/${encodeURIComponent(slug)}/preorder/confirm/${token}`;
  const copy = locale === "pt-BR"
   ? {
@@ -49,6 +49,8 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug
  const html = brandedEmail({
   lang: locale,
   preheader: copy.preheader,
+  eyebrow: locale === "pt-BR" ? "PRÉ-VENDA" : locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
+  heroImageUrl: coverImage,
   heading: copy.heading,
   intro: copy.intro,
   bodyHtml: `<p style="margin:0;color:#b8b8b8;line-height:1.8">${copy.expiry}</p>`,
