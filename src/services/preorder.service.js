@@ -214,6 +214,13 @@ export async function confirmPreorder(token) {
  for (let attempt = 0; attempt < 20; attempt += 1) {
   const code = newCode();
   try {
+   // Check both the current keyed digest and the legacy plain/SHA-256 representations
+   // so migration does not allow the same six-digit code to be assigned twice.
+   const collision = await query(
+    "SELECT id FROM game_preorders WHERE code_hash IN ($1,$2) OR reward_code=$3 LIMIT 1",
+    [codeHash(code), hash(code), code],
+   );
+   if (collision.rows.length) continue;
    const updated = await query(
     `UPDATE game_preorders
      SET confirmed_at = now(),
