@@ -38,7 +38,7 @@ export async function consumeOAuthState(stateHash, userId) {
        AND user_id = $2
        AND consumed_at IS NULL
        AND expires_at > now()
-     RETURNING user_id, client, locale, return_path`,
+     RETURNING user_id, client, locale, return_path, frontend_origin`,
     [stateHash, userId],
   );
   return rows[0] || null;
