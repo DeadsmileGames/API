@@ -70,7 +70,7 @@ export async function getPreorderStatus(slug, userId) {
  const game = gameResult.rows[0];
  if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
  const { rows: preorderRows } = await query(
-  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at,p.reward_code FROM game_preorders p JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
+  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at,p.reward_code,(g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended FROM game_preorders p JOIN games g ON g.id=p.game_id JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
   [game.id, userId],
  );
  const preorder = preorderRows[0] || null;
@@ -84,8 +84,7 @@ export async function getPreorderStatus(slug, userId) {
  const rewardRedeemable = Boolean(
   preorder?.confirmed_at &&
   preorder.reward_code &&
-  game.preorder_ends_at &&
-  now >= new Date(game.preorder_ends_at).getTime()
+  preorder.preorder_ended
  );
  return {
   game: { id: game.id, slug: game.slug, title: game.title, coverImage: game.cover_image, startsAt: game.preorder_starts_at, endsAt: game.preorder_ends_at, preorderEnabled: game.preorder_enabled, isFree: game.access_type === "free" },
@@ -246,7 +245,8 @@ export async function redeemPreorderCode(code, account) {
   // for records created during the transition to the on-page-code flow.
   const found = await client.query(
    `SELECT p.id,p.user_id,p.email,p.reward_code,p.redeemed_at,p.confirmed_at,
-           g.slug,g.preorder_ends_at
+           g.slug,g.preorder_ends_at,
+           (g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended
     FROM game_preorders p
     JOIN games g ON g.id = p.game_id
     WHERE p.reward_code = $1
@@ -262,7 +262,7 @@ export async function redeemPreorderCode(code, account) {
   if (!preorder || !belongsToAccount || preorder.redeemed_at || !preorder.confirmed_at) {
    throw new AppError(404, "PREORDER_CODE_INVALID");
   }
-  if (!preorder.preorder_ends_at || new Date(preorder.preorder_ends_at).getTime() > Date.now()) {
+  if (!preorder.preorder_ended) {
    throw new AppError(409, "PREORDER_NOT_ENDED");
   }
   const token = crypto.randomBytes(32).toString("base64url");
