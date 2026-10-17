@@ -28,8 +28,8 @@ export async function requireAuth(req, res, next) {
   try {
     if (tokenClaims) {
       const { rows: sessions } = await query(
-        "SELECT sid FROM user_sessions WHERE sid = $1 AND expire > now()",
-        [tokenClaims.sid],
+        "SELECT sid FROM user_sessions WHERE sid = $1 AND expire > now() AND sess->>'userId' = $2 AND sess->>'client' = 'mobile'",
+        [tokenClaims.sid, tokenClaims.sub],
       );
       if (!sessions.length) return sendError(res, 401, "SESSION_EXPIRED");
     }
@@ -49,7 +49,7 @@ export async function requireAuth(req, res, next) {
       if (!tokenClaims) req.session.destroy(() => {});
       return sendError(res, 403, "EMAIL_NOT_VERIFIED");
     }
-    req.auth = { userId: user.id, role: user.role };
+    req.auth = { userId: user.id, role: user.role, sessionId: tokenClaims?.sid || req.sessionID };
 
     if (req.session?.userId === user.id) {
       if (req.session.role && req.session.role !== user.role) {
