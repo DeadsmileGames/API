@@ -209,11 +209,6 @@ const server = createServer(app);
 
 const realtime = attachRealtimeServer(server);
 
-const preorderEmailTimer = setInterval(() => {
-  import("./services/preorder.service.js").then(({ sendPreorderEmailBatch }) => sendPreorderEmailBatch()).catch(() => {});
-}, 60_000);
-preorderEmailTimer.unref?.();
-
 if (!process.env.VERCEL) {
   server.listen(env.port);
   let stopping = false;
