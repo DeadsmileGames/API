@@ -113,7 +113,6 @@ export const login = asyncHandler(async (req, res) => {
     await regenerateSession(req);
 
     req.session.pendingTwoFactorUserId = result.userId;
-    req.session.pendingTwoFactorClient = client;
     req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
 
@@ -162,7 +161,7 @@ async function performLogin(req, res, { requireRecaptcha = false, client = "site
     await regenerateSession(req);
 
     req.session.pendingTwoFactorUserId = result.userId;
-
+    req.session.pendingTwoFactorClient = client;
     req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
 
