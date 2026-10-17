@@ -1306,6 +1306,9 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     );
     assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), false);
     assert.equal(await hasPreorderForUser(userId, freeId), false);
+    const pendingCatalog = await player.request("/library/catalog");
+    const pendingCatalogGame = pendingCatalog.body.data.items.find((item) => item.slug === "free");
+    assert.equal(Boolean(pendingCatalogGame?.preorderRegistered), false);
     await pool.query("DELETE FROM game_preorders WHERE id=$1", [pendingPlayerRows[0].id]);
 
     const rawToken = "one-time-preorder-confirmation-token-123456";
@@ -1333,6 +1336,12 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(await hasPreorderForUser(userId, freeId), true);
     assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.slug === "free"), true,
       "a confirmed matching email belongs in the reserved library");
+    const confirmedCatalog = await player.request("/library/catalog");
+    const confirmedCatalogGame = confirmedCatalog.body.data.items.find((item) => item.slug === "free");
+    assert.equal(confirmedCatalogGame?.preorderRegistered, true);
+    assert.equal(confirmedCatalogGame?.inLibrary, true);
+    assert.equal(confirmedCatalogGame?.preorderLocked, true);
+    assert.equal(confirmedCatalogGame?.downloadUrl, null);
 
     const duplicate = await preorderGuest.request("/preorders/free", {
       method: "POST",
