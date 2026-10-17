@@ -38,10 +38,10 @@ test("tokens with a different signing secret are rejected", () => {
   );
 });
 
-test("a bearer token requires the same live account and session cookie", () => {
+test("a bearer token can work without a cookie but cannot be combined with another account session", () => {
   const claims = { sub: "account-a", sid: "session-a" };
   assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-b" }, "session-b"), false);
   assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-a" }, "session-b"), false);
   assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-a" }, "session-a"), true);
-  assert.equal(isMobileTokenSessionCompatible(claims, {}, "new-anonymous-session"), false);
+  assert.equal(isMobileTokenSessionCompatible(claims, {}, "new-anonymous-session"), true);
 });
