@@ -17,8 +17,9 @@ export const ownerDownload=asyncHandler(async(req,res)=>{
  res.send(zip);
 });
 export const redeem=asyncHandler(async(req,res)=>{
- if(!req.session?.userId) throw new AppError(401,"UNAUTHENTICATED");
- const {rows}=await query("SELECT id,email FROM users WHERE id=$1",[req.session.userId]);
+ const userId=req.auth?.userId;
+ if(!userId) throw new AppError(401,"UNAUTHENTICATED");
+ const {rows}=await query("SELECT id,email FROM users WHERE id=$1",[userId]);
  if(!rows[0]) throw new AppError(401,"UNAUTHENTICATED");
  sendSuccess(res,await service.redeemPreorderCode(req.body.code,rows[0]));
 });
