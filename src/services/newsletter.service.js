@@ -3,7 +3,7 @@ import { AppError } from "../utils/AppError.js";
 import { env } from "../config/env.js";
 import { sendTransactionalEmail } from "./brevo.service.js";
 import * as repository from "../repositories/engagement.repository.js";
-import { escapeHtml } from "../utils/html.js";
+import { brandedEmail } from "./email-template.js";
 
 function hash(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -29,7 +29,7 @@ function parseUnsubscribeToken(token) {
   return match[1];
 }
 
-export async function subscribe(email) {
+export async function subscribe(email, locale = "en") {
   const normalized = email.trim().toLowerCase();
   const confirmationToken = crypto.randomBytes(32).toString("hex");
   const subscriber = await repository.upsertNewsletterSubscriber({
@@ -40,11 +40,50 @@ export async function subscribe(email) {
   if (subscriber.confirmed_at && !subscriber.unsubscribed_at) return { received: true };
 
   const confirmationUrl = `${env.frontendUrl}/newsletter/confirm?token=${encodeURIComponent(confirmationToken)}`;
-  const html = `<div style="font-family:Arial,sans-serif;background:#0b0b0b;color:#f5f1e8;padding:32px;max-width:560px;margin:auto;border-radius:18px;"><h1 style="font-size:28px;line-height:1.15;margin:0 0 12px;">Confirm your subscription</h1><p style="color:#b9b6af;line-height:1.6;margin:0 0 24px;">Confirm this address to receive new games, Newswire stories and videos from Deadsmile Games.</p><a href="${escapeHtml(confirmationUrl)}" style="display:inline-block;background:#f5f1e8;color:#0b0b0b;padding:13px 20px;border-radius:999px;font-weight:700;text-decoration:none;">Confirm email</a><p style="color:#6f6d68;font-size:12px;margin:30px 0 0;">If you did not request this, you can ignore this message.</p></div>`;
+  const language = ["en", "pt-BR", "es"].includes(locale) ? locale : "en";
+  const copy = {
+    en: {
+      subject: "Confirm your Deadsmile Games newsletter",
+      preheader: "Confirm your email to receive games, Newswire stories and videos.",
+      heading: "Confirm your newsletter",
+      intro: "Confirm this address to receive new games, Newswire stories and videos from Deadsmile Games.",
+      action: "Confirm email",
+      footer: "Newsletter subscription confirmation",
+      ignore: "If you did not request this, you can ignore this message.",
+    },
+    "pt-BR": {
+      subject: "Confirme sua newsletter da Deadsmile Games",
+      preheader: "Confirme seu e-mail para receber jogos, notícias e vídeos.",
+      heading: "Confirme sua inscrição",
+      intro: "Confirme este endereço para receber novidades sobre jogos, notícias e vídeos da Deadsmile Games.",
+      action: "Confirmar e-mail",
+      footer: "Confirmação de inscrição na newsletter",
+      ignore: "Se você não solicitou esta inscrição, pode ignorar esta mensagem.",
+    },
+    es: {
+      subject: "Confirma tu boletín de Deadsmile Games",
+      preheader: "Confirma tu correo para recibir juegos, noticias y vídeos.",
+      heading: "Confirma tu suscripción",
+      intro: "Confirma esta dirección para recibir novedades sobre juegos, artículos y vídeos de Deadsmile Games.",
+      action: "Confirmar correo",
+      footer: "Confirmación de suscripción al boletín",
+      ignore: "Si no solicitaste esta suscripción, puedes ignorar este mensaje.",
+    },
+  }[language];
+  const text = copy.intro + "\\n\\n" + confirmationUrl + "\\n\\n" + copy.ignore;
+  const html = brandedEmail({
+    lang: language,
+    preheader: copy.preheader,
+    heading: copy.heading,
+    intro: copy.intro,
+    actionLabel: copy.action,
+    actionUrl: confirmationUrl,
+    footer: copy.footer + ". " + copy.ignore,
+  });
   await sendTransactionalEmail({
     to: normalized,
-    subject: "Confirm your Deadsmile Games newsletter",
-    text: `Confirm your Deadsmile Games newsletter:\n\n${confirmationUrl}\n\nIf you did not request this, ignore this message.`,
+    subject: copy.subject,
+    text,
     html,
   });
   return { received: true };

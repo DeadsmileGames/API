@@ -3,7 +3,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import { confirm, subscribe, unsubscribe } from "../services/newsletter.service.js";
 
 export const create = asyncHandler(async (req, res) => {
-  const data = await subscribe(req.body.email);
+  const data = await subscribe(req.body.email, res.locals.locale);
   sendSuccess(res, data, 201);
 });
 
