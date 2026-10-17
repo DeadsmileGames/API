@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { errorCatalog, resolveLocale } from "./utils/publicErrors.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -13,6 +14,7 @@ import { pool, directPool } from "./config/database.js";
 import { csrfCookie, csrfToken, verifyCsrf } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminBodyLimiter } from "./middleware/bodyLimiter.js";
+import { sendError } from "./utils/apiResponse.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { gamesRouter } from "./routes/games.routes.js";
 import { launcherRouter } from "./routes/launcher.routes.js";
@@ -63,7 +65,7 @@ function cspDirectives() {
 function sessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: env.isProduction,
+    secure: "auto",
     sameSite: env.cookieSameSite,
     maxAge: 7 * 24 * 60 * 60 * 1_000,
     partitioned: env.isProduction && env.cookieSameSite === "none",
@@ -132,7 +134,14 @@ export function createApp() {
   app.options("*", cors(corsOptions));
   app.use(cors(corsOptions));
 
-  app.get("/api/health", async (_req, res) => {
+  app.get("/api/health", rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), async (_req, res) => {
     res.set("Cache-Control", "no-store");
     try {
       await pool.query("SELECT 1");
@@ -184,6 +193,7 @@ export function createApp() {
   });
 
   app.use(cookieParser(env.sessionSecret));
+  app.use("/api", verifyCsrf);
   app.use(csrfCookie);
   app.use(
     session({
@@ -209,8 +219,6 @@ export function createApp() {
     }),
   );
   app.get("/api/csrf", csrfToken);
-  app.use("/api", verifyCsrf);
-
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminBodyLimiter, adminRouter);
   app.use("/api/special-thanks", specialThanksRouter);
