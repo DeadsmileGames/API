@@ -127,9 +127,13 @@ export const gamePostSchema = z
       }
       if (!data.preorderRewardType || (!data.preorderRewardZipBase64 && !data.preorderRewardZipExisting)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preorderRewardZipBase64"], message: "Choose a reward type and upload a ZIP reward." });
-      } else {
+      } else if (data.preorderRewardZipBase64) {
         try {
-          const zip = Buffer.from(data.preorderRewardZipBase64, "base64");
+          const encoded = data.preorderRewardZipBase64.trim();
+          if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 === 1) {
+            throw new Error("Invalid base64");
+          }
+          const zip = Buffer.from(encoded, "base64");
           if (zip.length < 4 || zip.subarray(0, 2).toString("ascii") !== "PK") throw new Error("Invalid ZIP");
         } catch {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preorderRewardZipBase64"], message: "Reward must be a valid ZIP file." });
