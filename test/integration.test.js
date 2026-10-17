@@ -1243,7 +1243,7 @@ test("Android login, library, sessions and achievements share the existing accou
 
 
 test("pre-orders are free-only, keep age ratings private, require email confirmation and reject duplicates", async () => {
-  const { createHash } = await import("node:crypto");
+  const { createHash, createHmac } = await import("node:crypto");
   const preorderGuest = client();
   await pool.query(
     `UPDATE games
@@ -1345,7 +1345,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
     assert.equal(/^[0-9]{6}$/.test(registration.reward_code), true);
-    assert.equal(registration.code_hash, createHash("sha256").update(registration.reward_code).digest("hex"));
+    assert.equal(registration.code_hash, createHmac("sha256", process.env.DATA_ENCRYPTION_KEY).update("deadsmile:preorder-reward-code:v1:").update(registration.reward_code).digest("hex"));
     const managementStatus = await player.request("/preorders/free/status");
     assert.equal(managementStatus.body.data.rewardCode, null, "the code stays private until the preorder ends");
     assert.equal(managementStatus.body.data.rewardRedeemable, false);
@@ -1409,7 +1409,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(redeemedRecord.last_name, null);
     assert.equal(redeemedRecord.age, null);
     assert.equal(redeemedRecord.email, null);
-    assert.equal(redeemedRecord.code_hash, createHash("sha256").update(registration.reward_code).digest("hex"));
+    assert.equal(redeemedRecord.code_hash, createHmac("sha256", process.env.DATA_ENCRYPTION_KEY).update("deadsmile:preorder-reward-code:v1:").update(registration.reward_code).digest("hex"));
     assert.equal(redeemedRecord.reward_code, null);
     assert(redeemedRecord.redeemed_at);
 
