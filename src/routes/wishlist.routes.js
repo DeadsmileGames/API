@@ -2,7 +2,6 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { sendError } from "../utils/apiResponse.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { sendError } from "../utils/apiResponse.js";
 import { validate } from "../middleware/validate.js";
 import { z } from "zod";
 import * as controller from "../controllers/wishlist.controller.js";
