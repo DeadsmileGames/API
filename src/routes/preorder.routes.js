@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import { publicWriteLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
 import * as controller from "../controllers/preorder.controller.js";
 const slug=z.object({slug:z.string().min(2).max(120).regex(/^[a-z0-9-]+$/)}).strict();
@@ -10,7 +11,9 @@ const redeem=z.object({code:z.string().trim().regex(/^\d{6}$/)}).strict();
 export const preorderRouter=Router();
 preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),controller.redeem);
 preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
+preorderRouter.get("/:slug/status",validate(slug,"params"),requireAuth,controller.status);
 preorderRouter.get("/:slug",validate(slug,"params"),controller.info);
-preorderRouter.post("/:slug",publicWriteLimiter,validate(slug,"params"),validate(registration),controller.register);
+preorderRouter.post("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,validate(registration),controller.register);
+preorderRouter.delete("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,controller.cancel);
 preorderRouter.get("/reward/:token/download",validate(token,"params"),controller.download);
 preorderRouter.get("/reward/:token",validate(token,"params"),controller.reward);
