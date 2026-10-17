@@ -126,23 +126,30 @@ function attribute(tag, name) {
 }
 
 function decodeEntities(value) {
-  return value
-    .replace(/&#(x[0-9a-f]+|[0-9]+);?/gi, (_match, code) => {
-      const hexadecimal = /^x/i.test(code);
-      const number = Number.parseInt(hexadecimal ? code.slice(1) : code, hexadecimal ? 16 : 10);
+  const entities = {
+    amp: "&",
+    nbsp: " ",
+    quot: '"',
+    apos: "'",
+    lt: "<",
+    gt: ">",
+  };
+  return String(value || "").replace(
+    /&(#(?:x[0-9a-f]+|[0-9]+)|amp|nbsp|quot|apos|lt|gt);?/gi,
+    (_match, entity) => {
+      const normalized = entity.toLowerCase();
+      if (!normalized.startsWith("#")) return entities[normalized] ?? _match;
+      const hexadecimal = normalized.startsWith("#x");
+      const digits = hexadecimal ? normalized.slice(2) : normalized.slice(1);
+      const number = Number.parseInt(digits, hexadecimal ? 16 : 10);
       if (!Number.isFinite(number) || number < 1 || number > 0x10ffff) return "";
       try {
         return String.fromCodePoint(number);
       } catch {
         return "";
       }
-    })
-    .replace(/&nbsp;?/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&apos;|&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+    },
+  );
 }
 
 function cleanTitle(value) {
