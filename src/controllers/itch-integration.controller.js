@@ -64,11 +64,11 @@ export const callback = (_req, res) => {
 };
 
 export const status = asyncHandler(async (req, res) => {
-  sendSuccess(res, await getItchStatus(req.session.userId));
+  sendSuccess(res, await getItchStatus(req.auth.userId));
 });
 
 export const connect = asyncHandler(async (req, res) => {
-  sendSuccess(res, await beginItchConnection(req.session.userId, req.body), 201);
+  sendSuccess(res, await beginItchConnection(req.auth.userId, req.body), 201);
 });
 
 export const complete = asyncHandler(async (req, res) => {
@@ -82,5 +82,5 @@ export const complete = asyncHandler(async (req, res) => {
 });
 
 export const disconnect = asyncHandler(async (req, res) => {
-  sendSuccess(res, await disconnectItch(req.session.userId));
+  sendSuccess(res, await disconnectItch(req.auth.userId));
 });
