@@ -71,7 +71,7 @@ export async function createPreorder(slug,payload,requestLocale="en") {
  const locale=localeOf(payload.locale||requestLocale);
  const first=String(payload.firstName||"").trim(), last=String(payload.lastName||"").trim();
  const email=String(payload.email||"").trim().toLowerCase(), age=Number(payload.age);
- if(!first||first.length>100||!last||last.length>100||!Number.isInteger(age)||age<1||age>120||email.length>254||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new AppError(400,"PREORDER_INVALID_FORM");
+ if(!first||first.length>100||!last||last.length>100||!Number.isInteger(age)||age<1||age>120||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError(400,"PREORDER_INVALID_FORM");
  const rawToken=crypto.randomBytes(32).toString("base64url");
  const tokenHash=hash(rawToken);
  const client=await pool.connect();
