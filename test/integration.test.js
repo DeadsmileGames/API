@@ -124,7 +124,7 @@ function client() {
   let token;
   return {
     cookies,
-    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody } = {}) {
+    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -134,6 +134,7 @@ function client() {
         headers: {
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
+          ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
           ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
           ...(method !== "GET" && csrf ? { "X-CSRF-Token": token } : {}),
         },
@@ -1464,6 +1465,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const otherRedeemsAgain = await other.request("/preorders/redeem", {
       method: "POST",
       language: "pt-BR",
+      forwardedFor: "198.51.100.44",
       body: { code: registration.reward_code },
     });
     assert.equal(otherRedeemsAgain.status, 409, JSON.stringify(otherRedeemsAgain.body));
