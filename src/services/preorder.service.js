@@ -4,6 +4,7 @@ import { pool, query } from "../config/database.js";
 import { AppError } from "../utils/AppError.js";
 import { sendTransactionalEmail } from "./brevo.service.js";
 import { brandedEmail } from "./email-template.js";
+import { env } from "../config/env.js";
 
 const LOCALES = new Set(["en","pt-BR","es"]);
 const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
@@ -11,31 +12,117 @@ const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
 
+async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug, token, locale }) {
+ const confirmUrl = `${env.frontendUrl}/games/${encodeURIComponent(slug)}/preorder/confirm/${token}`;
+ const copy = locale === "pt-BR"
+  ? {
+      subject: `Confirme sua pré-venda: ${gameTitle}`,
+      preheader: "Confirme seu e-mail para concluir sua inscrição na pré-venda.",
+      heading: "Confirme sua inscrição",
+      intro: `Olá ${firstName}! Recebemos um pedido para inscrever você na pré-venda de ${gameTitle}.`,
+      action: "Confirmar pré-venda",
+      text: `Olá ${firstName}, recebemos um pedido de inscrição na pré-venda de ${gameTitle}. Confirme sua participação usando este link: ${confirmUrl}\n\nO link expira em 24 horas. Se você não fez esse pedido, ignore este e-mail.`,
+      expiry: "Este link expira em 24 horas. Sua inscrição só será confirmada depois que você clicar no botão.",
+      footer: "Se você não solicitou esta inscrição, pode ignorar esta mensagem."
+    }
+  : locale === "es"
+   ? {
+      subject: `Confirma tu reserva: ${gameTitle}`,
+      preheader: "Confirma tu correo para completar la reserva del juego.",
+      heading: "Confirma tu inscripción",
+      intro: `¡Hola ${firstName}! Recibimos una solicitud para inscribirte en la reserva de ${gameTitle}.`,
+      action: "Confirmar reserva",
+      text: `Hola ${firstName}, recibimos una solicitud para la reserva de ${gameTitle}. Confirma tu participación con este enlace: ${confirmUrl}\n\nEl enlace caduca en 24 horas. Si no hiciste esta solicitud, ignora este correo.`,
+      expiry: "Este enlace caduca en 24 horas. Tu inscripción solo se confirma al hacer clic en el botón.",
+      footer: "Si no solicitaste esta inscripción, puedes ignorar este mensaje."
+    }
+   : {
+      subject: `Confirm your pre-order: ${gameTitle}`,
+      preheader: "Confirm your email to finish joining this game's pre-order.",
+      heading: "Confirm your pre-order",
+      intro: `Hi ${firstName}! We received a request to join the pre-order for ${gameTitle}.`,
+      action: "Confirm pre-order",
+      text: `Hi ${firstName}, we received a request to join the pre-order for ${gameTitle}. Confirm your spot with this link: ${confirmUrl}\n\nThe link expires in 24 hours. If you did not make this request, ignore this email.`,
+      expiry: "This link expires in 24 hours. Your registration is complete only after you click the button.",
+      footer: "If you did not request this registration, you can ignore this message."
+    };
+ const html = brandedEmail({
+  lang: locale,
+  preheader: copy.preheader,
+  heading: copy.heading,
+  intro: copy.intro,
+  bodyHtml: `<p style="margin:0;color:#b8b8b8;line-height:1.8">${copy.expiry}</p>`,
+  actionLabel: copy.action,
+  actionUrl: confirmUrl,
+  footer: copy.footer
+ });
+ await sendTransactionalEmail({ to: email, subject: copy.subject, text: copy.text, html });
+}
+
 export async function getPreorderInfo(slug, locale="en") {
- const { rows } = await query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at,preorder_age_ratings FROM games WHERE slug=$1 AND preorder_enabled=true",[slug]);
+ const { rows } = await query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free'",[slug]);
  const game=rows[0]; if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");
  const now=Date.now();
  if(now<new Date(game.preorder_starts_at).getTime()||now>=new Date(game.preorder_ends_at).getTime()) throw new AppError(409,"PREORDER_NOT_OPEN");
- return {id:game.id,slug:game.slug,title:game.title,coverImage:game.cover_image,startsAt:game.preorder_starts_at,endsAt:game.preorder_ends_at,ageRatings:game.preorder_age_ratings||DEFAULT_AGE,locale:localeOf(locale)};
+ return {id:game.id,slug:game.slug,title:game.title,coverImage:game.cover_image,startsAt:game.preorder_starts_at,endsAt:game.preorder_ends_at,locale:localeOf(locale)};
 }
 
 export async function createPreorder(slug,payload,requestLocale="en") {
  const locale=localeOf(payload.locale||requestLocale);
  const first=String(payload.firstName||"").trim(), last=String(payload.lastName||"").trim();
  const email=String(payload.email||"").trim().toLowerCase(), age=Number(payload.age);
- if(!first||first.length>100||!last||last.length>100||!Number.isInteger(age)||age<1||age>120||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError(400,"PREORDER_INVALID_FORM");
+ if(!first||first.length>100||!last||last.length>100||!Number.isInteger(age)||age<1||age>120||email.length>254||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new AppError(400,"PREORDER_INVALID_FORM");
+ const rawToken=crypto.randomBytes(32).toString("base64url");
+ const tokenHash=hash(rawToken);
  const client=await pool.connect();
+ let registrationId;
+ let game;
  try {
   await client.query("BEGIN");
-  const found=await client.query("SELECT id,preorder_starts_at,preorder_ends_at,preorder_age_ratings FROM games WHERE slug=$1 AND preorder_enabled=true FOR SHARE",[slug]);
-  const game=found.rows[0]; if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");
-  const now=Date.now(); if(now<new Date(game.preorder_starts_at).getTime()||now>=new Date(game.preorder_ends_at).getTime()) throw new AppError(409,"PREORDER_NOT_OPEN");
+  const found=await client.query("SELECT id,slug,title,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE",[slug]);
+  game=found.rows[0];
+  if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");
+  const now=Date.now();
+  if(now<new Date(game.preorder_starts_at).getTime()||now>=new Date(game.preorder_ends_at).getTime()) throw new AppError(409,"PREORDER_NOT_OPEN");
   const min=Number((game.preorder_age_ratings||DEFAULT_AGE)[locale]??DEFAULT_AGE[locale]);
   if(age<min) throw new AppError(403,"PREORDER_AGE_RESTRICTED");
-  const result=await client.query("INSERT INTO game_preorders(game_id,first_name,last_name,age,locale,email) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(game_id,email) DO NOTHING RETURNING id",[game.id,first,last,age,locale,email]);
-  if(!result.rows[0]) throw new AppError(409,"PREORDER_ALREADY_REGISTERED");
-  await client.query("COMMIT"); return {registered:true};
- } catch(e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
+
+  let existing=await client.query("SELECT id,confirmed_at FROM game_preorders WHERE game_id=$1 AND email=$2 FOR UPDATE",[game.id,email]);
+  if(existing.rows[0]?.confirmed_at) throw new AppError(409,"PREORDER_ALREADY_REGISTERED");
+  if(existing.rows[0]) {
+   registrationId=existing.rows[0].id;
+   await client.query("UPDATE game_preorders SET first_name=$2,last_name=$3,age=$4,locale=$5,confirmation_token_hash=$6,confirmation_expires_at=now()+interval '24 hours' WHERE id=$1 AND confirmed_at IS NULL",[registrationId,first,last,age,locale,tokenHash]);
+  } else {
+   const inserted=await client.query("INSERT INTO game_preorders(game_id,first_name,last_name,age,locale,email,confirmation_token_hash,confirmation_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '24 hours') ON CONFLICT(game_id,email) DO NOTHING RETURNING id",[game.id,first,last,age,locale,email,tokenHash]);
+   if(inserted.rows[0]) registrationId=inserted.rows[0].id;
+   else {
+    existing=await client.query("SELECT id,confirmed_at FROM game_preorders WHERE game_id=$1 AND email=$2 FOR UPDATE",[game.id,email]);
+    if(!existing.rows[0]||existing.rows[0].confirmed_at) throw new AppError(409,"PREORDER_ALREADY_REGISTERED");
+    registrationId=existing.rows[0].id;
+    await client.query("UPDATE game_preorders SET first_name=$2,last_name=$3,age=$4,locale=$5,confirmation_token_hash=$6,confirmation_expires_at=now()+interval '24 hours' WHERE id=$1 AND confirmed_at IS NULL",[registrationId,first,last,age,locale,tokenHash]);
+   }
+  }
+  await client.query("COMMIT");
+ } catch(e) {
+  await client.query("ROLLBACK").catch(()=>{});
+  throw e;
+ } finally {
+  client.release();
+ }
+ await sendPreorderConfirmationEmail({email,firstName:first,gameTitle:game.title,slug:game.slug,token:rawToken,locale});
+ return {confirmationSent:true};
+}
+
+export async function confirmPreorder(token) {
+ if(typeof token!=="string"||token.length<32||token.length>128) throw new AppError(410,"PREORDER_CONFIRMATION_INVALID");
+ const {rows}=await query(`UPDATE game_preorders p
+  SET confirmed_at=now(),confirmation_token_hash=NULL,confirmation_expires_at=NULL
+  FROM games g
+  WHERE p.game_id=g.id AND p.confirmation_token_hash=$1
+    AND p.confirmation_expires_at>now() AND p.confirmed_at IS NULL
+  RETURNING g.slug`,[hash(token)]);
+ if(!rows[0]) throw new AppError(410,"PREORDER_CONFIRMATION_INVALID");
+ return {confirmed:true,slug:rows[0].slug};
 }
 
 export async function redeemPreorderCode(code,account) {
@@ -80,7 +167,7 @@ export async function sendPreorderEmailBatch() {
   const gate=await client.query("UPDATE preorder_email_batches SET last_batch_at=now() WHERE id=true AND (last_batch_at IS NULL OR last_batch_at<now()-interval '1 day') RETURNING id");
   if(!gate.rows.length){await client.query("ROLLBACK");return {sent:0};}
   const result=await client.query(`SELECT p.id,p.email,p.first_name,p.locale,p.game_id,g.title FROM game_preorders p JOIN games g ON g.id=p.game_id
-  WHERE p.email_status IN ('waiting','failed') AND g.preorder_enabled=true AND g.preorder_ends_at<=now() AND g.preorder_reward_zip IS NOT NULL
+  WHERE p.confirmed_at IS NOT NULL AND p.email_status IN ('waiting','failed') AND g.access_type='free' AND g.preorder_ends_at<=now() AND g.preorder_reward_zip IS NOT NULL
   ORDER BY p.created_at LIMIT 100 FOR UPDATE OF p SKIP LOCKED`);
   batch=result.rows; await client.query("COMMIT");
  } catch(e){await client.query("ROLLBACK");throw e;} finally{client.release();}
@@ -98,11 +185,19 @@ export async function sendPreorderEmailBatch() {
     : p.locale === "es"
       ? { heading: "Tu recompensa está lista", intro: `¡Hola ${name}! La reserva de ${title} ha terminado. Usa este código único en tu cuenta de Deadsmile Games para reclamar la recompensa.`, action: "Canjear código", footer: "Este código solo se puede usar una vez y debe canjearse en la cuenta asociada a este correo." }
       : { heading: "Your reward is ready", intro: `Hi ${name}! The preorder for ${title} has ended. Use this unique code in your Deadsmile Games account to claim your reward.`, action: "Redeem code", footer: "This code can only be used once and must be redeemed from the account associated with this email." };
+   const rewardDetails = p.locale === "pt-BR"
+    ? { label: "Código de resgate de uso único", instruction: "Entre na sua conta Deadsmile Games, escolha Resgatar código e digite os seis números acima. Não compartilhe este código.", action: "Abrir minha conta" }
+    : p.locale === "es"
+     ? { label: "Código de canje de un solo uso", instruction: "Inicia sesión en Deadsmile Games, elige Canjear código e introduce los seis dígitos anteriores. No compartas este código.", action: "Abrir mi cuenta" }
+     : { label: "One-time reward code", instruction: "Sign in to your Deadsmile Games account, choose Redeem code, and enter the six digits above. Keep this code private.", action: "Open my account" };
    const html = brandedEmail({
+    lang: p.locale,
     preheader: copy.subject,
     heading: emailCopy.heading,
     intro: emailCopy.intro,
-    bodyHtml: `<div style="margin:8px 0 20px;padding:20px;text-align:center;background:#0f0f0f;border:1px solid #3d3d3d;border-radius:10px"><div style="margin-bottom:8px;color:#b8b8b8;font-size:11px;letter-spacing:1.5px;text-transform:uppercase">One-time reward code</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:7px;color:#ffffff">${code}</div></div><p style="color:#b8b8b8;line-height:1.8">Sign in to your account, open the code redemption option, and enter the six digits above. Keep this code private.</p>`,
+    bodyHtml: `<div style="margin:8px 0 20px;padding:20px;text-align:center;background:#0f0f0f;border:1px solid #3d3d3d;border-radius:10px"><div style="margin-bottom:8px;color:#b8b8b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">${rewardDetails.label}</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:7px;color:#ffffff">${code}</div></div><p style="color:#b8b8b8;line-height:1.8">${rewardDetails.instruction}</p>`,
+    actionLabel: rewardDetails.action,
+    actionUrl: `${env.frontendUrl}/account`,
     footer: emailCopy.footer,
    });
    await sendTransactionalEmail({to:p.email,subject:copy.subject,text:copy.text,html});

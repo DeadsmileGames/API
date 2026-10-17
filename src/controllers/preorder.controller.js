@@ -4,7 +4,8 @@ import { AppError } from "../utils/AppError.js";
 import { query } from "../config/database.js";
 import * as service from "../services/preorder.service.js";
 export const info=asyncHandler(async(req,res)=>sendSuccess(res,await service.getPreorderInfo(req.params.slug,res.locals.locale)));
-export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service.createPreorder(req.params.slug,req.body,res.locals.locale),201));
+export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service.createPreorder(req.params.slug,req.body,res.locals.locale),202));
+export const confirm=asyncHandler(async(req,res)=>sendSuccess(res,await service.confirmPreorder(req.params.token)));
 export const redeem=asyncHandler(async(req,res)=>{
  if(!req.session?.userId) throw new AppError(401,"UNAUTHENTICATED");
  const {rows}=await query("SELECT email FROM users WHERE id=$1",[req.session.userId]);

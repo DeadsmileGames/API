@@ -9,6 +9,7 @@ const registration=z.object({firstName:z.string().trim().min(1).max(100),lastNam
 const redeem=z.object({code:z.string().trim().regex(/^\d{6}$/)}).strict();
 export const preorderRouter=Router();
 preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),controller.redeem);
+preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
 preorderRouter.get("/:slug",validate(slug,"params"),controller.info);
 preorderRouter.post("/:slug",publicWriteLimiter,validate(slug,"params"),validate(registration),controller.register);
 preorderRouter.get("/reward/:token/download",validate(token,"params"),controller.download);

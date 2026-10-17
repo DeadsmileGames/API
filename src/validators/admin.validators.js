@@ -120,6 +120,9 @@ export const gamePostSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
+    if (data.preorderEnabled && data.accessType !== "free") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accessType"], message: "Only free games can have an on-site pre-order." });
+    }
     if (data.preorderEnabled) {
       if (!data.preorderStartsAt || !data.preorderEndsAt ||
           new Date(data.preorderEndsAt).getTime() <= new Date(data.preorderStartsAt).getTime()) {
