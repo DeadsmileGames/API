@@ -9,6 +9,14 @@ import { env } from "../config/env.js";
 const LOCALES = new Set(["en","pt-BR","es"]);
 const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const absoluteEmailImageUrl = (value) => {
+ try {
+  const parsed = new URL(String(value || ""), env.frontendUrl);
+  return ["https:", "http:"].includes(parsed.protocol) ? parsed.href : "";
+ } catch {
+  return "";
+ }
+};
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
 
@@ -50,7 +58,7 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, cove
   lang: locale,
   preheader: copy.preheader,
   eyebrow: locale === "pt-BR" ? "PRÉ-VENDA" : locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
-  heroImageUrl: coverImage,
+  heroImageUrl: absoluteEmailImageUrl(coverImage),
   heading: copy.heading,
   intro: copy.intro,
   bodyHtml: `<p style="margin:0;color:#b8b8b8;line-height:1.8">${copy.expiry}</p>`,
@@ -164,7 +172,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
  } finally {
   client.release();
  }
- await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, coverImage: game.cover_image, slug: game.slug, token: rawToken, locale });
+ await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, coverImage: absoluteEmailImageUrl(game.cover_image), slug: game.slug, token: rawToken, locale });
  return { confirmationSent: true, attemptsRemaining: Math.max(0, 2 - attemptsUsed) };
 }
 
@@ -267,7 +275,7 @@ export async function sendPreorderEmailBatch() {
     lang: p.locale,
     preheader: copy.subject,
     eyebrow: p.locale === "pt-BR" ? "PRÉ-VENDA" : p.locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
-    heroImageUrl: p.cover_image,
+    heroImageUrl: absoluteEmailImageUrl(p.cover_image),
     heading: emailCopy.heading,
     intro: emailCopy.intro,
     bodyHtml: `<div style="margin:8px 0 20px;padding:20px;text-align:center;background:#0f0f0f;border:1px solid #3d3d3d;border-radius:10px"><div style="margin-bottom:8px;color:#b8b8b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">${rewardDetails.label}</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:7px;color:#ffffff">${code}</div></div><p style="color:#b8b8b8;line-height:1.8">${rewardDetails.instruction}</p>`,
