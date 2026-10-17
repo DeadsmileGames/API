@@ -47,14 +47,6 @@ import {
   resendEmailSchema,
 } from "../validators/account-email.validators.js";
 
-const mobileTokenRateLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-});
-
 export const authRouter = Router();
 authRouter.use(authenticatedApiLimiter);
 authRouter.post(
@@ -83,7 +75,20 @@ authRouter.post(
   verifyTwoFactor,
 );
 authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post("/mobile-token", mobileTokenRateLimiter, authenticatedApiLimiter, requireAuth, integrationLimiter, mobileToken);
+authRouter.post(
+  "/mobile-token",
+  rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }),
+  authenticatedApiLimiter,
+  requireAuth,
+  integrationLimiter,
+  mobileToken,
+);
 authRouter.post(
   "/mobile-register",
   registerLimiter,
