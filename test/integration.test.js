@@ -1344,7 +1344,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert(registration.confirmed_at);
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
-    assert.match(registration.reward_code, /^\\d{6}$/);
+    assert.equal(/^[0-9]{6}$/.test(registration.reward_code), true);
     assert.equal(registration.code_hash, createHash("sha256").update(registration.reward_code).digest("hex"));
     const managementStatus = await player.request("/preorders/free/status");
     assert.equal(managementStatus.body.data.rewardCode, registration.reward_code);
@@ -1391,7 +1391,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
       body: { code: registration.reward_code },
     });
     assert.equal(successfulRedemption.status, 200, JSON.stringify(successfulRedemption.body));
-    assert.match(successfulRedemption.body.data.rewardUrl, /^\\/games\\/free\\/preorder\\/reward\\//);
+    assert.equal(successfulRedemption.body.data.rewardUrl.startsWith("/games/free/preorder/reward/"), true);
   } finally {
     await pool.query("DELETE FROM game_preorders WHERE game_id IN ($1,$2)", [freeId, paidId]);
     await pool.query(
