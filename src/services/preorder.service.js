@@ -282,6 +282,7 @@ export async function redeemPreorderCode(code, account) {
   await client.query(
    `UPDATE game_preorders
      SET user_id=COALESCE(user_id,$2),
+         code_hash=COALESCE(code_hash,$3),
          redeemed_at=now(),
          claim_token_hash=NULL,
          claim_token_expires_at=NULL,
@@ -295,7 +296,7 @@ export async function redeemPreorderCode(code, account) {
          confirmation_token_hash=NULL,
          confirmation_expires_at=NULL
      WHERE id=$1`,
-   [preorder.id, account.id],
+   [preorder.id, account.id, hash(normalized)],
   );
   await client.query("COMMIT");
   return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward", alreadyRedeemed: false };
