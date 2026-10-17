@@ -79,6 +79,9 @@ export async function getGameDetails(slug, locale = "en") {
 export async function getGameDownload(slug, userId) {
   const game = await findGameBySlug(slug);
   if (!game) throw new AppError(404, "GAME_NOT_FOUND");
+  if (game.preorder_enabled && game.preorder_ends_at && Date.now() < new Date(game.preorder_ends_at).getTime()) {
+    throw new AppError(409, "GAME_PREORDER_LOCKED");
+  }
   if (getEffectiveGameStatus(game) !== "released") throw new AppError(409, "GAME_NOT_RELEASED");
   if (game.access_type !== "free") {
     if (!userId) throw new AppError(401, "UNAUTHENTICATED");
