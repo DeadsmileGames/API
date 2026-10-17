@@ -1,5 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { getPreorderedLibraryItems } from "../services/preorder-library.service.js";
 import {
   getInstallMetadata,
   getLibrary,
@@ -12,7 +13,11 @@ import {
 
 export const list = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
-  sendSuccess(res, await getLibrary(req.session.userId));
+  const userId = req.session.userId;
+  const [library, preorders] = await Promise.all([getLibrary(userId), getPreorderedLibraryItems(userId)]);
+  const items = new Map((library.items || []).map((game) => [String(game.id), game]));
+  for (const game of preorders) if (!items.has(String(game.id))) items.set(String(game.id), game);
+  sendSuccess(res, { ...library, items: [...items.values()] });
 });
 
 export const sync = asyncHandler(async (req, res) => {
@@ -30,7 +35,11 @@ export const installMetadata = asyncHandler(async (req, res) => {
 
 export const catalog = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
-  sendSuccess(res, await getLauncherCatalog(req.session.userId));
+  const userId = req.session.userId;
+  const [catalog, preorders] = await Promise.all([getLauncherCatalog(userId), getPreorderedLibraryItems(userId)]);
+  const items = new Map((catalog.items || []).map((game) => [String(game.id), game]));
+  for (const game of preorders) if (!items.has(String(game.id))) items.set(String(game.id), game);
+  sendSuccess(res, { ...catalog, items: [...items.values()] });
 });
 
 export const add = asyncHandler(async (req, res) => {
