@@ -43,7 +43,10 @@ export function validate(schema, source = "body") {
                     {
                       field,
                       code,
-                      message: publicErrorMessage(code, 400, res.locals?.locale),
+                      message:
+                        issue.code === "custom"
+                          ? issue.message
+                          : publicErrorMessage(code, 400, res.locals?.locale),
                     },
                   ];
                 }),
