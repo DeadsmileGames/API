@@ -59,6 +59,16 @@ globalThis.fetch = async (input, options) => {
     }
     return Response.json(value);
   }
+  if (url === "https://api.itch.io/credentials/info")
+    return Response.json({ scopes: ["profile:me", "profile:owned"] });
+  if (url === "https://api.itch.io/profile")
+    return Response.json({
+      user: {
+        id: 9876543210,
+        username: "oauth-bound-test",
+        url: "https://oauth-bound-test.itch.io",
+      },
+    });
   if (url.includes("/profile/owned-keys")) {
     const page = Number(new URL(url).searchParams.get("page") || 1);
     if (ownedKeysOverride) return Response.json(ownedKeysOverride(page));
@@ -468,6 +478,42 @@ test("itch OAuth initiation rejects untrusted origins and binds valid flows to t
     client: "site",
     frontendOrigin: "https://deadsmilegames.onrender.com",
   });
+
+  const unauthenticated = await guest.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+
+  const previousRevoked = revoked;
+  const previousOwnedKeysOverride = ownedKeysOverride;
+  revoked = false;
+  ownedKeysOverride = () => ({ per_page: 50, owned_keys: [] });
+  try {
+    const completed = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    assert.equal(completed.body.data.client, "site");
+    assert.equal(completed.body.data.returnUrl, "https://deadsmilegames.onrender.com/account#games");
+    const storedState = await pool.query(
+      "SELECT consumed_at, frontend_origin FROM itch_oauth_states WHERE state_hash=$1",
+      [createHash("sha256").update(state).digest("hex")],
+    );
+    assert(storedState.rows[0].consumed_at);
+    assert.equal(storedState.rows[0].frontend_origin, "https://deadsmilegames.onrender.com");
+  } finally {
+    revoked = previousRevoked;
+    ownedKeysOverride = previousOwnedKeysOverride;
+  }
 });
 
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
