@@ -43,3 +43,35 @@ jobs:
           languages: javascript-typescript
           build-mode: none
       - uses: github/codeql-action/analyze@v4
+      - name: Report SARIF security findings
+        if: always()
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const file = "results/javascript.sarif";
+          if (!fs.existsSync(file)) {
+            console.log("SARIF_RESULT_FILE_NOT_FOUND");
+            process.exit(0);
+          }
+          const sarif = JSON.parse(fs.readFileSync(file, "utf8"));
+          for (const run of sarif.runs || []) {
+            const rules = new Map((run.tool?.driver?.rules || []).map((rule) => [rule.id, rule]));
+            for (const result of run.results || []) {
+              const rule = rules.get(result.ruleId);
+              const severity = Number(rule?.properties?.["security-severity"] || 0);
+              if (severity < 7 && result.level !== "error") continue;
+              console.log(JSON.stringify({
+                ruleId: result.ruleId,
+                level: result.level || null,
+                severity: severity || null,
+                message: result.message?.text || "",
+                locations: (result.locations || []).map((location) => ({
+                  file: location.physicalLocation?.artifactLocation?.uri || null,
+                  line: location.physicalLocation?.region?.startLine || null,
+                  column: location.physicalLocation?.region?.startColumn || null,
+                })),
+              }));
+            }
+          }
+          NODE
