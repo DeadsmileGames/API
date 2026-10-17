@@ -6,25 +6,40 @@ export async function createOAuthState({
   client,
   locale,
   returnPath,
+  frontendOrigin,
   expiresAt,
 }) {
   await query(
     "DELETE FROM itch_oauth_states WHERE expires_at < now() OR consumed_at IS NOT NULL",
   );
   await query(
-    `INSERT INTO itch_oauth_states (state_hash, user_id, client, locale, return_path, expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [stateHash, userId, client, locale, returnPath, expiresAt],
+    `INSERT INTO itch_oauth_states (state_hash, user_id, client, locale, return_path, frontend_origin, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [stateHash, userId, client, locale, returnPath, frontendOrigin, expiresAt],
   );
 }
 
-export async function consumeOAuthState(stateHash) {
+export async function findOAuthStateFlow(stateHash) {
+  const { rows } = await query(
+    `SELECT client, frontend_origin
+     FROM itch_oauth_states
+     WHERE state_hash = $1 AND consumed_at IS NULL AND expires_at > now()`,
+    [stateHash],
+  );
+  return rows[0] || null;
+}
+
+export async function consumeOAuthState(stateHash, userId) {
   const { rows } = await query(
     `UPDATE itch_oauth_states
      SET consumed_at = now()
-     WHERE state_hash = $1 AND consumed_at IS NULL AND expires_at > now()
-     RETURNING user_id, client, locale, return_path`,
-    [stateHash],
+     WHERE state_hash = $1
+       AND client = 'site'
+       AND user_id = $2
+       AND consumed_at IS NULL
+       AND expires_at > now()
+     RETURNING user_id, client, locale, return_path, frontend_origin`,
+    [stateHash, userId],
   );
   return rows[0] || null;
 }

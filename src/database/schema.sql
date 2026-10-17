@@ -176,10 +176,11 @@ CREATE TABLE "itch_oauth_states" (
 	"client" text NOT NULL,
 	"locale" text DEFAULT 'en' NOT NULL,
 	"return_path" text,
+	"frontend_origin" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"consumed_at" timestamp with time zone,
-	CONSTRAINT "itch_oauth_states_client_check" CHECK ((client = ANY (ARRAY['site'::text, 'launcher'::text]))),
+	CONSTRAINT "itch_oauth_states_client_check" CHECK (client = 'site'),
 	CONSTRAINT "itch_oauth_states_locale_check" CHECK ((locale = ANY (ARRAY['en'::text, 'pt-BR'::text, 'es'::text])))
 );
 CREATE TABLE "news" (

@@ -17,9 +17,15 @@ export const connectItchSchema = z
   })
   .strict();
 
+export const itchOAuthFlowSchema = z
+  .object({
+    state: z.string().min(40).max(200).regex(/^[A-Za-z0-9_-]+$/),
+  })
+  .strict();
+
 export const completeItchSchema = z
   .object({
-    state: z.string().min(40).max(200),
+    state: z.string().min(40).max(200).regex(/^[A-Za-z0-9_-]+$/),
     accessToken: z.string().min(20).max(1_000),
   })
   .strict();

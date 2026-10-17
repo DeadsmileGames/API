@@ -53,6 +53,7 @@ const params = new URLSearchParams(location.hash.slice(1));
 const oauthState = params.get("state");
 const accessToken = params.get("access_token");
 history.replaceState({}, document.title, location.pathname);
+
 async function request(url, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
@@ -64,53 +65,64 @@ async function request(url, options = {}) {
     } catch {
       throw { code: "INVALID_RESPONSE" };
     }
-    if (!response.ok) throw payload?.error || { code: "INTERNAL_ERROR" };
-    return payload;
+    if (!response.ok || payload?.success !== true || !payload?.data) {
+      throw payload?.error || { code: "INTERNAL_ERROR" };
+    }
+    return payload.data;
   } catch (error) {
-    if (error.name === "AbortError") throw { code: "REQUEST_TIMEOUT" };
+    if (error?.name === "AbortError") throw { code: "REQUEST_TIMEOUT" };
     throw error;
   } finally {
     clearTimeout(timer);
   }
 }
+
 async function run() {
-  if (!oauthState || !accessToken) throw { code: "ITCH_LINK_EXPIRED" };
-  const csrfPayload = await request("/api/csrf", {
+  if (
+    !oauthState ||
+    !accessToken ||
+    !/^[A-Za-z0-9_-]{40,200}$/.test(oauthState) ||
+    accessToken.length < 20 ||
+    accessToken.length > 1000
+  ) {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+
+  const csrf = await request("/api/csrf", {
     credentials: "include",
     headers: { "Accept-Language": locale },
   });
-  if (!csrfPayload?.data?.token) throw { code: "CSRF_INIT_FAILED" };
-  const payload = await request("/api/integrations/itch/complete", {
+  if (typeof csrf.token !== "string" || !csrf.token) throw { code: "CSRF_INIT_FAILED" };
+
+  const flow = await request("/api/integrations/itch/flow", {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-CSRF-Token": csrfPayload.data.token,
+      "X-CSRF-Token": csrf.token,
       "Accept-Language": locale,
     },
-    body: JSON.stringify({ state: oauthState, accessToken }),
+    body: JSON.stringify({ state: oauthState }),
   });
-  if (!payload?.data) throw { code: "INVALID_RESPONSE" };
-  locale = payload.data?.locale || locale;
-  strings = copy[locale] || copy.en;
-  messages = window.deadsmileErrors[locale] || window.deadsmileErrors.en;
-  document.documentElement.lang = locale;
-  state("done");
-  if (payload.data?.returnUrl) {
-    const url = new URL(payload.data.returnUrl);
-    if (
-      (url.protocol === "https:" ||
-        (url.protocol === "http:" &&
-          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) &&
-      !url.username &&
-      !url.password &&
-      url.origin === new URL(document.getElementById("returnLink").href).origin
-    ) {
-      document.getElementById("returnLink").href = url.toString();
-      setTimeout(() => location.replace(url.toString()), 900);
-    }
+  if (flow.client !== "site" || typeof flow.frontendOrigin !== "string") {
+    throw { code: "ITCH_LINK_EXPIRED" };
   }
+  const origin = new URL(flow.frontendOrigin);
+  const localHttp =
+    origin.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
+  if ((origin.protocol !== "https:" && !localHttp) || origin.origin !== flow.frontendOrigin) {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+
+  const target = new URL("/itch-callback", origin);
+  target.hash = new URLSearchParams({
+    state: oauthState,
+    access_token: accessToken,
+  }).toString();
+  location.replace(target.toString());
 }
+
 run().catch((error) => {
   locale = error.locale || locale;
   strings = copy[locale] || copy.en;

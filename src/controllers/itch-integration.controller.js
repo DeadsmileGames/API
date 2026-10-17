@@ -6,6 +6,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import {
   beginItchConnection,
   completeItchConnection,
+  getItchOAuthFlow,
   disconnectItch,
   getItchStatus,
 } from "../services/itch-integration.service.js";
@@ -68,13 +69,22 @@ export const status = asyncHandler(async (req, res) => {
 });
 
 export const connect = asyncHandler(async (req, res) => {
-  sendSuccess(res, await beginItchConnection(req.session.userId, req.body), 201);
+  sendSuccess(
+    res,
+    await beginItchConnection(req.session.userId, req.body, req.get("origin")),
+    201,
+  );
+});
+
+export const flow = asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  sendSuccess(res, await getItchOAuthFlow(req.body.state));
 });
 
 export const complete = asyncHandler(async (req, res) => {
   sendSuccess(
     res,
-    await completeItchConnection(req.body, (locale) => {
+    await completeItchConnection(req.body, req.auth.userId, (locale) => {
       res.locals.locale = resolveLocale(locale);
       res.set("Content-Language", res.locals.locale);
     }),

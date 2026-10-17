@@ -59,6 +59,16 @@ globalThis.fetch = async (input, options) => {
     }
     return Response.json(value);
   }
+  if (url === "https://api.itch.io/credentials/info")
+    return Response.json({ scopes: ["profile:me", "profile:owned"] });
+  if (url === "https://api.itch.io/profile")
+    return Response.json({
+      user: {
+        id: 9876543210,
+        username: "oauth-bound-test",
+        url: "https://oauth-bound-test.itch.io",
+      },
+    });
   if (url.includes("/profile/owned-keys")) {
     const page = Number(new URL(url).searchParams.get("page") || 1);
     if (ownedKeysOverride) return Response.json(ownedKeysOverride(page));
@@ -124,7 +134,7 @@ function client() {
   let token;
   return {
     cookies,
-    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor } = {}) {
+    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor, origin } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -135,6 +145,7 @@ function client() {
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
+          ...(origin ? { Origin: origin } : {}),
           ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
           ...(method !== "GET" && csrf ? { "X-CSRF-Token": token } : {}),
         },
@@ -386,6 +397,133 @@ test("newswire returns the persisted original in every interface language", asyn
     "<p>English story.</p>",
   );
 });
+test("itch OAuth flow reveals only the allowed frontend redirect and keeps state account-bound", async () => {
+  const { createHash, randomBytes } = await import("node:crypto");
+  const { createOAuthState } = await import("../src/repositories/itch-integration.repository.js");
+  const state = randomBytes(48).toString("base64url");
+  const stateHash = createHash("sha256").update(state).digest("hex");
+  await createOAuthState({
+    stateHash,
+    userId,
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+  });
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "a-test-access-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+  const row = await pool.query(
+    "SELECT consumed_at FROM itch_oauth_states WHERE state_hash=$1",
+    [stateHash],
+  );
+  assert.equal(row.rows[0].consumed_at, null);
+
+  const blockedLauncherFlow = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: { client: "launcher", locale: "en" },
+  });
+  assert.equal(blockedLauncherFlow.status, 400);
+  assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
+});
+
+
+test("itch OAuth initiation rejects untrusted origins and binds valid flows to the requested frontend", async () => {
+  const { createHash } = await import("node:crypto");
+  const payload = {
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+  };
+  const rejected = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://evil.example",
+  });
+  assert.equal(rejected.status, 403);
+
+  const created = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://deadsmilegames.onrender.com",
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const authorizeUrl = new URL(created.body.data.authorizeUrl);
+  const state = authorizeUrl.searchParams.get("state");
+  assert.equal(authorizeUrl.origin, "https://itch.io");
+  assert.equal(authorizeUrl.pathname, "/user/oauth");
+  assert.equal(authorizeUrl.searchParams.get("response_type"), "token");
+  assert(state);
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+  });
+
+  const unauthenticated = await guest.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+
+  const previousRevoked = revoked;
+  const previousOwnedKeysOverride = ownedKeysOverride;
+  revoked = false;
+  ownedKeysOverride = () => ({ per_page: 50, owned_keys: [] });
+  try {
+    const completed = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    assert.equal(completed.body.data.client, "site");
+    assert.equal(completed.body.data.returnUrl, "https://deadsmilegames.onrender.com/account#games");
+    const storedState = await pool.query(
+      "SELECT consumed_at, frontend_origin FROM itch_oauth_states WHERE state_hash=$1",
+      [createHash("sha256").update(state).digest("hex")],
+    );
+    assert(storedState.rows[0].consumed_at);
+    assert.equal(storedState.rows[0].frontend_origin, "https://deadsmilegames.onrender.com");
+
+    const replay = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(replay.status, 400);
+    assert.equal(replay.body.error.code, "ITCH_LINK_EXPIRED");
+  } finally {
+    revoked = previousRevoked;
+    ownedKeysOverride = previousOwnedKeysOverride;
+  }
+});
+
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
   const origin = new URL(base).origin;
   const response = await originalFetch(`${base}/integrations/itch/callback`);
@@ -402,9 +540,11 @@ test("itch callback reuses website CSS and ships bounded accessible connection s
   );
   assert.equal((await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status, 200);
   const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
-  assert(script.includes("controller.abort()"));
   assert(script.includes("location.hash.slice(1)"));
   assert(script.includes("history.replaceState"));
+  assert(script.includes("/api/integrations/itch/flow"));
+  assert(script.includes("/itch-callback"));
+  assert(!script.includes("/api/integrations/itch/complete"));
 });
 
 test("CSRF, role checks and malicious payloads fail with localized safe errors", async () => {
