@@ -1347,14 +1347,14 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(/^[0-9]{6}$/.test(registration.reward_code), true);
     assert.equal(registration.code_hash, createHash("sha256").update(registration.reward_code).digest("hex"));
     const managementStatus = await player.request("/preorders/free/status");
-    assert.equal(managementStatus.body.data.rewardCode, registration.reward_code);
+    assert.equal(managementStatus.body.data.rewardCode, null, "the code stays private until the preorder ends");
     assert.equal(managementStatus.body.data.rewardRedeemable, false);
     const earlyRedemption = await player.request("/preorders/redeem", {
       method: "POST",
       body: { code: registration.reward_code },
     });
-    assert.equal(earlyRedemption.status, 404);
-    assert.equal(earlyRedemption.body.error.code, "PREORDER_CODE_INVALID");
+    assert.equal(earlyRedemption.status, 409);
+    assert.equal(earlyRedemption.body.error.code, "PREORDER_NOT_ENDED");
     assert.equal(await hasPreorderForUser(userId, freeId), true);
     assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.slug === "free"), true,
       "a confirmed matching email belongs in the reserved library");
@@ -1386,6 +1386,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     await pool.query("UPDATE games SET preorder_ends_at=now()-interval '1 second' WHERE id=$1", [freeId]);
     const endedStatus = await player.request("/preorders/free/status");
     assert.equal(endedStatus.body.data.rewardRedeemable, true);
+    assert.equal(endedStatus.body.data.rewardCode, registration.reward_code, "the code appears once the preorder has ended");
     const successfulRedemption = await player.request("/preorders/redeem", {
       method: "POST",
       body: { code: registration.reward_code },
