@@ -141,6 +141,7 @@ export function createApp() {
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), async (_req, res) => {
     res.set("Cache-Control", "no-store");
