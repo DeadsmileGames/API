@@ -1331,7 +1331,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
     assert.equal(await hasPreorderForUser(userId, freeId), true);
-    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), true,
+    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.slug === "free"), true,
       "a confirmed matching email belongs in the reserved library");
 
     const duplicate = await preorderGuest.request("/preorders/free", {
