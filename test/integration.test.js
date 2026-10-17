@@ -511,6 +511,13 @@ test("itch OAuth initiation rejects untrusted origins and binds valid flows to t
     );
     assert(storedState.rows[0].consumed_at);
     assert.equal(storedState.rows[0].frontend_origin, "https://deadsmilegames.onrender.com");
+
+    const replay = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(replay.status, 400);
+    assert.equal(replay.body.error.code, "ITCH_LINK_EXPIRED");
   } finally {
     revoked = previousRevoked;
     ownedKeysOverride = previousOwnedKeysOverride;
