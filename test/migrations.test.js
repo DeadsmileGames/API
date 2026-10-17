@@ -58,7 +58,7 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      19,
+      20,
     );
     assert.deepEqual(
       (await db.query(
@@ -77,6 +77,24 @@ test("existing database migrates without changing historical checksums or losing
         [["user_id"]],
       )).rows,
       [{ column_name: "user_id" }],
+    );
+    assert.deepEqual(
+      (await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'game_preorders' AND column_name = ANY($1::text[]) ORDER BY column_name",
+        [["reward_code"]],
+      )).rows,
+      [{ column_name: "reward_code" }],
+    );
+    assert.deepEqual(
+      (await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'game_preorders' AND column_name = ANY($1::text[]) ORDER BY column_name",
+        [["code_sent_at", "email_status"]],
+      )).rows,
+      [],
+    );
+    assert.equal(
+      (await db.query("SELECT to_regclass('public.preorder_email_batches') AS name")).rows[0].name,
+      null,
     );
     assert.equal(
       (await db.query("SELECT to_regclass('public.game_preorder_daily_limits') AS name")).rows[0].name,
