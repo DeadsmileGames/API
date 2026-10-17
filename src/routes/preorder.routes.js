@@ -17,5 +17,5 @@ preorderRouter.get("/:slug/reward",validate(slug,"params"),requireAuth,controlle
 preorderRouter.get("/:slug",validate(slug,"params"),controller.info);
 preorderRouter.post("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,validate(registration),controller.register);
 preorderRouter.delete("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,controller.cancel);
-preorderRouter.get("/reward/:token/download",validate(token,"params"),controller.download);
-preorderRouter.get("/reward/:token",validate(token,"params"),controller.reward);
+preorderRouter.get("/reward/:token/download",validate(token,"params"),requireAuth,controller.download);
+preorderRouter.get("/reward/:token",validate(token,"params"),requireAuth,controller.reward);
