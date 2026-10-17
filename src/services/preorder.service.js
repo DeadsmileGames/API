@@ -67,50 +67,121 @@ export async function getPreorderInfo(slug, locale="en") {
  return {id:game.id,slug:game.slug,title:game.title,coverImage:game.cover_image,startsAt:game.preorder_starts_at,endsAt:game.preorder_ends_at,locale:localeOf(locale)};
 }
 
-export async function createPreorder(slug,payload,requestLocale="en") {
- const locale=localeOf(payload.locale||requestLocale);
- const first=String(payload.firstName||"").trim(), last=String(payload.lastName||"").trim();
- const email=String(payload.email||"").trim().toLowerCase(), age=Number(payload.age);
- if(!first||first.length>100||!last||last.length>100||!Number.isInteger(age)||age<1||age>120||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError(400,"PREORDER_INVALID_FORM");
- const rawToken=crypto.randomBytes(32).toString("base64url");
- const tokenHash=hash(rawToken);
- const client=await pool.connect();
+export async function getPreorderStatus(slug, userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+ const gameResult = await query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at,preorder_enabled,access_type FROM games WHERE slug=$1", [slug]);
+ const game = gameResult.rows[0];
+ if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
+ const { rows: preorderRows } = await query(
+  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at FROM game_preorders p JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
+  [game.id, userId],
+ );
+ const preorder = preorderRows[0] || null;
+ const { rows: limitRows } = await query(
+  "SELECT attempts FROM game_preorder_daily_limits WHERE user_id=$1 AND game_id=$2 AND activity_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date",
+  [userId, game.id],
+ );
+ const attemptsUsed = Number(limitRows[0]?.attempts || 0);
+ const now = Date.now();
+ const preorderStatus = !preorder ? null : preorder.confirmed_at ? "confirmed" : preorder.confirmation_expires_at && new Date(preorder.confirmation_expires_at).getTime() <= now ? "expired" : "pending";
+ return {
+  game: { id: game.id, slug: game.slug, title: game.title, coverImage: game.cover_image, startsAt: game.preorder_starts_at, endsAt: game.preorder_ends_at, preorderEnabled: game.preorder_enabled, isFree: game.access_type === "free" },
+  preorderStatus,
+  hasPreorderRecord: Boolean(preorder),
+  attemptsUsed,
+  attemptsRemaining: Math.max(0, 2 - attemptsUsed),
+ };
+}
+
+export async function createPreorder(slug, payload, requestLocale = "en", userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+ const locale = localeOf(payload.locale || requestLocale);
+ const first = String(payload.firstName || "").trim();
+ const last = String(payload.lastName || "").trim();
+ const email = String(payload.email || "").trim().toLowerCase();
+ const age = Number(payload.age);
+ if (!first || first.length > 100 || !last || last.length > 100 || !Number.isInteger(age) || age < 1 || age > 120 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  throw new AppError(400, "PREORDER_INVALID_FORM");
+ }
+ const rawToken = crypto.randomBytes(32).toString("base64url");
+ const tokenHash = hash(rawToken);
+ const client = await pool.connect();
  let registrationId;
  let game;
+ let attemptsUsed = 0;
  try {
   await client.query("BEGIN");
-  const found=await client.query("SELECT id,slug,title,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE",[slug]);
-  game=found.rows[0];
-  if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");
-  const now=Date.now();
-  if(now<new Date(game.preorder_starts_at).getTime()||now>=new Date(game.preorder_ends_at).getTime()) throw new AppError(409,"PREORDER_NOT_OPEN");
-  const min=Number((game.preorder_age_ratings||DEFAULT_AGE)[locale]??DEFAULT_AGE[locale]);
-  if(age<min) throw new AppError(403,"PREORDER_AGE_RESTRICTED");
+  const found = await client.query("SELECT id,slug,title,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE", [slug]);
+  game = found.rows[0];
+  if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
+  const now = Date.now();
+  if (now < new Date(game.preorder_starts_at).getTime() || now >= new Date(game.preorder_ends_at).getTime()) throw new AppError(409, "PREORDER_NOT_OPEN");
+  const min = Number((game.preorder_age_ratings || DEFAULT_AGE)[locale] ?? DEFAULT_AGE[locale]);
+  if (age < min) throw new AppError(403, "PREORDER_AGE_RESTRICTED");
 
-  let existing=await client.query("SELECT id,confirmed_at FROM game_preorders WHERE game_id=$1 AND email=$2 FOR UPDATE",[game.id,email]);
-  if(existing.rows[0]?.confirmed_at) throw new AppError(409,"PREORDER_ALREADY_REGISTERED");
-  if(existing.rows[0]) {
-   registrationId=existing.rows[0].id;
-   await client.query("UPDATE game_preorders SET first_name=$2,last_name=$3,age=$4,locale=$5,confirmation_token_hash=$6,confirmation_expires_at=now()+interval '24 hours' WHERE id=$1 AND confirmed_at IS NULL",[registrationId,first,last,age,locale,tokenHash]);
+  const current = await client.query(
+   "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.user_id FROM game_preorders p LEFT JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND account.id IS NOT NULL AND lower(p.email)=lower(account.email))) FOR UPDATE OF p",
+   [game.id, userId],
+  );
+  const existing = current.rows[0] || null;
+  if (existing?.confirmed_at) throw new AppError(409, "PREORDER_ALREADY_REGISTERED");
+  if (existing?.confirmation_expires_at && new Date(existing.confirmation_expires_at).getTime() > now) throw new AppError(409, "PREORDER_AWAITING_CONFIRMATION");
+
+  const emailOwner = await client.query(
+   "SELECT id,user_id FROM game_preorders WHERE game_id=$1 AND lower(email)=lower($2) FOR UPDATE",
+   [game.id, email],
+  );
+  if (emailOwner.rows[0] && String(emailOwner.rows[0].id) !== String(existing?.id || "")) throw new AppError(409, "PREORDER_EMAIL_IN_USE");
+
+  const quota = await client.query(
+   "INSERT INTO game_preorder_daily_limits(user_id,game_id,activity_date,attempts,updated_at) VALUES($1,$2,(now() AT TIME ZONE 'America/Sao_Paulo')::date,1,now()) ON CONFLICT(user_id,game_id,activity_date) DO UPDATE SET attempts=game_preorder_daily_limits.attempts+1,updated_at=now() WHERE game_preorder_daily_limits.attempts<2 RETURNING attempts",
+   [userId, game.id],
+  );
+  if (!quota.rows.length) throw new AppError(429, "PREORDER_DAILY_LIMIT");
+  attemptsUsed = Number(quota.rows[0].attempts);
+  await client.query("DELETE FROM game_preorder_daily_limits WHERE activity_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date - 7");
+
+  if (existing) {
+   registrationId = existing.id;
+   await client.query(
+    "UPDATE game_preorders SET user_id=$2,first_name=$3,last_name=$4,age=$5,locale=$6,email=$7,code_hash=NULL,code_sent_at=NULL,email_status='waiting',claim_token_hash=NULL,claim_token_expires_at=NULL,reward_accessed_at=NULL,reward_download_token_hash=NULL,redeemed_at=NULL,confirmation_token_hash=$8,confirmation_expires_at=now()+interval '24 hours',confirmed_at=NULL,created_at=now() WHERE id=$1",
+    [registrationId, userId, first, last, age, locale, email, tokenHash],
+   );
   } else {
-   const inserted=await client.query("INSERT INTO game_preorders(game_id,first_name,last_name,age,locale,email,confirmation_token_hash,confirmation_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '24 hours') ON CONFLICT(game_id,email) DO NOTHING RETURNING id",[game.id,first,last,age,locale,email,tokenHash]);
-   if(inserted.rows[0]) registrationId=inserted.rows[0].id;
-   else {
-    existing=await client.query("SELECT id,confirmed_at FROM game_preorders WHERE game_id=$1 AND email=$2 FOR UPDATE",[game.id,email]);
-    if(!existing.rows[0]||existing.rows[0].confirmed_at) throw new AppError(409,"PREORDER_ALREADY_REGISTERED");
-    registrationId=existing.rows[0].id;
-    await client.query("UPDATE game_preorders SET first_name=$2,last_name=$3,age=$4,locale=$5,confirmation_token_hash=$6,confirmation_expires_at=now()+interval '24 hours' WHERE id=$1 AND confirmed_at IS NULL",[registrationId,first,last,age,locale,tokenHash]);
-   }
+   const inserted = await client.query(
+    "INSERT INTO game_preorders(game_id,user_id,first_name,last_name,age,locale,email,confirmation_token_hash,confirmation_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval '24 hours') RETURNING id",
+    [game.id, userId, first, last, age, locale, email, tokenHash],
+   );
+   registrationId = inserted.rows[0].id;
   }
   await client.query("COMMIT");
- } catch(e) {
-  await client.query("ROLLBACK").catch(()=>{});
-  throw e;
+ } catch (error) {
+  await client.query("ROLLBACK").catch(() => {});
+  if (error?.code === "23505") throw new AppError(409, "PREORDER_EMAIL_IN_USE");
+  throw error;
  } finally {
   client.release();
  }
- await sendPreorderConfirmationEmail({email,firstName:first,gameTitle:game.title,slug:game.slug,token:rawToken,locale});
- return {confirmationSent:true};
+ await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, slug: game.slug, token: rawToken, locale });
+ return { confirmationSent: true, attemptsRemaining: Math.max(0, 2 - attemptsUsed) };
+}
+
+export async function cancelPreorder(slug, userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+ const gameResult = await query("SELECT id FROM games WHERE slug=$1", [slug]);
+ const game = gameResult.rows[0];
+ if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
+ const { rows } = await query(
+  "DELETE FROM game_preorders p USING users account WHERE p.game_id=$1 AND account.id=$2 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) RETURNING p.id",
+  [game.id, userId],
+ );
+ if (!rows.length) throw new AppError(404, "PREORDER_NOT_FOUND");
+ const { rows: limitRows } = await query(
+  "SELECT attempts FROM game_preorder_daily_limits WHERE user_id=$1 AND game_id=$2 AND activity_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date",
+  [userId, game.id],
+ );
+ const attemptsUsed = Number(limitRows[0]?.attempts || 0);
+ return { cancelled: true, attemptsUsed, attemptsRemaining: Math.max(0, 2 - attemptsUsed) };
 }
 
 export async function confirmPreorder(token) {
@@ -131,9 +202,9 @@ export async function redeemPreorderCode(code,account) {
  const client=await pool.connect();
  try {
   await client.query("BEGIN");
-  const found=await client.query("SELECT p.id,p.email,p.redeemed_at,g.slug FROM game_preorders p JOIN games g ON g.id=p.game_id WHERE p.code_hash=$1 FOR UPDATE",[hash(normalized)]);
+  const found=await client.query("SELECT p.id,p.user_id,p.email,p.redeemed_at,g.slug FROM game_preorders p JOIN games g ON g.id=p.game_id WHERE p.code_hash=$1 FOR UPDATE",[hash(normalized)]);
   const p=found.rows[0];
-  if(!p||p.redeemed_at||p.email!==String(account.email||"").trim().toLowerCase()) throw new AppError(404,"PREORDER_CODE_INVALID");
+  if(!p||p.redeemed_at||(p.user_id?String(p.user_id)!==String(account.id||""):p.email!==String(account.email||"").trim().toLowerCase())) throw new AppError(404,"PREORDER_CODE_INVALID");
   const token=crypto.randomBytes(32).toString("base64url");
   await client.query("UPDATE game_preorders SET redeemed_at=now(),claim_token_hash=$2,claim_token_expires_at=now()+interval '15 minutes' WHERE id=$1",[p.id,hash(token)]);
   await client.query("COMMIT");
