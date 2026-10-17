@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { issueMobileAccessToken, verifyMobileAccessToken } from "../src/utils/mobile-access-token.js";
+import { issueMobileAccessToken, isMobileTokenSessionCompatible, verifyMobileAccessToken } from "../src/utils/mobile-access-token.js";
 
 const sessionSecret = "test-only-session-secret-that-is-long-enough-123456";
 const now = 1_800_000_000_000;
@@ -36,4 +36,12 @@ test("tokens with a different signing secret are rejected", () => {
     () => verifyMobileAccessToken(token, { sessionSecret: sessionSecret + "x", now }),
     { code: "INVALID_ACCESS_TOKEN" },
   );
+});
+
+test("a bearer token cannot be combined with another account session cookie", () => {
+  const claims = { sub: "account-a", sid: "session-a" };
+  assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-b" }, "session-b"), false);
+  assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-a" }, "session-b"), false);
+  assert.equal(isMobileTokenSessionCompatible(claims, { userId: "account-a" }, "session-a"), true);
+  assert.equal(isMobileTokenSessionCompatible(claims, {}, "new-anonymous-session"), true);
 });

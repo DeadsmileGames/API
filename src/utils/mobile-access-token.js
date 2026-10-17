@@ -94,3 +94,8 @@ export function verifyMobileAccessToken(token, { sessionSecret, now = Date.now()
   }
   return payload;
 }
+
+export function isMobileTokenSessionCompatible(tokenClaims, session, sessionId) {
+  if (!session?.userId) return true;
+  return String(session.userId) === String(tokenClaims?.sub) && sessionId === tokenClaims?.sid;
+}

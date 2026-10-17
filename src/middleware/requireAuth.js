@@ -1,7 +1,7 @@
 import { query } from "../config/database.js";
 import { env } from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
-import { verifyMobileAccessToken } from "../utils/mobile-access-token.js";
+import { isMobileTokenSessionCompatible, verifyMobileAccessToken } from "../utils/mobile-access-token.js";
 
 export async function requireAuth(req, res, next) {
   res.set("Cache-Control", "private, no-store");
@@ -14,6 +14,9 @@ export async function requireAuth(req, res, next) {
     if (!match) return sendError(res, 401, "INVALID_ACCESS_TOKEN");
     try {
       tokenClaims = verifyMobileAccessToken(match[1], { sessionSecret: env.sessionSecret });
+      if (!isMobileTokenSessionCompatible(tokenClaims, req.session, req.sessionID)) {
+        return sendError(res, 401, "SESSION_IDENTITY_MISMATCH");
+      }
       userId = tokenClaims.sub;
     } catch (error) {
       return sendError(res, 401, error?.code || "INVALID_ACCESS_TOKEN");
