@@ -1346,6 +1346,17 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(registration.confirmation_expires_at, null);
     assert.equal(/^[0-9]{6}$/.test(registration.reward_code), true);
     assert.equal(registration.code_hash, createHmac("sha256", process.env.DATA_ENCRYPTION_KEY).update("deadsmile:preorder-reward-code:v1:").update(registration.reward_code).digest("hex"));
+    // Simulate an outstanding code created before the HMAC migration.
+    await pool.query(
+      "UPDATE game_preorders SET code_hash=$3 WHERE game_id=$1 AND email=$2",
+      [freeId, "player@example.test", createHash("sha256").update(registration.reward_code).digest("hex")],
+    );
+    const anonymousRedeem = await preorderGuest.request("/preorders/redeem", {
+      method: "POST",
+      body: { code: registration.reward_code },
+    });
+    assert.equal(anonymousRedeem.status, 401);
+    assert.equal(anonymousRedeem.body.error.code, "UNAUTHENTICATED");
     const managementStatus = await player.request("/preorders/free/status");
     assert.equal(managementStatus.body.data.rewardCode, null, "the code stays private until the preorder ends");
     assert.equal(managementStatus.body.data.rewardRedeemable, false);
