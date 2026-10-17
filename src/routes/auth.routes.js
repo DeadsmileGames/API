@@ -84,7 +84,6 @@ authRouter.post(
     legacyHeaders: false,
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
-  authenticatedApiLimiter,
   requireAuth,
   integrationLimiter,
   mobileToken,
