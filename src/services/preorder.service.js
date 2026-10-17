@@ -246,16 +246,16 @@ export async function redeemPreorderCode(code, account) {
  try {
   await client.query("BEGIN");
   const found = await client.query(
-   `SELECT p.id,p.user_id,p.email,p.reward_code,p.redeemed_at,p.confirmed_at,
+   `SELECT p.id,p.user_id,p.email,p.reward_code,p.code_hash,p.redeemed_at,p.confirmed_at,
            g.slug,g.preorder_ends_at,
            (g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended
     FROM game_preorders p
     JOIN games g ON g.id = p.game_id
-    WHERE p.code_hash = $1 OR (p.code_hash IS NULL AND p.reward_code = $2)
+    WHERE p.code_hash = $1 OR p.code_hash = $2 OR (p.code_hash IS NULL AND p.reward_code = $3)
     ORDER BY CASE WHEN p.code_hash = $1 THEN 0 ELSE 1 END
     LIMIT 1
     FOR UPDATE OF p`,
-   [hash(normalized), normalized],
+   [codeHash(normalized), hash(normalized), normalized],
   );
   const preorder = found.rows[0];
   if (!preorder) throw new AppError(404, "PREORDER_CODE_INVALID");
@@ -265,6 +265,9 @@ export async function redeemPreorderCode(code, account) {
   if (preorder.redeemed_at) {
    if (String(preorder.user_id || "") !== String(account.id)) {
     throw new AppError(409, "PREORDER_CODE_ALREADY_REDEEMED");
+   }
+   if (preorder.code_hash !== codeHash(normalized)) {
+    await client.query("UPDATE game_preorders SET code_hash=$2 WHERE id=$1", [preorder.id, codeHash(normalized)]);
    }
    await client.query("COMMIT");
    return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward", alreadyRedeemed: true };
@@ -283,7 +286,7 @@ export async function redeemPreorderCode(code, account) {
   await client.query(
    `UPDATE game_preorders
      SET user_id=COALESCE(user_id,$2),
-         code_hash=COALESCE(code_hash,$3),
+         code_hash=$3,
          redeemed_at=now(),
          claim_token_hash=NULL,
          claim_token_expires_at=NULL,
@@ -297,7 +300,7 @@ export async function redeemPreorderCode(code, account) {
          confirmation_token_hash=NULL,
          confirmation_expires_at=NULL
      WHERE id=$1`,
-   [preorder.id, account.id, hash(normalized)],
+   [preorder.id, account.id, codeHash(normalized)],
   );
   await client.query("COMMIT");
   return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward", alreadyRedeemed: false };
