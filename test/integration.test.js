@@ -1243,7 +1243,8 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
   const { createHash } = await import("node:crypto");
   await pool.query(
     `UPDATE games
-     SET preorder_enabled=true,
+     SET access_type='free',
+         preorder_enabled=true,
          preorder_starts_at=now()-interval '1 hour',
          preorder_ends_at=now()+interval '1 day',
          preorder_age_ratings=$2::jsonb,
@@ -1255,7 +1256,8 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
   // Simulate an old paid-game record with preorder flags, so the public API must fail closed.
   await pool.query(
     `UPDATE games
-     SET preorder_enabled=true,
+     SET access_type='paid',
+         preorder_enabled=true,
          preorder_starts_at=now()-interval '1 hour',
          preorder_ends_at=now()+interval '1 day',
          preorder_reward_type='package',
@@ -1336,7 +1338,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
   } finally {
     await pool.query("DELETE FROM game_preorders WHERE game_id IN ($1,$2)", [freeId, paidId]);
     await pool.query(
-      "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL WHERE id IN ($1,$3)",
+      "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL, access_type=CASE WHEN id=$1 THEN 'free' ELSE 'paid' END WHERE id IN ($1,$3)",
       [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 }), paidId],
     );
   }
