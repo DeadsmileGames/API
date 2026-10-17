@@ -524,7 +524,7 @@ test("server time endpoint returns authoritative time formatted for the visitor 
   assert.equal(fallback.body.data.timeZone, "UTC");
 });
 
-test("only the canonical studio account can configure a public profile banner and verified mark", async () => {
+test("only the reserved Deadsmile and luxjson accounts can configure verified public profile banners", async () => {
   await pool.query("UPDATE users SET username='deadsmilegames', profile_banner_url=NULL WHERE id=$1", [adminId]);
   try {
     const officialRename = await admin.request("/account", {
@@ -561,11 +561,37 @@ test("only the canonical studio account can configure a public profile banner an
     const publicPlayer = await guest.request("/account/profile/player");
     assert.equal(publicPlayer.body.data.bannerUrl, null);
     assert.equal(publicPlayer.body.data.isVerified, false);
+
+    await pool.query("UPDATE users SET username='luxjson', profile_banner_url=NULL WHERE id=$1", [otherId]);
+    const luxjsonRename = await other.request("/account", {
+      method: "PATCH",
+      body: { username: "luxjson_changed" },
+    });
+    assert.equal(luxjsonRename.status, 409, JSON.stringify(luxjsonRename.body));
+
+    const claimedLuxjsonName = await player.request("/account", {
+      method: "PATCH",
+      body: { username: "luxjson" },
+    });
+    assert.equal(claimedLuxjsonName.status, 409, JSON.stringify(claimedLuxjsonName.body));
+
+    const luxjsonSaved = await other.request("/account", {
+      method: "PATCH",
+      body: { profileBannerUrl: "https://images.example.test/luxjson-banner.webp" },
+    });
+    assert.equal(luxjsonSaved.status, 200, JSON.stringify(luxjsonSaved.body));
+    assert.equal(luxjsonSaved.body.data.profileBannerUrl, "https://images.example.test/luxjson-banner.webp");
+    assert.equal(luxjsonSaved.body.data.isVerified, true);
+
+    const publicLuxjson = await guest.request("/account/profile/luxjson");
+    assert.equal(publicLuxjson.status, 200, JSON.stringify(publicLuxjson.body));
+    assert.equal(publicLuxjson.body.data.bannerUrl, "https://images.example.test/luxjson-banner.webp");
+    assert.equal(publicLuxjson.body.data.isVerified, true);
   } finally {
     await pool.query("UPDATE users SET username='admin', profile_banner_url=NULL WHERE id=$1", [adminId]);
+    await pool.query("UPDATE users SET username='other', profile_banner_url=NULL WHERE id=$1", [otherId]);
   }
 });
-
 test("privacy defaults hide activity and telemetry consent rejects collection", async () => {
   let result = await player.request("/platform/telemetry", {
     method: "POST",
