@@ -11,18 +11,8 @@ const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
-const absoluteEmailImageUrl = (value) => {
- const raw = String(value || "").trim();
- if (!raw) return "";
- try {
-  const parsed = new URL(raw, env.frontendUrl);
-  return ["https:", "http:"].includes(parsed.protocol) ? parsed.href : "";
- } catch {
-  return "";
- }
-};
 
-async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, coverImage, slug, token, locale }) {
+async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug, token, locale }) {
  const confirmUrl = `${env.frontendUrl}/games/${encodeURIComponent(slug)}/preorder/confirm/${token}`;
  const copy = locale === "pt-BR"
   ? {
@@ -57,13 +47,8 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, cove
       footer: "If you did not request this registration, you can ignore this message."
     };
  const html = brandedEmail({
-  lang: locale,
-  preheader: copy.preheader,
-  eyebrow: locale === "pt-BR" ? "PRÉ-VENDA" : locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
-  heroImageUrl: absoluteEmailImageUrl(coverImage),
   heading: copy.heading,
-  intro: copy.intro,
-  bodyHtml: `<p style="margin:0;color:#b8b8b8;line-height:1.8">${copy.expiry}</p>`,
+  intro: `${copy.intro} ${copy.expiry}`,
   actionLabel: copy.action,
   actionUrl: confirmUrl,
   footer: copy.footer
@@ -85,7 +70,7 @@ export async function getPreorderStatus(slug, userId) {
  const game = gameResult.rows[0];
  if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
  const { rows: preorderRows } = await query(
-  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at FROM game_preorders p JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
+  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at,p.reward_code FROM game_preorders p JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
   [game.id, userId],
  );
  const preorder = preorderRows[0] || null;
@@ -102,6 +87,8 @@ export async function getPreorderStatus(slug, userId) {
   hasPreorderRecord: Boolean(preorder),
   attemptsUsed,
   attemptsRemaining: Math.max(0, 2 - attemptsUsed),
+  rewardCode: preorder?.confirmed_at ? preorder.reward_code || null : null,
+  rewardRedeemable: Boolean(preorder?.confirmed_at && game.preorder_ends_at && Date.now() >= new Date(game.preorder_ends_at).getTime()),
  };
 }
 
@@ -123,7 +110,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
  let attemptsUsed = 0;
  try {
   await client.query("BEGIN");
-  const found = await client.query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE", [slug]);
+  const found = await client.query("SELECT id,slug,title,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE", [slug]);
   game = found.rows[0];
   if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
   const now = Date.now();
@@ -156,7 +143,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
   if (existing) {
    registrationId = existing.id;
    await client.query(
-    "UPDATE game_preorders SET user_id=$2,first_name=$3,last_name=$4,age=$5,locale=$6,email=$7,code_hash=NULL,code_sent_at=NULL,email_status='waiting',claim_token_hash=NULL,claim_token_expires_at=NULL,reward_accessed_at=NULL,reward_download_token_hash=NULL,redeemed_at=NULL,confirmation_token_hash=$8,confirmation_expires_at=now()+interval '24 hours',confirmed_at=NULL,created_at=now() WHERE id=$1",
+    "UPDATE game_preorders SET user_id=$2,first_name=$3,last_name=$4,age=$5,locale=$6,email=$7,code_hash=NULL,reward_code=NULL,claim_token_hash=NULL,claim_token_expires_at=NULL,reward_accessed_at=NULL,reward_download_token_hash=NULL,redeemed_at=NULL,confirmation_token_hash=$8,confirmation_expires_at=now()+interval '24 hours',confirmed_at=NULL,created_at=now() WHERE id=$1",
     [registrationId, userId, first, last, age, locale, email, tokenHash],
    );
   } else {
@@ -174,7 +161,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
  } finally {
   client.release();
  }
- await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, coverImage: game.cover_image, slug: game.slug, token: rawToken, locale });
+ await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, slug: game.slug, token: rawToken, locale });
  return { confirmationSent: true, attemptsRemaining: Math.max(0, 2 - attemptsUsed) };
 }
 
@@ -197,15 +184,49 @@ export async function cancelPreorder(slug, userId) {
 }
 
 export async function confirmPreorder(token) {
- if(typeof token!=="string"||token.length<32||token.length>128) throw new AppError(410,"PREORDER_CONFIRMATION_INVALID");
- const {rows}=await query(`UPDATE game_preorders p
-  SET confirmed_at=now(),confirmation_token_hash=NULL,confirmation_expires_at=NULL
-  FROM games g
-  WHERE p.game_id=g.id AND p.confirmation_token_hash=$1
-    AND p.confirmation_expires_at>now() AND p.confirmed_at IS NULL
-  RETURNING g.slug`,[hash(token)]);
- if(!rows[0]) throw new AppError(410,"PREORDER_CONFIRMATION_INVALID");
- return {confirmed:true,slug:rows[0].slug};
+ if (typeof token !== "string" || token.length < 32 || token.length > 128) {
+  throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
+ }
+ const tokenHash = hash(token);
+ const pending = await query(
+  `SELECT p.id, g.slug
+   FROM game_preorders p JOIN games g ON g.id = p.game_id
+   WHERE p.confirmation_token_hash = $1
+     AND p.confirmation_expires_at > now()
+     AND p.confirmed_at IS NULL`,
+  [tokenHash],
+ );
+ const preorder = pending.rows[0];
+ if (!preorder) throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
+
+ // Allocate the displayable six-digit code as part of confirming the registration.
+ // The digest remains the value used for redemption; the raw value is only returned
+ // to the authenticated owner through the preorder status endpoint.
+ for (let attempt = 0; attempt < 20; attempt += 1) {
+  const code = newCode();
+  try {
+   const updated = await query(
+    `UPDATE game_preorders
+     SET confirmed_at = now(),
+         confirmation_token_hash = NULL,
+         confirmation_expires_at = NULL,
+         code_hash = $2,
+         reward_code = $3
+     WHERE id = $1
+       AND confirmation_token_hash = $4
+       AND confirmation_expires_at > now()
+       AND confirmed_at IS NULL
+     RETURNING id`,
+    [preorder.id, hash(code), code, tokenHash],
+   );
+   if (!updated.rows[0]) throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
+   return { confirmed: true, slug: preorder.slug };
+  } catch (error) {
+   if (error?.code === "23505") continue;
+   throw error;
+  }
+ }
+ throw new AppError(503, "PREORDER_CODE_GENERATION_FAILED");
 }
 
 export async function redeemPreorderCode(code,account) {
@@ -214,7 +235,7 @@ export async function redeemPreorderCode(code,account) {
  const client=await pool.connect();
  try {
   await client.query("BEGIN");
-  const found=await client.query("SELECT p.id,p.user_id,p.email,p.redeemed_at,g.slug FROM game_preorders p JOIN games g ON g.id=p.game_id WHERE p.code_hash=$1 FOR UPDATE",[hash(normalized)]);
+  const found=await client.query("SELECT p.id,p.user_id,p.email,p.redeemed_at,p.confirmed_at,g.slug FROM game_preorders p JOIN games g ON g.id=p.game_id WHERE p.code_hash=$1 AND p.confirmed_at IS NOT NULL AND g.preorder_ends_at <= now() FOR UPDATE",[hash(normalized)]);
   const p=found.rows[0];
   if(!p||p.redeemed_at||(p.user_id?String(p.user_id)!==String(account.id||""):p.email!==String(account.email||"").trim().toLowerCase())) throw new AppError(404,"PREORDER_CODE_INVALID");
   const token=crypto.randomBytes(32).toString("base64url");
@@ -243,55 +264,3 @@ export async function downloadPreorderReward(token,key) {
  return rows[0].preorder_reward_zip;
 }
 
-export async function sendPreorderEmailBatch() {
- const client=await pool.connect(); let batch=[];
- try {
-  await client.query("BEGIN");
-  const gate=await client.query("UPDATE preorder_email_batches SET last_batch_at=now() WHERE id=true AND (last_batch_at IS NULL OR last_batch_at<now()-interval '1 day') RETURNING id");
-  if(!gate.rows.length){await client.query("ROLLBACK");return {sent:0};}
-  const result=await client.query(`SELECT p.id,p.email,p.first_name,p.locale,p.game_id,g.title,g.cover_image FROM game_preorders p JOIN games g ON g.id=p.game_id
-  WHERE p.confirmed_at IS NOT NULL AND p.email_status IN ('waiting','failed') AND g.access_type='free' AND g.preorder_ends_at<=now() AND g.preorder_reward_zip IS NOT NULL
-  ORDER BY p.created_at LIMIT 100 FOR UPDATE OF p SKIP LOCKED`);
-  batch=result.rows; await client.query("COMMIT");
- } catch(e){await client.query("ROLLBACK");throw e;} finally{client.release();}
- let sent=0;
- for(const p of batch){
-  let code=null;
-  try {
-   for(let i=0;i<10;i++){const candidate=newCode();const exists=await query("SELECT 1 FROM game_preorders WHERE code_hash=$1",[hash(candidate)]);if(!exists.rows.length){code=candidate;break;}}
-   if(!code) throw new AppError(503,"PREORDER_CODE_GENERATION_FAILED");
-   await query("UPDATE game_preorders SET code_hash=$2 WHERE id=$1",[p.id,hash(code)]);
-   const name=p.first_name, title=p.title;
-   const copy=p.locale==="pt-BR"?{subject:"Sua recompensa de pré-venda: "+p.title,text:"Olá "+p.first_name+", a pré-venda terminou. Seu código único de resgate é "+code+". Entre na conta Deadsmile Games e selecione Resgatar código."}:p.locale==="es"?{subject:"Tu recompensa de reserva: "+p.title,text:"Hola "+p.first_name+", la reserva terminó. Tu código único es "+code+". Inicia sesión en Deadsmile Games y elige Canjear código."}:{subject:"Your preorder reward: "+p.title,text:"Hi "+p.first_name+", the preorder has ended. Your unique redemption code is "+code+". Sign in to Deadsmile Games and choose Redeem code."};
-   const emailCopy = p.locale === "pt-BR"
-    ? { heading: "Sua recompensa está pronta", intro: `Olá ${name}! A pré-venda de ${title} terminou. Use este código único na sua conta Deadsmile Games para resgatar a recompensa.`, action: "Resgatar código", footer: "Este código só pode ser usado uma vez e deve ser resgatado na conta associada a este e-mail." }
-    : p.locale === "es"
-      ? { heading: "Tu recompensa está lista", intro: `¡Hola ${name}! La reserva de ${title} ha terminado. Usa este código único en tu cuenta de Deadsmile Games para reclamar la recompensa.`, action: "Canjear código", footer: "Este código solo se puede usar una vez y debe canjearse en la cuenta asociada a este correo." }
-      : { heading: "Your reward is ready", intro: `Hi ${name}! The preorder for ${title} has ended. Use this unique code in your Deadsmile Games account to claim your reward.`, action: "Redeem code", footer: "This code can only be used once and must be redeemed from the account associated with this email." };
-   const rewardDetails = p.locale === "pt-BR"
-    ? { label: "Código de resgate de uso único", instruction: "Entre na sua conta Deadsmile Games, escolha Resgatar código e digite os seis números acima. Não compartilhe este código.", action: "Abrir minha conta" }
-    : p.locale === "es"
-     ? { label: "Código de canje de un solo uso", instruction: "Inicia sesión en Deadsmile Games, elige Canjear código e introduce los seis dígitos anteriores. No compartas este código.", action: "Abrir mi cuenta" }
-     : { label: "One-time reward code", instruction: "Sign in to your Deadsmile Games account, choose Redeem code, and enter the six digits above. Keep this code private.", action: "Open my account" };
-   const html = brandedEmail({
-    lang: p.locale,
-    preheader: copy.subject,
-    eyebrow: p.locale === "pt-BR" ? "PRÉ-VENDA" : p.locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
-    heroImageUrl: absoluteEmailImageUrl(p.cover_image),
-    heading: emailCopy.heading,
-    intro: emailCopy.intro,
-    bodyHtml: "<p style=\"margin:12px 0 8px;color:#b8b8b8;font-size:13px\">" + rewardDetails.label + "</p>" +
-      "<p style=\"margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:7px;color:#ffffff\">" + code + "</p>" +
-      "<p style=\"margin:0;color:#b8b8b8;line-height:1.8\">" + rewardDetails.instruction + "</p>",
-    actionLabel: rewardDetails.action,
-    actionUrl: `${env.frontendUrl}/account`,
-    footer: emailCopy.footer,
-   });
-   await sendTransactionalEmail({to:p.email,subject:copy.subject,text:copy.text,html});
-   await query("UPDATE game_preorders SET email_status='sent',code_sent_at=now() WHERE id=$1",[p.id]);sent++;
-  } catch {
-   await query("UPDATE game_preorders SET email_status='failed',code_hash=NULL WHERE id=$1",[p.id]).catch(()=>{});
-  }
- }
- return {sent};
-}
