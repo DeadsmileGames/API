@@ -12,6 +12,8 @@ export const preorderRouter=Router();
 preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),controller.redeem);
 preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
 preorderRouter.get("/:slug/status",validate(slug,"params"),requireAuth,controller.status);
+preorderRouter.get("/:slug/reward/download",validate(slug,"params"),requireAuth,controller.ownerDownload);
+preorderRouter.get("/:slug/reward",validate(slug,"params"),requireAuth,controller.ownerReward);
 preorderRouter.get("/:slug",validate(slug,"params"),controller.info);
 preorderRouter.post("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,validate(registration),controller.register);
 preorderRouter.delete("/:slug",publicWriteLimiter,validate(slug,"params"),requireAuth,controller.cancel);
