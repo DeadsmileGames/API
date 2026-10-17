@@ -173,7 +173,8 @@
     "PREORDER_DAILY_LIMIT": "You've reached the limit of two pre-order sign-ups for this game today. Try again tomorrow.",
     "PREORDER_AWAITING_CONFIRMATION": "This pre-order is waiting for email confirmation. Check your inbox or cancel it first.",
     "PREORDER_EMAIL_IN_USE": "That email is already associated with a pre-order for this game.",
-    "PREORDER_NOT_ENDED": "This pre-order has not ended yet."
+    "PREORDER_NOT_ENDED": "This pre-order has not ended yet.",
+    "PREORDER_CODE_ALREADY_REDEEMED": "This reward code has already been redeemed by another account."
   },
   "pt-BR": {
     "INTERNAL_ERROR": "Algo deu errado. Tente novamente mais tarde.",
@@ -349,7 +350,8 @@
     "PREORDER_DAILY_LIMIT": "Você atingiu o limite de duas inscrições na pré-venda deste jogo hoje. Tente novamente amanhã.",
     "PREORDER_AWAITING_CONFIRMATION": "Esta pré-venda está aguardando confirmação por e-mail. Confira sua caixa de entrada ou cancele a inscrição atual.",
     "PREORDER_EMAIL_IN_USE": "Esse e-mail já está associado a uma pré-venda deste jogo.",
-    "PREORDER_NOT_ENDED": "Esta pré-venda ainda não terminou."
+    "PREORDER_NOT_ENDED": "Esta pré-venda ainda não terminou.",
+    "PREORDER_CODE_ALREADY_REDEEMED": "Este código de recompensa já foi resgatado por outra conta."
   },
   "es": {
     "INTERNAL_ERROR": "Algo salió mal. Inténtalo más tarde.",
@@ -525,6 +527,7 @@
     "PREORDER_DAILY_LIMIT": "Has alcanzado el límite de dos inscripciones para la reserva de este juego hoy. Inténtalo mañana.",
     "PREORDER_AWAITING_CONFIRMATION": "Esta reserva está pendiente de confirmación por correo. Revisa tu bandeja de entrada o cancela la inscripción actual.",
     "PREORDER_EMAIL_IN_USE": "Ese correo ya está asociado a una reserva de este juego.",
-    "PREORDER_NOT_ENDED": "Esta reserva aún no ha terminado."
+    "PREORDER_NOT_ENDED": "Esta reserva aún no ha terminado.",
+    "PREORDER_CODE_ALREADY_REDEEMED": "Otra cuenta ya ha canjeado este código de recompensa."
   }
 }
