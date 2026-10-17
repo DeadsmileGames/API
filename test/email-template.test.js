@@ -7,6 +7,7 @@ test("pre-order email template follows the Newswire editorial layout", () => {
     lang: "pt-BR",
     preheader: "Confirme sua inscrição",
     eyebrow: "PRÉ-VENDA",
+    variant: "newswire",
     heroImageUrl: "https://cdn.example.test/game-cover.jpg",
     heading: "Confirme sua pré-venda",
     intro: "Recebemos seu pedido para participar.",
@@ -17,6 +18,8 @@ test("pre-order email template follows the Newswire editorial layout", () => {
   });
 
   assert.match(html, /<html lang="pt-BR">/);
+  assert.match(html, /background:#0f0f0f;border:0;border-radius:0/);
+  assert.doesNotMatch(html, /border:1px solid #3d3d3d;border-radius:14px/);
   assert.match(html, /PRÉ-VENDA/);
   assert.match(html, /https:\/\/cdn\.example\.test\/game-cover\.jpg/);
   assert.match(html, /Confirme sua pré-venda/);
