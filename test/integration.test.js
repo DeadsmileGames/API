@@ -444,6 +444,7 @@ test("itch OAuth flow reveals only the allowed frontend redirect and keeps state
 
 
 test("itch OAuth initiation rejects untrusted origins and binds valid flows to the requested frontend", async () => {
+  const { createHash } = await import("node:crypto");
   const payload = {
     client: "site",
     locale: "en",
