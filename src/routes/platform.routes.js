@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { expectedAccount } from "../middleware/expectedAccount.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { integrationLimiter } from "../middleware/rateLimiters.js";
+import { authenticatedApiLimiter, integrationLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import * as controller from "../controllers/platform.controller.js";
 import {
@@ -19,6 +19,7 @@ import {
 } from "../validators/platform.validators.js";
 
 export const platformRouter = Router();
+platformRouter.use(authenticatedApiLimiter);
 
 platformRouter.get("/status", controller.status);
 platformRouter.get("/events", validate(eventQuerySchema, "query"), controller.events);
