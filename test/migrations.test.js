@@ -58,7 +58,7 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      18,
+      19,
     );
     assert.deepEqual(
       (await db.query(
@@ -70,6 +70,17 @@ test("existing database migrates without changing historical checksums or losing
         { column_name: "confirmation_token_hash" },
         { column_name: "confirmed_at" },
       ],
+    );
+    assert.deepEqual(
+      (await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'game_preorders' AND column_name = ANY($1::text[]) ORDER BY column_name",
+        [["user_id"]],
+      )).rows,
+      [{ column_name: "user_id" }],
+    );
+    assert.equal(
+      (await db.query("SELECT to_regclass('public.game_preorder_daily_limits') AS name")).rows[0].name,
+      "game_preorder_daily_limits",
     );
     assert.equal(
       (await db.query("SELECT to_regclass('public.game_preorders_confirmation_token_uidx') AS name")).rows[0].name,
