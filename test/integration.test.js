@@ -34,6 +34,8 @@ process.env.ITCH_TOKEN_ENCRYPTION_KEY = "isolated-test-itch-key-".repeat(2);
 process.env.ITCH_REDIRECT_URI = "https://api.example.test/callback";
 process.env.VERCEL = "1";
 process.env.NODE_ENV = "development";
+process.env.BREVO_API_KEY = "integration-test-brevo-key";
+process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
 const { pool } = await import("../src/config/database.js");
 const { hashPassword } = await import("../src/utils/password.js");
 const { encryptToken } = await import("../src/utils/tokenCipher.js");
@@ -45,6 +47,7 @@ const base = `http://127.0.0.1:${server.address().port}/api`;
 globalThis.fetch = async (input, options) => {
   const url = String(input);
   if (url.startsWith(base)) return originalFetch(input, options);
+  if (url.startsWith("https://api.brevo.com/")) return Response.json({ messageId: "preorder-email-test" });
   calls.push(url);
   if (/^https:\/\/(?:storeedgefd.dsx|displaycatalog).mp.microsoft.com\//.test(url)) {
     if (storeOffline) throw new Error("provider unavailable");
@@ -1276,7 +1279,15 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(publicGame.status, 200);
     assert.equal(Object.hasOwn(publicGame.body.data, "preorderAgeRatings"), false);
 
-    const deniedAge = await preorderGuest.request("/preorders/free", {
+    const anonymousSignup = await preorderGuest.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "Player", lastName: "One", age: 18, email: "player@example.test", locale: "pt-BR" },
+    });
+    assert.equal(anonymousSignup.status, 401);
+    assert.equal(anonymousSignup.body.error.code, "UNAUTHENTICATED");
+
+    const deniedAge = await player.request("/preorders/free", {
       method: "POST",
       language: "pt-BR",
       body: { firstName: "Player", lastName: "One", age: 17, email: "too-young@example.test", locale: "pt-BR" },
@@ -1290,7 +1301,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
 
     const paidInfo = await preorderGuest.request("/preorders/paid");
     assert.equal(paidInfo.status, 404);
-    const paidSignup = await preorderGuest.request("/preorders/paid", {
+    const paidSignup = await player.request("/preorders/paid", {
       method: "POST",
       body: { firstName: "Player", lastName: "Paid", age: 30, email: "paid-preorder@example.test" },
     });
@@ -1343,7 +1354,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(confirmedCatalogGame?.preorderLocked, true);
     assert.equal(confirmedCatalogGame?.downloadUrl, null);
 
-    const duplicate = await preorderGuest.request("/preorders/free", {
+    const duplicate = await player.request("/preorders/free", {
       method: "POST",
       language: "pt-BR",
       body: { firstName: "Pending", lastName: "Player", age: 18, email: "player@example.test", locale: "pt-BR" },
@@ -1365,6 +1376,88 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     await pool.query(
       "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL, access_type=CASE WHEN id=$1 THEN 'free' ELSE 'paid' END WHERE id IN ($1,$3)",
       [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 }), paidId],
+    );
+  }
+});
+
+
+test("pre-order cancellation deletes personal details and preserves the two-per-day limit", async () => {
+  await pool.query("DELETE FROM game_preorders WHERE game_id=$1", [freeId]);
+  await pool.query("DELETE FROM game_preorder_daily_limits WHERE user_id=$1 AND game_id=$2", [userId, freeId]);
+  await pool.query(
+    `UPDATE games SET access_type='free', preorder_enabled=true,
+      preorder_starts_at=now()-interval '1 hour', preorder_ends_at=now()+interval '1 day',
+      preorder_age_ratings=$2::jsonb, preorder_reward_type='package',
+      preorder_reward_zip=decode('504b0304','hex') WHERE id=$1`,
+    [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 })],
+  );
+  try {
+    const anonymousCancel = await guest.request("/preorders/free", { method: "DELETE" });
+    assert.equal(anonymousCancel.status, 401);
+
+    const initial = await player.request("/preorders/free/status");
+    assert.equal(initial.status, 200, JSON.stringify(initial.body));
+    assert.equal(initial.body.data.attemptsRemaining, 2);
+    assert.equal(initial.body.data.hasPreorderRecord, false);
+
+    const first = await player.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "First", lastName: "Entry", age: 22, email: "player@example.test", locale: "pt-BR" },
+    });
+    assert.equal(first.status, 202, JSON.stringify(first.body));
+    assert.equal(first.body.data.attemptsRemaining, 1);
+    let record = (await pool.query("SELECT user_id,first_name,last_name,age,email FROM game_preorders WHERE game_id=$1", [freeId])).rows[0];
+    assert.equal(record.user_id, userId);
+    assert.equal(record.first_name, "First");
+    assert.equal(record.last_name, "Entry");
+    assert.equal(Number(record.age), 22);
+
+    const pendingStatus = await player.request("/preorders/free/status");
+    assert.equal(pendingStatus.body.data.preorderStatus, "pending");
+    const cancelled = await player.request("/preorders/free", { method: "DELETE" });
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.body));
+    assert.equal(cancelled.body.data.cancelled, true);
+    assert.equal(cancelled.body.data.attemptsRemaining, 1);
+    assert.equal((await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1", [freeId])).rows[0].count, 0);
+    assert.equal(
+      (await pool.query("SELECT attempts::int AS attempts FROM game_preorder_daily_limits WHERE user_id=$1 AND game_id=$2 AND activity_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date", [userId, freeId])).rows[0].attempts,
+      1,
+    );
+
+    const second = await player.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "Second", lastName: "Entry", age: 25, email: "player@example.test", locale: "pt-BR" },
+    });
+    assert.equal(second.status, 202, JSON.stringify(second.body));
+    assert.equal(second.body.data.attemptsRemaining, 0);
+    record = (await pool.query("SELECT first_name,last_name,age,email FROM game_preorders WHERE game_id=$1", [freeId])).rows[0];
+    assert.equal(record.first_name, "Second");
+    assert.equal(record.last_name, "Entry");
+    assert.equal(Number(record.age), 25);
+
+    const cancelledAgain = await player.request("/preorders/free", { method: "DELETE" });
+    assert.equal(cancelledAgain.status, 200);
+    assert.equal(cancelledAgain.body.data.attemptsRemaining, 0);
+    const third = await player.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "Third", lastName: "Entry", age: 25, email: "player@example.test", locale: "pt-BR" },
+    });
+    assert.equal(third.status, 429, JSON.stringify(third.body));
+    assert.equal(third.body.error.code, "PREORDER_DAILY_LIMIT");
+    assert.equal((await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1", [freeId])).rows[0].count, 0);
+    const finalStatus = await player.request("/preorders/free/status");
+    assert.equal(finalStatus.body.data.attemptsUsed, 2);
+    assert.equal(finalStatus.body.data.attemptsRemaining, 0);
+    assert.equal(finalStatus.body.data.hasPreorderRecord, false);
+  } finally {
+    await pool.query("DELETE FROM game_preorders WHERE game_id=$1", [freeId]);
+    await pool.query("DELETE FROM game_preorder_daily_limits WHERE user_id=$1 AND game_id=$2", [userId, freeId]);
+    await pool.query(
+      "UPDATE games SET preorder_enabled=false,preorder_starts_at=NULL,preorder_ends_at=NULL,preorder_age_ratings=$2::jsonb,preorder_reward_type=NULL,preorder_reward_zip=NULL,access_type='free' WHERE id=$1",
+      [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 })],
     );
   }
 });
