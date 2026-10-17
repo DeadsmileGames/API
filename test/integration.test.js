@@ -1242,25 +1242,25 @@ test("Android login, library, sessions and achievements share the existing accou
 test("pre-orders are free-only, keep age ratings private, require email confirmation and reject duplicates", async () => {
   const { createHash } = await import("node:crypto");
   await pool.query(
-    \`UPDATE games
+    `UPDATE games
      SET preorder_enabled=true,
          preorder_starts_at=now()-interval '1 hour',
          preorder_ends_at=now()+interval '1 day',
          preorder_age_ratings=$2::jsonb,
          preorder_reward_type='package',
          preorder_reward_zip=decode('504b0304','hex')
-     WHERE id=$1\`,
+     WHERE id=$1`,
     [freeId, JSON.stringify({ en: 13, "pt-BR": 18, es: 13 })],
   );
   // Simulate an old paid-game record with preorder flags, so the public API must fail closed.
   await pool.query(
-    \`UPDATE games
+    `UPDATE games
      SET preorder_enabled=true,
          preorder_starts_at=now()-interval '1 hour',
          preorder_ends_at=now()+interval '1 day',
          preorder_reward_type='package',
          preorder_reward_zip=decode('504b0304','hex')
-     WHERE id=$1\`,
+     WHERE id=$1`,
     [paidId],
   );
   try {
@@ -1296,9 +1296,9 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const rawToken = "one-time-preorder-confirmation-token-123456";
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
     await pool.query(
-      \`INSERT INTO game_preorders
+      `INSERT INTO game_preorders
        (game_id, first_name, last_name, age, locale, email, confirmation_token_hash, confirmation_expires_at)
-       VALUES ($1,'Pending','Player',18,'pt-BR','pending-preorder@example.test',$2,now()+interval '1 hour')\`,
+       VALUES ($1,'Pending','Player',18,'pt-BR','pending-preorder@example.test',$2,now()+interval '1 hour')`,
       [freeId, tokenHash],
     );
     const confirmed = await guest.request("/preorders/confirm/" + rawToken, {
