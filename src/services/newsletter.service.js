@@ -70,7 +70,7 @@ export async function subscribe(email, locale = "en") {
       ignore: "Si no solicitaste esta suscripción, puedes ignorar este mensaje.",
     },
   }[language];
-  const text = copy.intro + "\\n\\n" + confirmationUrl + "\\n\\n" + copy.ignore;
+  const text = copy.intro + "\n\n" + confirmationUrl + "\n\n" + copy.ignore;
   const html = brandedEmail({
     lang: language,
     preheader: copy.preheader,
