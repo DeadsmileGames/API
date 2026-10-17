@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { publicWriteLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
+import { integrationLimiter, publicWriteLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
 import * as controller from "../controllers/preorder.controller.js";
 const slug=z.object({slug:z.string().min(2).max(120).regex(/^[a-z0-9-]+$/)}).strict();
 const token=z.object({token:z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/)}).strict();
