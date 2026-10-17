@@ -9,6 +9,7 @@ import {
   resetPasswordLimiter,
   publicEmailLimiter,
   integrationLimiter,
+  authenticatedApiLimiter,
 } from "../middleware/rateLimiters.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { totpTokenSchema } from "../validators/totp.validators.js";
@@ -45,6 +46,7 @@ import {
 } from "../validators/account-email.validators.js";
 
 export const authRouter = Router();
+authRouter.use(authenticatedApiLimiter);
 authRouter.post(
   "/confirm-email",
   publicEmailLimiter,
