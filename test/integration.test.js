@@ -124,7 +124,7 @@ function client() {
   let token;
   return {
     cookies,
-    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor } = {}) {
+    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor, authorization, omitCookies = false } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -132,7 +132,8 @@ function client() {
       const response = await fetch(base + path, {
         method,
         headers: {
-          Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
+          ...(omitCookies ? {} : { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; ") }),
+          ...(authorization ? { Authorization: authorization } : {}),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
           ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
@@ -1251,6 +1252,27 @@ test("Android login, library, sessions and achievements share the existing accou
   const account = (await mobile.request("/auth/me")).body.data;
   assert.equal(account.id, mobileId);
   assert.equal(account.password_hash, undefined);
+
+  const issued = await mobile.request("/auth/mobile-token", { method: "POST", body: {} });
+  assert.equal(issued.status, 200, JSON.stringify(issued.body));
+  assert.equal(issued.body.data.tokenType, "Bearer");
+  assert.equal(issued.body.data.expiresIn, 900);
+  const bearerHeader = `Bearer ${issued.body.data.accessToken}`;
+  const bearer = client();
+  const bearerAccount = await bearer.request("/auth/me", { authorization: bearerHeader, omitCookies: true });
+  assert.equal(bearerAccount.status, 200, JSON.stringify(bearerAccount.body));
+  assert.equal(bearerAccount.body.data.id, mobileId);
+  const bearerLibrary = await bearer.request(`/library/${abbyId}`, {
+    method: "POST",
+    body: {},
+    authorization: bearerHeader,
+  });
+  assert.equal(bearerLibrary.status, 200, JSON.stringify(bearerLibrary.body));
+  assert.equal(bearerLibrary.body.data.inLibrary, true);
+  const bearerSessions = await bearer.request("/account/sessions", { authorization: bearerHeader });
+  assert.equal(bearerSessions.status, 200, JSON.stringify(bearerSessions.body));
+  assert(bearerSessions.body.data.sessions.some((session) => session.isCurrent));
+
   const game = await mobile.request("/games/abbys-restless-heart");
   assert.equal(game.status, 200);
   assert.equal(game.body.data.id, abbyId);
@@ -1318,7 +1340,18 @@ test("Android login, library, sessions and achievements share the existing accou
     (await mobile.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
     "ITCH_NOT_CONNECTED",
   );
-  await mobile.request("/auth/logout", { method: "POST", body: {} });
+  const bearerLogout = await bearer.request("/auth/logout", {
+    method: "POST",
+    body: {},
+    authorization: bearerHeader,
+  });
+  assert.equal(bearerLogout.status, 200, JSON.stringify(bearerLogout.body));
+  const revokedBearer = await bearer.request("/auth/me", {
+    authorization: bearerHeader,
+    omitCookies: true,
+  });
+  assert.equal(revokedBearer.status, 401, JSON.stringify(revokedBearer.body));
+  assert.equal((await mobile.request("/auth/me")).status, 401);
   assert.equal((await mobile.request(`/platform/achievements/${abbyId}`)).status, 401);
 });
 
