@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { validate } from "../middleware/validate.js";
 import {
   loginLimiter,
@@ -10,9 +11,9 @@ import {
   publicEmailLimiter,
   integrationLimiter,
   authenticatedApiLimiter,
-  searchLimiter,
 } from "../middleware/rateLimiters.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { sendError } from "../utils/apiResponse.js";
 import { totpTokenSchema } from "../validators/totp.validators.js";
 import {
   registerSchema,
@@ -46,6 +47,14 @@ import {
   resendEmailSchema,
 } from "../validators/account-email.validators.js";
 
+const mobileTokenRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+});
+
 export const authRouter = Router();
 authRouter.use(authenticatedApiLimiter);
 authRouter.post(
@@ -74,7 +83,7 @@ authRouter.post(
   verifyTwoFactor,
 );
 authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post("/mobile-token", searchLimiter, authenticatedApiLimiter, requireAuth, integrationLimiter, mobileToken);
+authRouter.post("/mobile-token", mobileTokenRateLimiter, authenticatedApiLimiter, requireAuth, integrationLimiter, mobileToken);
 authRouter.post(
   "/mobile-register",
   registerLimiter,
