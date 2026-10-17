@@ -13,6 +13,7 @@ import { pool, directPool } from "./config/database.js";
 import { csrfCookie, csrfToken, verifyCsrf } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminBodyLimiter } from "./middleware/bodyLimiter.js";
+import { apiRequestLimiter } from "./middleware/rateLimiters.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { gamesRouter } from "./routes/games.routes.js";
 import { launcherRouter } from "./routes/launcher.routes.js";
@@ -131,6 +132,7 @@ export function createApp() {
   };
   app.options("*", cors(corsOptions));
   app.use(cors(corsOptions));
+  app.use("/api", apiRequestLimiter);
 
   app.get("/api/health", async (_req, res) => {
     res.set("Cache-Control", "no-store");
