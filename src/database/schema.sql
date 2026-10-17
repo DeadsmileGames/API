@@ -156,6 +156,14 @@ CREATE TABLE "games" (
 	"save_path_template" text,
 	"cloud_saves_enabled" boolean DEFAULT false NOT NULL,
 	"telemetry_enabled" boolean DEFAULT true NOT NULL,
+	"preorder_enabled" boolean DEFAULT false NOT NULL,
+	"preorder_starts_at" timestamp with time zone,
+	"preorder_ends_at" timestamp with time zone,
+	"preorder_age_ratings" jsonb DEFAULT '{"en":13,"pt-BR":13,"es":13}'::jsonb NOT NULL,
+	"preorder_reward_type" text,
+	"preorder_reward_description" text,
+	"preorder_reward_zip" bytea,
+	"preorder_reward_wallpapers" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	CONSTRAINT "games_status_check" CHECK ((status = ANY (ARRAY['announced'::text, 'in_development'::text, 'released'::text])))
 );
 CREATE TABLE "genres" (
@@ -525,4 +533,29 @@ CREATE TABLE microsoft_store_products (
   metadata jsonb NOT NULL CHECK (jsonb_typeof(metadata) = 'object'),
   fetched_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (product_id, market, locale)
+);
+
+CREATE TABLE IF NOT EXISTS "game_preorders" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  "first_name" varchar(100) NOT NULL,
+  "last_name" varchar(100) NOT NULL,
+  "age" smallint NOT NULL CHECK (age BETWEEN 1 AND 120),
+  "locale" varchar(10) NOT NULL CHECK (locale IN ('en','pt-BR','es')),
+  "email" varchar(254) NOT NULL,
+  "code_hash" char(64) UNIQUE,
+  "code_sent_at" timestamp with time zone,
+  "email_status" text NOT NULL DEFAULT 'waiting' CHECK (email_status IN ('waiting','sent','failed')),
+  "claim_token_hash" char(64) UNIQUE,
+  "claim_token_expires_at" timestamp with time zone,
+  "reward_accessed_at" timestamp with time zone,
+  "reward_download_token_hash" char(64) UNIQUE,
+  "redeemed_at" timestamp with time zone,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  UNIQUE (game_id, email)
+);
+CREATE INDEX IF NOT EXISTS game_preorders_email_queue_idx ON game_preorders(email_status, created_at) WHERE email_status IN ('waiting','failed');
+CREATE TABLE IF NOT EXISTS "preorder_email_batches" (
+  "id" boolean PRIMARY KEY DEFAULT true CHECK (id = true),
+  "last_batch_at" timestamp with time zone
 );
