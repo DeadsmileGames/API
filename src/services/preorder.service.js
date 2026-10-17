@@ -240,11 +240,10 @@ export async function confirmPreorder(token) {
 export async function redeemPreorderCode(code, account) {
  const normalized = String(code || "").replace(/\s/g, "");
  if (!/^\d{6}$/.test(normalized)) throw new AppError(404, "PREORDER_CODE_INVALID");
+ if (!account?.id) throw new AppError(401, "UNAUTHENTICATED");
  const client = await pool.connect();
  try {
   await client.query("BEGIN");
-  // Check the registration by its digest; the stored raw value is a safe fallback
-  // for records created during the transition to the on-page-code flow.
   const found = await client.query(
    `SELECT p.id,p.user_id,p.email,p.reward_code,p.redeemed_at,p.confirmed_at,
            g.slug,g.preorder_ends_at,
@@ -252,47 +251,98 @@ export async function redeemPreorderCode(code, account) {
     FROM game_preorders p
     JOIN games g ON g.id = p.game_id
     WHERE p.code_hash = $1 OR (p.code_hash IS NULL AND p.reward_code = $2)
+    ORDER BY CASE WHEN p.code_hash = $1 THEN 0 ELSE 1 END
+    LIMIT 1
     FOR UPDATE OF p`,
    [hash(normalized), normalized],
   );
   const preorder = found.rows[0];
-  const belongsToAccount = preorder && (
-   preorder.user_id
-    ? String(preorder.user_id) === String(account.id || "")
-    : String(preorder.email || "").trim().toLowerCase() === String(account.email || "").trim().toLowerCase()
-  );
-  if (!preorder || !belongsToAccount || preorder.redeemed_at || !preorder.confirmed_at) {
+  if (!preorder) throw new AppError(404, "PREORDER_CODE_INVALID");
+
+  // A redeemed code remains identifiable by its digest, never by the raw code.
+  // Its owner may reopen the reward; another account gets an explicit already-redeemed response.
+  if (preorder.redeemed_at) {
+   if (String(preorder.user_id || "") !== String(account.id)) {
+    throw new AppError(409, "PREORDER_CODE_ALREADY_REDEEMED");
+   }
+   await client.query("COMMIT");
+   return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward", alreadyRedeemed: true };
+  }
+
+  const belongsToAccount = preorder.user_id
+   ? String(preorder.user_id) === String(account.id)
+   : String(preorder.email || "").trim().toLowerCase() === String(account.email || "").trim().toLowerCase();
+  if (!belongsToAccount || !preorder.confirmed_at) {
    throw new AppError(404, "PREORDER_CODE_INVALID");
   }
   if (!preorder.preorder_ended) {
    throw new AppError(409, "PREORDER_NOT_ENDED");
   }
-  const token = crypto.randomBytes(32).toString("base64url");
+
   await client.query(
    `UPDATE game_preorders
-     SET user_id=COALESCE(user_id,$3),
+     SET user_id=COALESCE(user_id,$2),
          redeemed_at=now(),
-         claim_token_hash=$2,
-         claim_token_expires_at=now()+interval '15 minutes',
+         claim_token_hash=NULL,
+         claim_token_expires_at=NULL,
+         reward_accessed_at=NULL,
+         reward_download_token_hash=NULL,
          first_name=NULL,
          last_name=NULL,
          age=NULL,
          email=NULL,
-         code_hash=NULL,
          reward_code=NULL,
          confirmation_token_hash=NULL,
          confirmation_expires_at=NULL
      WHERE id=$1`,
-   [preorder.id, hash(token), account.id],
+   [preorder.id, account.id],
   );
   await client.query("COMMIT");
-  return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward/" + token };
+  return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward", alreadyRedeemed: false };
  } catch (error) {
-  await client.query("ROLLBACK");
+  await client.query("ROLLBACK").catch(() => {});
   throw error;
  } finally {
   client.release();
  }
+}
+
+export async function getOwnedPreorderReward(slug, userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+ const { rows } = await query(
+  `SELECT g.id,g.slug,g.title,g.preorder_reward_type,g.preorder_reward_description,
+          g.preorder_reward_wallpapers,(g.preorder_reward_zip IS NOT NULL) AS has_zip
+   FROM game_preorders p JOIN games g ON g.id=p.game_id
+   WHERE g.slug=$1 AND p.user_id=$2 AND p.redeemed_at IS NOT NULL
+   ORDER BY p.redeemed_at DESC LIMIT 1`,
+  [slug, userId],
+ );
+ const row = rows[0];
+ if (!row) throw new AppError(404, "PREORDER_REWARD_NOT_FOUND");
+ return {
+  id: row.id,
+  slug: row.slug,
+  title: row.title,
+  rewardType: row.preorder_reward_type,
+  description: row.preorder_reward_description || "",
+  wallpapers: row.preorder_reward_wallpapers || [],
+  downloadAvailable: row.has_zip,
+  downloadUrl: row.has_zip ? "/preorders/" + encodeURIComponent(row.slug) + "/reward/download" : null,
+ };
+}
+
+export async function downloadOwnedPreorderReward(slug, userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+ const { rows } = await query(
+  `SELECT g.preorder_reward_zip
+   FROM game_preorders p JOIN games g ON g.id=p.game_id
+   WHERE g.slug=$1 AND p.user_id=$2 AND p.redeemed_at IS NOT NULL
+     AND g.preorder_reward_zip IS NOT NULL
+   ORDER BY p.redeemed_at DESC LIMIT 1`,
+  [slug, userId],
+ );
+ if (!rows[0]?.preorder_reward_zip) throw new AppError(404, "PREORDER_REWARD_NOT_FOUND");
+ return rows[0].preorder_reward_zip;
 }
 
 export async function consumePreorderReward(token) {
