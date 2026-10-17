@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { authenticatedApiLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import { z } from "zod";
 import * as controller from "../controllers/wishlist.controller.js";
@@ -17,7 +18,7 @@ const gameParamsSchema = z
   .strict();
 
 export const wishlistRouter = Router();
-wishlistRouter.use(requireAuth);
+wishlistRouter.use(authenticatedApiLimiter, requireAuth);
 wishlistRouter.get("/", controller.list);
 wishlistRouter.post("/", validate(gameBodySchema), controller.add);
 wishlistRouter.delete(
