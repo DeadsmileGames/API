@@ -4,6 +4,7 @@ import { pool, query } from "../config/database.js";
 import { AppError } from "../utils/AppError.js";
 import { sendTransactionalEmail } from "./brevo.service.js";
 import { escapeHtml } from "../utils/html.js";
+import { brandedEmail } from "./email-template.js";
 
 const LOCALES = new Set(["en","pt-BR","es"]);
 const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
@@ -93,7 +94,19 @@ export async function sendPreorderEmailBatch() {
    await query("UPDATE game_preorders SET code_hash=$2 WHERE id=$1",[p.id,hash(code)]);
    const name=escapeHtml(p.first_name), title=escapeHtml(p.title);
    const copy=p.locale==="pt-BR"?{subject:"Sua recompensa de pré-venda: "+p.title,text:"Olá "+p.first_name+", a pré-venda terminou. Seu código único de resgate é "+code+". Entre na conta Deadsmile Games e selecione Resgatar código."}:p.locale==="es"?{subject:"Tu recompensa de reserva: "+p.title,text:"Hola "+p.first_name+", la reserva terminó. Tu código único es "+code+". Inicia sesión en Deadsmile Games y elige Canjear código."}:{subject:"Your preorder reward: "+p.title,text:"Hi "+p.first_name+", the preorder has ended. Your unique redemption code is "+code+". Sign in to Deadsmile Games and choose Redeem code."};
-   await sendTransactionalEmail({to:p.email,subject:copy.subject,text:copy.text,html:`<p>${name}, ${title}</p><p><strong>${code}</strong></p><p>Deadsmile Games</p>`});
+   const emailCopy = p.locale === "pt-BR"
+    ? { heading: "Sua recompensa está pronta", intro: `Olá ${name}! A pré-venda de ${title} terminou. Use este código único na sua conta Deadsmile Games para resgatar a recompensa.`, action: "Resgatar código", footer: "Este código só pode ser usado uma vez e deve ser resgatado na conta associada a este e-mail." }
+    : p.locale === "es"
+      ? { heading: "Tu recompensa está lista", intro: `¡Hola ${name}! La reserva de ${title} ha terminado. Usa este código único en tu cuenta de Deadsmile Games para reclamar la recompensa.`, action: "Canjear código", footer: "Este código solo se puede usar una vez y debe canjearse en la cuenta asociada a este correo." }
+      : { heading: "Your reward is ready", intro: `Hi ${name}! The preorder for ${title} has ended. Use this unique code in your Deadsmile Games account to claim your reward.`, action: "Redeem code", footer: "This code can only be used once and must be redeemed from the account associated with this email." };
+   const html = brandedEmail({
+    preheader: copy.subject,
+    heading: emailCopy.heading,
+    intro: emailCopy.intro,
+    bodyHtml: `<div style="margin:8px 0 20px;padding:20px;text-align:center;background:#0f0f0f;border:1px solid #3d3d3d;border-radius:10px"><div style="margin-bottom:8px;color:#b8b8b8;font-size:11px;letter-spacing:1.5px;text-transform:uppercase">One-time reward code</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:7px;color:#ffffff">${code}</div></div><p style="color:#b8b8b8;line-height:1.8">Sign in to your account, open the code redemption option, and enter the six digits above. Keep this code private.</p>`,
+    footer: emailCopy.footer,
+   });
+   await sendTransactionalEmail({to:p.email,subject:copy.subject,text:copy.text,html});
    await query("UPDATE game_preorders SET email_status='sent',code_sent_at=now() WHERE id=$1",[p.id]);sent++;
   } catch {
    await query("UPDATE game_preorders SET email_status='failed',code_hash=NULL WHERE id=$1",[p.id]).catch(()=>{});
