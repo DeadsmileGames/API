@@ -59,12 +59,15 @@ jobs:
             const rules = new Map((run.tool?.driver?.rules || []).map((rule) => [rule.id, rule]));
             for (const result of run.results || []) {
               const rule = rules.get(result.ruleId);
-              const severity = Number(rule?.properties?.["security-severity"] || 0);
-              if (severity < 7 && result.level !== "error") continue;
+              const severity = Number(result.properties?.["security-severity"] || rule?.properties?.["security-severity"] || 0);
+              const level = result.level || rule?.defaultConfiguration?.level || "warning";
+              if (level === "note") continue;
               console.log(JSON.stringify({
                 ruleId: result.ruleId,
-                level: result.level || null,
+                level,
                 severity: severity || null,
+                ruleProperties: rule?.properties || {},
+                resultProperties: result.properties || {},
                 message: result.message?.text || "",
                 locations: (result.locations || []).map((location) => ({
                   file: location.physicalLocation?.artifactLocation?.uri || null,

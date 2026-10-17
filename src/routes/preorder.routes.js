@@ -1,6 +1,5 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import rateLimit from "express-rate-limit";
 import { sendError } from "../utils/apiResponse.js";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
