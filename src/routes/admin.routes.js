@@ -9,6 +9,8 @@ import {
 } from "../validators/admin.validators.js";
 import * as controller from "../controllers/admin.controller.js";
 import * as platformController from "../controllers/admin-platform.controller.js";
+import * as specialThanksController from "../controllers/special-thanks.controller.js";
+import { specialThanksPostSchema } from "../validators/special-thanks.validators.js";
 import {
   achievementAdminSchema,
   betaSchema,
@@ -73,4 +75,15 @@ adminRouter.post(
   "/platform/incidents",
   validate(incidentSchema),
   platformController.incident,
+);
+
+adminRouter.post(
+  "/special-thanks",
+  validate(specialThanksPostSchema),
+  specialThanksController.create,
+);
+adminRouter.delete(
+  "/special-thanks/:id",
+  validate(adminIdSchema, "params"),
+  specialThanksController.remove,
 );

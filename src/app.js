@@ -30,6 +30,7 @@ import {
   soundtracksRouter,
 } from "./routes/content.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
+import { specialThanksRouter } from "./routes/special-thanks.routes.js";
 import { itchIntegrationRouter } from "./routes/itch-integration.routes.js";
 import { libraryRouter } from "./routes/library.routes.js";
 import { platformRouter } from "./routes/platform.routes.js";
@@ -212,6 +213,7 @@ export function createApp() {
 
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminBodyLimiter, adminRouter);
+  app.use("/api/special-thanks", specialThanksRouter);
   app.use("/api/games", gamesRouter);
   app.use("/api/launcher", launcherRouter);
   app.use("/api/search", searchRouter);
