@@ -16,7 +16,6 @@ export function toClientGame(row, { includeDownload = false } = {}) {
     preorderEnabled: Boolean(row.preorder_enabled),
     preorderStartsAt: row.preorder_starts_at || null,
     preorderEndsAt: row.preorder_ends_at || null,
-    preorderAgeRatings: row.preorder_age_ratings || { en: 13, "pt-BR": 13, es: 13 },
     heroImage: row.hero_image,
     coverImage: row.cover_image,
     trailerUrl: row.trailer_url,
