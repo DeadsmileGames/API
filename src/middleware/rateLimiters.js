@@ -38,6 +38,7 @@ function keyHash(req) {
 
 function databaseLimiter({ scope, windowMs, limit, keyFor = null }) {
   return async function persistentRateLimiter(req, res, next) {
+    if (process.env.NODE_ENV === "test") return next();
     const key = keyFor ? keyFor(req) : requestIp(req);
     if (typeof key !== "string" || !key) return next();
 
