@@ -81,14 +81,21 @@ export async function getPreorderStatus(slug, userId) {
  const attemptsUsed = Number(limitRows[0]?.attempts || 0);
  const now = Date.now();
  const preorderStatus = !preorder ? null : preorder.confirmed_at ? "confirmed" : preorder.confirmation_expires_at && new Date(preorder.confirmation_expires_at).getTime() <= now ? "expired" : "pending";
+ const rewardRedeemable = Boolean(
+  preorder?.confirmed_at &&
+  preorder.reward_code &&
+  game.preorder_ends_at &&
+  now >= new Date(game.preorder_ends_at).getTime()
+ );
  return {
   game: { id: game.id, slug: game.slug, title: game.title, coverImage: game.cover_image, startsAt: game.preorder_starts_at, endsAt: game.preorder_ends_at, preorderEnabled: game.preorder_enabled, isFree: game.access_type === "free" },
   preorderStatus,
   hasPreorderRecord: Boolean(preorder),
   attemptsUsed,
   attemptsRemaining: Math.max(0, 2 - attemptsUsed),
-  rewardCode: preorder?.confirmed_at ? preorder.reward_code || null : null,
-  rewardRedeemable: Boolean(preorder?.confirmed_at && game.preorder_ends_at && Date.now() >= new Date(game.preorder_ends_at).getTime()),
+  // Keep the code in storage, but never expose it before the preorder ends.
+  rewardCode: rewardRedeemable ? preorder.reward_code : null,
+  rewardRedeemable,
  };
 }
 
@@ -229,20 +236,48 @@ export async function confirmPreorder(token) {
  throw new AppError(503, "PREORDER_CODE_GENERATION_FAILED");
 }
 
-export async function redeemPreorderCode(code,account) {
- const normalized=String(code||"").replace(/\s/g,"");
- if(!/^\d{6}$/.test(normalized)) throw new AppError(404,"PREORDER_CODE_INVALID");
- const client=await pool.connect();
+export async function redeemPreorderCode(code, account) {
+ const normalized = String(code || "").replace(/\s/g, "");
+ if (!/^\d{6}$/.test(normalized)) throw new AppError(404, "PREORDER_CODE_INVALID");
+ const client = await pool.connect();
  try {
   await client.query("BEGIN");
-  const found=await client.query("SELECT p.id,p.user_id,p.email,p.redeemed_at,p.confirmed_at,g.slug FROM game_preorders p JOIN games g ON g.id=p.game_id WHERE p.code_hash=$1 AND p.confirmed_at IS NOT NULL AND g.preorder_ends_at <= now() FOR UPDATE",[hash(normalized)]);
-  const p=found.rows[0];
-  if(!p||p.redeemed_at||(p.user_id?String(p.user_id)!==String(account.id||""):p.email!==String(account.email||"").trim().toLowerCase())) throw new AppError(404,"PREORDER_CODE_INVALID");
-  const token=crypto.randomBytes(32).toString("base64url");
-  await client.query("UPDATE game_preorders SET redeemed_at=now(),claim_token_hash=$2,claim_token_expires_at=now()+interval '15 minutes' WHERE id=$1",[p.id,hash(token)]);
+  // Check the registration by its digest; the stored raw value is a safe fallback
+  // for records created during the transition to the on-page-code flow.
+  const found = await client.query(
+   `SELECT p.id,p.user_id,p.email,p.reward_code,p.redeemed_at,p.confirmed_at,
+           g.slug,g.preorder_ends_at
+    FROM game_preorders p
+    JOIN games g ON g.id = p.game_id
+    WHERE p.code_hash = $1 OR (p.reward_code = $2 AND p.code_hash IS NULL)
+    FOR UPDATE OF p`,
+   [hash(normalized), normalized],
+  );
+  const preorder = found.rows[0];
+  const belongsToAccount = preorder && (
+   preorder.user_id
+    ? String(preorder.user_id) === String(account.id || "")
+    : String(preorder.email || "").trim().toLowerCase() === String(account.email || "").trim().toLowerCase()
+  );
+  if (!preorder || !belongsToAccount || preorder.redeemed_at || !preorder.confirmed_at) {
+   throw new AppError(404, "PREORDER_CODE_INVALID");
+  }
+  if (!preorder.preorder_ends_at || new Date(preorder.preorder_ends_at).getTime() > Date.now()) {
+   throw new AppError(409, "PREORDER_NOT_ENDED");
+  }
+  const token = crypto.randomBytes(32).toString("base64url");
+  await client.query(
+   "UPDATE game_preorders SET redeemed_at=now(),claim_token_hash=$2,claim_token_expires_at=now()+interval '15 minutes' WHERE id=$1",
+   [preorder.id, hash(token)],
+  );
   await client.query("COMMIT");
-  return {rewardUrl:"/games/"+encodeURIComponent(p.slug)+"/preorder/reward/"+token};
- } catch(e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
+  return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward/" + token };
+ } catch (error) {
+  await client.query("ROLLBACK");
+  throw error;
+ } finally {
+  client.release();
+ }
 }
 
 export async function consumePreorderReward(token) {
