@@ -23,6 +23,26 @@ function inIpv4Range(parts, base, prefix) {
   return (value & mask) === (network & mask);
 }
 
+function ipv6Hextets(address) {
+  const normalized = address.toLowerCase().split("%")[0];
+  if (normalized.includes(".")) return null;
+
+  const halves = normalized.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  if (missing < 0 || (halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1))
+    return null;
+
+  const parts = halves.length === 2
+    ? [...left, ...Array(missing).fill("0"), ...right]
+    : left;
+  if (parts.length !== 8 || parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part)))
+    return null;
+  return parts.map((part) => Number.parseInt(part, 16));
+}
+
 export function isPublicAddress(address) {
   const family = net.isIP(address);
   if (family === 4) {
@@ -50,13 +70,17 @@ export function isPublicAddress(address) {
   if (family === 6) {
     const normalized = address.toLowerCase().split("%")[0];
     if (normalized.startsWith("::ffff:")) return false;
-    const firstHextet = Number.parseInt(normalized.split(":")[0] || "0", 16);
-    if (firstHextet < 0x2000 || firstHextet > 0x3fff) return false;
-    if (
-      normalized.startsWith("2001:db8:") ||
-      normalized === "2001:db8::" ||
-      normalized.startsWith("2001:10:")
-    ) return false;
+    const hextets = ipv6Hextets(normalized);
+    if (!hextets) return false;
+
+    const [first, second] = hextets;
+    // Only global-unicast space is considered. Reject IANA special-use blocks,
+    // documentation prefixes, and transition ranges that can tunnel to IPv4.
+    if (first < 0x2000 || first > 0x3fff) return false;
+    if (first === 0x2001 && second <= 0x01ff) return false; // IETF assignments, Teredo, ORCHID, benchmarking, etc.
+    if (first === 0x2001 && second === 0x0db8) return false; // Documentation
+    if (first === 0x2002) return false; // 6to4 transition
+    if (first === 0x3fff && second <= 0x000f) return false; // Documentation
     return true;
   }
 
