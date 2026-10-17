@@ -28,6 +28,7 @@ adminRouter.use(rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
   handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
 }), requireAuth, requireRole("admin"));
 
