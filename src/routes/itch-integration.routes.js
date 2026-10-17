@@ -11,7 +11,7 @@ import * as controller from "../controllers/itch-integration.controller.js";
 
 export const itchIntegrationRouter = Router();
 
-itchIntegrationRouter.get("/callback", controller.callback);
+itchIntegrationRouter.get("/callback", integrationLimiter, controller.callback);
 itchIntegrationRouter.post(
   "/flow",
   integrationLimiter,
