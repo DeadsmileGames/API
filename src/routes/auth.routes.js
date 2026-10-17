@@ -8,6 +8,7 @@ import {
   forgotPasswordLimiter,
   resetPasswordLimiter,
   publicEmailLimiter,
+  integrationLimiter,
 } from "../middleware/rateLimiters.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { totpTokenSchema } from "../validators/totp.validators.js";
@@ -70,7 +71,7 @@ authRouter.post(
   verifyTwoFactor,
 );
 authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post("/mobile-token", requireAuth, mobileToken);
+authRouter.post("/mobile-token", requireAuth, integrationLimiter, mobileToken);
 authRouter.post(
   "/mobile-register",
   registerLimiter,
