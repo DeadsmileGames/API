@@ -36,8 +36,8 @@ export async function sendTicketNotification(ticket) {
 
 export async function sendPasswordResetEmail({ to, username, resetUrl }) {
   const displayName = username ? ` ${username}` : "";
-  const safeName = username ? ` ${escapeHtml(username)}` : "";
-  const safeResetUrl = escapeHtml(resetUrl);
+  const safeName = username ? ` ${username}` : "";
+  const safeResetUrl = resetUrl;
   const text = `Hi${displayName},\n\nWe received a request to reset your Deadsmile Games password.\n\nClick the link below to choose a new password (valid for 1 hour):\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.\n\n— Deadsmile Games`;
   const html = brandedEmail({
     preheader: "Secure link to reset your Deadsmile Games password.",
