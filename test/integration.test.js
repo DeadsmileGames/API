@@ -49,7 +49,7 @@ globalThis.fetch = async (input, options) => {
   if (url.startsWith(base)) return originalFetch(input, options);
   if (url.startsWith("https://api.brevo.com/")) return Response.json({ messageId: "preorder-email-test" });
   calls.push(url);
-  if (/^https:\/\/(?:storeedgefd.dsx|displaycatalog).mp.microsoft.com\//.test(url)) {
+  if (/^https:\/\/(?:storeedgefd\.dsx|displaycatalog)\.mp\.microsoft\.com\//.test(url)) {
     if (storeOffline) throw new Error("provider unavailable");
     const value = structuredClone(url.includes("storeedgefd") ? storeEdge : storeCatalog);
     if (storePaid) {
