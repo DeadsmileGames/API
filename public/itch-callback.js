@@ -111,7 +111,19 @@ async function run() {
   const localHttp =
     origin.protocol === "http:" &&
     ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
-  if ((origin.protocol !== "https:" && !localHttp) || origin.origin !== flow.frontendOrigin) {
+  let allowedOrigins;
+  try {
+    const configured = document.querySelector('meta[name="deadsmile-frontend-origins"]')?.content;
+    allowedOrigins = JSON.parse(configured || "null");
+  } catch {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+  if (
+    !Array.isArray(allowedOrigins) ||
+    !allowedOrigins.includes(origin.origin) ||
+    (origin.protocol !== "https:" && !localHttp) ||
+    origin.origin !== flow.frontendOrigin
+  ) {
     throw { code: "ITCH_LINK_EXPIRED" };
   }
 
