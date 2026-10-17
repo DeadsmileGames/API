@@ -55,6 +55,18 @@ function destroySession(req) {
   });
 }
 
+async function destroySessionById(store, sessionId) {
+  return new Promise((resolve, reject) => {
+    store.destroy(sessionId, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 export const verifyTwoFactor = asyncHandler(async (req, res) => {
   const { token } = req.body;
 
@@ -130,6 +142,9 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
+  if (req.auth?.sessionId && req.auth.sessionId !== req.sessionID && req.sessionStore?.destroy) {
+    await destroySessionById(req.sessionStore, req.auth.sessionId);
+  }
   await destroySession(req);
 
   res.clearCookie("deadsmile.sid", {
