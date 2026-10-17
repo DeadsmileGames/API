@@ -1284,7 +1284,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(deniedAge.status, 403);
     assert.equal(deniedAge.body.error.code, "PREORDER_AGE_RESTRICTED");
     assert.equal(
-      (await pool.query("SELECT count(*) AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "too-young@example.test"])).rows[0].count,
+      (await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "too-young@example.test"])).rows[0].count,
       0,
     );
 
@@ -1295,6 +1295,18 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
       body: { firstName: "Player", lastName: "Paid", age: 30, email: "paid-preorder@example.test" },
     });
     assert.equal(paidSignup.status, 404);
+
+    const { getPreorderedLibraryItems, hasPreorderForUser } = await import("../src/services/preorder-library.service.js");
+    const { rows: pendingPlayerRows } = await pool.query(
+      `INSERT INTO game_preorders
+       (game_id, first_name, last_name, age, locale, email, confirmation_token_hash, confirmation_expires_at)
+       VALUES ($1,'Player','Pending',18,'pt-BR','player@example.test',$2,now()+interval '1 hour')
+       RETURNING id`,
+      [freeId, createHash("sha256").update("unconfirmed-player-token").digest("hex")],
+    );
+    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), false);
+    assert.equal(await hasPreorderForUser(userId, freeId), false);
+    await pool.query("DELETE FROM game_preorders WHERE id=$1", [pendingPlayerRows[0].id]);
 
     const rawToken = "one-time-preorder-confirmation-token-123456";
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -1318,6 +1330,9 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert(registration.confirmed_at);
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
+    assert.equal(await hasPreorderForUser(userId, freeId), true);
+    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), false,
+      "the test registration is not the player account; only a confirmed matching email belongs in the library");
 
     const duplicate = await preorderGuest.request("/preorders/free", {
       method: "POST",
@@ -1327,7 +1342,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(duplicate.status, 409);
     assert.equal(duplicate.body.error.code, "PREORDER_ALREADY_REGISTERED");
     assert.equal(
-      (await pool.query("SELECT count(*) AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "pending-preorder@example.test"])).rows[0].count,
+      (await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "pending-preorder@example.test"])).rows[0].count,
       1,
     );
 

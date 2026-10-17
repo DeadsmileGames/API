@@ -13,7 +13,6 @@ import { verifyGameOwnership, addGameToLibrary } from "./itch-integration.servic
 import { isHttpsUrl } from "../utils/url.js";
 import { getEffectiveGameStatus } from "../utils/gameRelease.js";
 import { getItchPrice, gameOffers } from "./game-commerce.service.js";
-import { hasPreorderForUser } from "./preorder-library.service.js";
 
 export async function getGamesList({ page, limit, featured, genre, platform, status }) {
   const { items, total } = await listGames({
@@ -91,8 +90,7 @@ export async function getGameDownload(slug, userId) {
     throw new AppError(409, "GAME_NOT_RELEASED");
   if (game.access_type !== "free") {
     if (!userId) throw new AppError(401, "UNAUTHENTICATED");
-    const preordered = await hasPreorderForUser(userId, game.id);
-    if (!preordered && !(await verifyGameOwnership(userId, game.id)).owned)
+    if (!(await verifyGameOwnership(userId, game.id)).owned)
       throw new AppError(403, "GAME_NOT_OWNED");
   }
   if (!isHttpsUrl(game.download_url))

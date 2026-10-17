@@ -14,7 +14,7 @@ export async function getPreorderedLibraryItems(userId) {
      FROM game_preorders p
      JOIN games g ON g.id = p.game_id
      JOIN users u ON lower(u.email) = lower(p.email)
-     WHERE u.id = $1
+     WHERE u.id = $1 AND p.confirmed_at IS NOT NULL AND g.access_type = 'free'
      ORDER BY p.created_at DESC`,
     [userId],
   );
@@ -41,7 +41,8 @@ export async function hasPreorderForUser(userId, gameId) {
     `SELECT 1
      FROM game_preorders p
      JOIN users u ON lower(u.email) = lower(p.email)
-     WHERE u.id = $1 AND p.game_id = $2
+     JOIN games g ON g.id = p.game_id
+     WHERE u.id = $1 AND p.game_id = $2 AND p.confirmed_at IS NOT NULL AND g.access_type = 'free'
      LIMIT 1`,
     [userId, gameId],
   );
