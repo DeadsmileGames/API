@@ -22,9 +22,9 @@ export const redeem=asyncHandler(async(req,res)=>{
  if(!rows[0]) throw new AppError(401,"UNAUTHENTICATED");
  sendSuccess(res,await service.redeemPreorderCode(req.body.code,rows[0]));
 });
-export const reward=asyncHandler(async(req,res)=>sendSuccess(res,await service.consumePreorderReward(req.params.token)));
+export const reward=asyncHandler(async(req,res)=>{res.set("Cache-Control","private, no-store");sendSuccess(res,await service.consumePreorderReward(req.params.token,req.auth.userId));});
 export const download=asyncHandler(async(req,res)=>{
- const zip=await service.downloadPreorderReward(req.params.token,String(req.query.key||""));
+ const zip=await service.downloadPreorderReward(req.params.token,String(req.query.key||""),req.auth.userId);
  res.set("Content-Type","application/zip");
  res.set("Content-Disposition",'attachment; filename="deadsmile-preorder-reward.zip"');
  res.set("Cache-Control","no-store");res.send(zip);
