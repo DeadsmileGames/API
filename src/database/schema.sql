@@ -570,7 +570,7 @@ CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
 );
 
 
--- Special Thanks public list, managed by administrators.
+
 CREATE TABLE IF NOT EXISTS special_thanks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(100) NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 100),

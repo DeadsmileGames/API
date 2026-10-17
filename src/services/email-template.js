@@ -1,7 +1,7 @@
 import { escapeHtml } from "../utils/html.js";
 
-// Keep this fragment aligned with the original newsletter confirmation email.
-// Brevo wraps the fragment in its own HTML document and adds tracking markup.
+
+
 export function brandedEmail({
   heading,
   intro = "",

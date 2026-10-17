@@ -74,13 +74,13 @@ export function isPublicAddress(address) {
     if (!hextets) return false;
 
     const [first, second] = hextets;
-    // Only global-unicast space is considered. Reject IANA special-use blocks,
-    // documentation prefixes, and transition ranges that can tunnel to IPv4.
+
+
     if (first < 0x2000 || first > 0x3fff) return false;
-    if (first === 0x2001 && second <= 0x01ff) return false; // IETF assignments, Teredo, ORCHID, benchmarking, etc.
-    if (first === 0x2001 && second === 0x0db8) return false; // Documentation
-    if (first === 0x2002) return false; // 6to4 transition
-    if (first === 0x3fff && second <= 0x000f) return false; // Documentation
+    if (first === 0x2001 && second <= 0x01ff) return false;
+    if (first === 0x2001 && second === 0x0db8) return false;
+    if (first === 0x2002) return false;
+    if (first === 0x3fff && second <= 0x000f) return false;
     return true;
   }
 
