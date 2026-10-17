@@ -169,7 +169,10 @@
     "FIELD_CATEGORY": "Category: enter between 1 and 80 characters.",
     "GAME_UNINSTALL_FAILED": "The game could not be uninstalled. Close it and check your folder permissions before trying again.",
     "GAME_DOWNLOAD_IN_PROGRESS": "A download or update is already in progress for this game.",
-    "UPDATE_START_FAILED": "The updater could not start. Try again or use the official installer."
+    "UPDATE_START_FAILED": "The updater could not start. Try again or use the official installer.",
+    "PREORDER_DAILY_LIMIT": "You've reached the limit of two pre-order sign-ups for this game today. Try again tomorrow.",
+    "PREORDER_AWAITING_CONFIRMATION": "This pre-order is waiting for email confirmation. Check your inbox or cancel it first.",
+    "PREORDER_EMAIL_IN_USE": "That email is already associated with a pre-order for this game."
   },
   "pt-BR": {
     "INTERNAL_ERROR": "Algo deu errado. Tente novamente mais tarde.",
@@ -341,7 +344,10 @@
     "FIELD_CATEGORY": "Categoria: use entre 1 e 80 caracteres.",
     "GAME_UNINSTALL_FAILED": "Não foi possível desinstalar o jogo. Feche-o e verifique as permissões da pasta antes de tentar novamente.",
     "GAME_DOWNLOAD_IN_PROGRESS": "Um download ou atualização deste jogo já está em andamento.",
-    "UPDATE_START_FAILED": "Não foi possível iniciar o atualizador. Tente novamente ou use o instalador oficial."
+    "UPDATE_START_FAILED": "Não foi possível iniciar o atualizador. Tente novamente ou use o instalador oficial.",
+    "PREORDER_DAILY_LIMIT": "Você atingiu o limite de duas inscrições na pré-venda deste jogo hoje. Tente novamente amanhã.",
+    "PREORDER_AWAITING_CONFIRMATION": "Esta pré-venda está aguardando confirmação por e-mail. Confira sua caixa de entrada ou cancele a inscrição atual.",
+    "PREORDER_EMAIL_IN_USE": "Esse e-mail já está associado a uma pré-venda deste jogo."
   },
   "es": {
     "INTERNAL_ERROR": "Algo salió mal. Inténtalo más tarde.",
@@ -513,6 +519,9 @@
     "FIELD_CATEGORY": "Categoría: usa entre 1 y 80 caracteres.",
     "GAME_UNINSTALL_FAILED": "No se pudo desinstalar el juego. Ciérralo y comprueba los permisos de la carpeta antes de volver a intentarlo.",
     "GAME_DOWNLOAD_IN_PROGRESS": "Ya hay una descarga o actualización de este juego en curso.",
-    "UPDATE_START_FAILED": "No se pudo iniciar el actualizador. Inténtalo de nuevo o usa el instalador oficial."
+    "UPDATE_START_FAILED": "No se pudo iniciar el actualizador. Inténtalo de nuevo o usa el instalador oficial.",
+    "PREORDER_DAILY_LIMIT": "Has alcanzado el límite de dos inscripciones para la reserva de este juego hoy. Inténtalo mañana.",
+    "PREORDER_AWAITING_CONFIRMATION": "Esta reserva está pendiente de confirmación por correo. Revisa tu bandeja de entrada o cancela la inscripción actual.",
+    "PREORDER_EMAIL_IN_USE": "Ese correo ya está asociado a una reserva de este juego."
   }
 }
