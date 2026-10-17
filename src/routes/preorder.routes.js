@@ -9,7 +9,7 @@ const token=z.object({token:z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/
 const registration=z.object({firstName:z.string().trim().min(1).max(100),lastName:z.string().trim().min(1).max(100),age:z.coerce.number().int().min(1).max(120),email:z.string().trim().email().max(254),locale:z.enum(["en","pt-BR","es"]).optional()}).strict();
 const redeem=z.object({code:z.string().trim().regex(/^\d{6}$/)}).strict();
 export const preorderRouter=Router();
-preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),controller.redeem);
+preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),requireAuth,controller.redeem);
 preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
 preorderRouter.get("/:slug/status",validate(slug,"params"),requireAuth,controller.status);
 preorderRouter.get("/:slug/reward/download",validate(slug,"params"),requireAuth,controller.ownerDownload);
