@@ -1245,9 +1245,15 @@ test("Android login, library, sessions and achievements share the existing accou
 test("pre-orders are free-only, keep age ratings private, require email confirmation and reject duplicates", async () => {
   const { createHash, createHmac } = await import("node:crypto");
   const preorderGuest = client();
+  const originalFreeGame = (await pool.query(
+    "SELECT status, release_date FROM games WHERE id=$1",
+    [freeId],
+  )).rows[0];
   await pool.query(
     `UPDATE games
-     SET access_type='free',
+     SET status='in_development',
+         release_date=(CURRENT_DATE + interval '7 days')::date,
+         access_type='free',
          preorder_enabled=true,
          preorder_starts_at=now()-interval '1 hour',
          preorder_ends_at=now()+interval '1 day',
@@ -1398,6 +1404,14 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const endedStatus = await player.request("/preorders/free/status");
     assert.equal(endedStatus.body.data.rewardRedeemable, true);
     assert.equal(endedStatus.body.data.rewardCode, registration.reward_code, "the code appears once the preorder has ended");
+
+    const earlyGameDownload = await player.request("/games/free/download");
+    assert.equal(earlyGameDownload.status, 409, JSON.stringify(earlyGameDownload.body));
+    assert.equal(earlyGameDownload.body.error.code, "GAME_NOT_RELEASED");
+
+    const earlyLauncherDownload = await player.request(`/library/${freeId}/install-metadata`);
+    assert.equal(earlyLauncherDownload.status, 409, JSON.stringify(earlyLauncherDownload.body));
+    assert.equal(earlyLauncherDownload.body.error.code, "GAME_NOT_RELEASED");
     // Keep only the digest after redemption: it identifies later attempts without retaining
     // the code in readable form or restoring any personal details.
     await pool.query(
@@ -1461,8 +1475,8 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
   } finally {
     await pool.query("DELETE FROM game_preorders WHERE game_id IN ($1,$2)", [freeId, paidId]);
     await pool.query(
-      "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL, access_type=CASE WHEN id=$1 THEN 'free' ELSE 'paid' END WHERE id IN ($1,$3)",
-      [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 }), paidId],
+      "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL, access_type=CASE WHEN id=$1 THEN 'free' ELSE 'paid' END, status=CASE WHEN id=$1 THEN $4 ELSE status END, release_date=CASE WHEN id=$1 THEN $5::date ELSE release_date END WHERE id IN ($1,$3)",
+      [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 }), paidId, originalFreeGame.status, originalFreeGame.release_date],
     );
   }
 });
