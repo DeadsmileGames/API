@@ -5,12 +5,19 @@ import { validate } from "../middleware/validate.js";
 import {
   completeItchSchema,
   connectItchSchema,
+  itchOAuthFlowSchema,
 } from "../validators/itch-integration.validators.js";
 import * as controller from "../controllers/itch-integration.controller.js";
 
 export const itchIntegrationRouter = Router();
 
 itchIntegrationRouter.get("/callback", controller.callback);
+itchIntegrationRouter.post(
+  "/flow",
+  integrationLimiter,
+  validate(itchOAuthFlowSchema),
+  controller.flow,
+);
 itchIntegrationRouter.post(
   "/complete",
   requireAuth,

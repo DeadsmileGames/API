@@ -52,32 +52,78 @@ state("loading");
 const params = new URLSearchParams(location.hash.slice(1));
 const oauthState = params.get("state");
 const accessToken = params.get("access_token");
-const returnLink = document.getElementById("returnLink");
-let frontendOrigin = "";
-try {
-  frontendOrigin = new URL(returnLink.href).origin;
-} catch {
-  frontendOrigin = "";
-}
 history.replaceState({}, document.title, location.pathname);
-function run() {
+
+async function request(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw { code: "INVALID_RESPONSE" };
+    }
+    if (!response.ok || payload?.success !== true || !payload?.data) {
+      throw payload?.error || { code: "INTERNAL_ERROR" };
+    }
+    return payload.data;
+  } catch (error) {
+    if (error?.name === "AbortError") throw { code: "REQUEST_TIMEOUT" };
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function run() {
   if (
     !oauthState ||
     !accessToken ||
-    !frontendOrigin ||
     !/^[A-Za-z0-9_-]{40,200}$/.test(oauthState) ||
     accessToken.length < 20 ||
     accessToken.length > 1000
   ) {
     throw { code: "ITCH_LINK_EXPIRED" };
   }
-  const target = new URL("/itch-callback", frontendOrigin);
-  target.hash = new URLSearchParams({ state: oauthState, access_token: accessToken }).toString();
+
+  const csrf = await request("/api/csrf", {
+    credentials: "include",
+    headers: { "Accept-Language": locale },
+  });
+  if (typeof csrf.token !== "string" || !csrf.token) throw { code: "CSRF_INIT_FAILED" };
+
+  const flow = await request("/api/integrations/itch/flow", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf.token,
+      "Accept-Language": locale,
+    },
+    body: JSON.stringify({ state: oauthState }),
+  });
+  if (flow.client !== "site" || typeof flow.frontendOrigin !== "string") {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+  const origin = new URL(flow.frontendOrigin);
+  const localHttp =
+    origin.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
+  if ((origin.protocol !== "https:" && !localHttp) || origin.origin !== flow.frontendOrigin) {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+
+  const target = new URL("/itch-callback", origin);
+  target.hash = new URLSearchParams({
+    state: oauthState,
+    access_token: accessToken,
+  }).toString();
   location.replace(target.toString());
 }
-try {
-  run();
-} catch (error) {
+
+run().catch((error) => {
   locale = error.locale || locale;
   strings = copy[locale] || copy.en;
   messages = window.deadsmileErrors[locale] || window.deadsmileErrors.en;
@@ -88,4 +134,4 @@ try {
       ? error.message
       : messages[error.code] || messages.NETWORK_ERROR,
   );
-}
+});

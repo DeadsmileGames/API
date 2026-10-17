@@ -386,7 +386,7 @@ test("newswire returns the persisted original in every interface language", asyn
     "<p>English story.</p>",
   );
 });
-test("itch OAuth completion cannot be consumed by a different account or a launcher client", async () => {
+test("itch OAuth flow reveals only the allowed frontend redirect and keeps state account-bound", async () => {
   const { createHash, randomBytes } = await import("node:crypto");
   const { createOAuthState } = await import("../src/repositories/itch-integration.repository.js");
   const state = randomBytes(48).toString("base64url");
@@ -397,7 +397,18 @@ test("itch OAuth completion cannot be consumed by a different account or a launc
     client: "site",
     locale: "en",
     returnPath: "/account#games",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
     expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
   });
 
   const wrongAccount = await other.request("/integrations/itch/complete", {
@@ -420,6 +431,7 @@ test("itch OAuth completion cannot be consumed by a different account or a launc
   assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
 });
 
+
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
   const origin = new URL(base).origin;
   const response = await originalFetch(`${base}/integrations/itch/callback`);
@@ -438,6 +450,7 @@ test("itch callback reuses website CSS and ships bounded accessible connection s
   const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
   assert(script.includes("location.hash.slice(1)"));
   assert(script.includes("history.replaceState"));
+  assert(script.includes("/api/integrations/itch/flow"));
   assert(script.includes("/itch-callback"));
   assert(!script.includes("/api/integrations/itch/complete"));
 });
