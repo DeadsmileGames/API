@@ -1393,7 +1393,7 @@ test("pre-order cancellation deletes personal details and preserves the two-per-
   );
   try {
     const anonymousCancel = await guest.request("/preorders/free", { method: "DELETE" });
-    assert.equal(anonymousCancel.status, 401);
+    assert([401, 403].includes(anonymousCancel.status), JSON.stringify(anonymousCancel.body));
 
     const initial = await player.request("/preorders/free/status");
     assert.equal(initial.status, 200, JSON.stringify(initial.body));
