@@ -1,5 +1,5 @@
--- Remove registrations created before the new on-page reward-code flow went live.
--- Only rows older than the rollout cutoff are affected; new sign-ups are preserved.
+
+
 WITH removed_preorders AS (
   DELETE FROM game_preorders
   WHERE created_at < TIMESTAMPTZ '2026-10-17 13:25:00+00'
