@@ -1423,6 +1423,11 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const replayedClaim = await player.request("/preorders/free/reward");
     assert.equal(replayedClaim.status, 200, JSON.stringify(replayedClaim.body));
 
+    const cancelRedeemedReward = await player.request("/preorders/free", { method: "DELETE" });
+    assert.equal(cancelRedeemedReward.status, 404);
+    const preservedAfterCancel = await player.request("/preorders/free/reward");
+    assert.equal(preservedAfterCancel.status, 200, "cancellation must not delete a redeemed reward");
+
     const ownerRedeemsAgain = await player.request("/preorders/redeem", {
       method: "POST",
       body: { code: registration.reward_code },
