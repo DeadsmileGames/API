@@ -56,6 +56,7 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, cove
     };
  const html = brandedEmail({
   lang: locale,
+  variant: "newswire",
   preheader: copy.preheader,
   eyebrow: locale === "pt-BR" ? "PRÉ-VENDA" : locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
   heroImageUrl: absoluteEmailImageUrl(coverImage),
@@ -273,6 +274,7 @@ export async function sendPreorderEmailBatch() {
      : { label: "One-time reward code", instruction: "Sign in to your Deadsmile Games account, choose Redeem code, and enter the six digits above. Keep this code private.", action: "Open my account" };
    const html = brandedEmail({
     lang: p.locale,
+    variant: "newswire",
     preheader: copy.subject,
     eyebrow: p.locale === "pt-BR" ? "PRÉ-VENDA" : p.locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
     heroImageUrl: absoluteEmailImageUrl(p.cover_image),
