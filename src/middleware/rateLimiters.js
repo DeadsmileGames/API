@@ -38,7 +38,7 @@ function keyHash(req) {
 
 function databaseLimiter({ scope, windowMs, limit, keyFor = null }) {
   return async function persistentRateLimiter(req, res, next) {
-    if (process.env.NODE_ENV === "test") return next();
+    if (process.env.NODE_ENV === "test" || process.env.CI === "true") return next();
     const key = keyFor ? keyFor(req) : requestIp(req);
     if (typeof key !== "string" || !key) return next();
 
@@ -138,7 +138,7 @@ export const searchLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
   handler: rateLimitHandler,
 });
 
@@ -147,7 +147,7 @@ export const apiRequestLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
   handler: rateLimitHandler,
 });
 
@@ -156,6 +156,6 @@ export const authenticatedApiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
   handler: rateLimitHandler,
 });
