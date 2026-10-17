@@ -195,6 +195,7 @@ export function createApp() {
   });
 
   app.use(cookieParser(env.sessionSecret));
+  app.use("/api", verifyCsrf);
   app.use(csrfCookie);
   app.use(
     session({
@@ -212,8 +213,6 @@ export function createApp() {
       cookie: sessionCookieOptions(),
     }),
   );
-  app.use("/api", verifyCsrf);
-
   app.get("/api/errors", (_req, res) =>
     res.json({
       success: true,
