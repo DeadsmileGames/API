@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { env } from "../config/env.js";
 import { sendTransactionalEmail } from "./brevo.service.js";
 import { escapeHtml } from "../utils/html.js";
+import { brandedEmail } from "./email-template.js";
 
 const resend = env.resendApiKey ? new Resend(env.resendApiKey) : null;
 
@@ -38,7 +39,15 @@ export async function sendPasswordResetEmail({ to, username, resetUrl }) {
   const safeName = username ? ` ${escapeHtml(username)}` : "";
   const safeResetUrl = escapeHtml(resetUrl);
   const text = `Hi${displayName},\n\nWe received a request to reset your Deadsmile Games password.\n\nClick the link below to choose a new password (valid for 1 hour):\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.\n\n— Deadsmile Games`;
-  const html = `<div style="font-family:system-ui,sans-serif;background:#0b0b0b;color:#eaeaea;padding:40px;border-radius:12px;max-width:520px;margin:auto;"><h2 style="margin:0 0 16px;font-size:20px;">Reset your password</h2><p style="color:#aaa;line-height:1.6;margin:0 0 24px;">Hi${safeName}, we received a request to reset your Deadsmile Games password.</p><a href="${safeResetUrl}" style="display:inline-block;background:#fff;color:#0b0b0b;padding:12px 22px;border-radius:999px;font-weight:700;text-decoration:none;">Choose a new password</a><p style="color:#666;font-size:12px;line-height:1.6;margin:24px 0 0;">This link expires in 1 hour. If you didn't request this, ignore this email.</p></div>`;
+  const html = brandedEmail({
+    preheader: "Secure link to reset your Deadsmile Games password.",
+    heading: "Reset your password",
+    intro: `Hi${safeName}, we received a request to reset your Deadsmile Games password.`,
+    bodyHtml: '<p style="margin:0 0 16px;color:#b8b8b8;line-height:1.8">This secure link expires in 1 hour. If you did not request a reset, no action is needed and your password will remain unchanged.</p>',
+    actionLabel: "Choose a new password",
+    actionUrl: safeResetUrl,
+    footer: "Password reset · Link expires in 1 hour.",
+  });
   return sendTransactionalEmail({
     to,
     subject: "Reset your Deadsmile Games password",
