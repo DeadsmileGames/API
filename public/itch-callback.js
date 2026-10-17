@@ -107,10 +107,6 @@ async function run() {
   if (flow.client !== "site" || typeof flow.frontendOrigin !== "string") {
     throw { code: "ITCH_LINK_EXPIRED" };
   }
-  const origin = new URL(flow.frontendOrigin);
-  const localHttp =
-    origin.protocol === "http:" &&
-    ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
   let allowedOrigins;
   try {
     const configured = document.querySelector('meta[name="deadsmile-frontend-origins"]')?.content;
@@ -118,16 +114,31 @@ async function run() {
   } catch {
     throw { code: "ITCH_LINK_EXPIRED" };
   }
+  if (!Array.isArray(allowedOrigins) || !allowedOrigins.every((value) => typeof value === "string")) {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+  const approvedOrigin = allowedOrigins.find((value) => value === flow.frontendOrigin);
+  if (!approvedOrigin) throw { code: "ITCH_LINK_EXPIRED" };
+
+  let origin;
+  try {
+    origin = new URL(approvedOrigin);
+  } catch {
+    throw { code: "ITCH_LINK_EXPIRED" };
+  }
+  const localHttp =
+    origin.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
   if (
-    !Array.isArray(allowedOrigins) ||
-    !allowedOrigins.includes(origin.origin) ||
     (origin.protocol !== "https:" && !localHttp) ||
-    origin.origin !== flow.frontendOrigin
+    origin.origin !== approvedOrigin ||
+    origin.username ||
+    origin.password
   ) {
     throw { code: "ITCH_LINK_EXPIRED" };
   }
 
-  const target = new URL("/itch-callback", origin);
+  const target = new URL("/itch-callback", approvedOrigin);
   target.hash = new URLSearchParams({
     state: oauthState,
     access_token: accessToken,
