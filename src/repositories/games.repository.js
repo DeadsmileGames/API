@@ -4,6 +4,7 @@ const GAME_SUMMARY_SELECT = `
   SELECT
     g.id, g.title, g.slug, g.short_description,
     g.status, g.release_date, g.hero_image, g.cover_image,
+    g.preorder_enabled, g.preorder_starts_at, g.preorder_ends_at, g.preorder_age_ratings,
     g.trailer_url, g.featured, g.purchase_url, g.download_url, g.itch_game_id,
     g.access_type, g.itch_url, g.microsoft_product_id, g.microsoft_badge_image,
     g.engine, g.save_path_template, g.cloud_saves_enabled, g.telemetry_enabled,
