@@ -1237,3 +1237,107 @@ test("Android login, library, sessions and achievements share the existing accou
   await mobile.request("/auth/logout", { method: "POST", body: {} });
   assert.equal((await mobile.request(`/platform/achievements/${abbyId}`)).status, 401);
 });
+
+
+test("pre-orders are free-only, keep age ratings private, require email confirmation and reject duplicates", async () => {
+  const { createHash } = await import("node:crypto");
+  await pool.query(
+    \`UPDATE games
+     SET preorder_enabled=true,
+         preorder_starts_at=now()-interval '1 hour',
+         preorder_ends_at=now()+interval '1 day',
+         preorder_age_ratings=$2::jsonb,
+         preorder_reward_type='package',
+         preorder_reward_zip=decode('504b0304','hex')
+     WHERE id=$1\`,
+    [freeId, JSON.stringify({ en: 13, "pt-BR": 18, es: 13 })],
+  );
+  // Simulate an old paid-game record with preorder flags, so the public API must fail closed.
+  await pool.query(
+    \`UPDATE games
+     SET preorder_enabled=true,
+         preorder_starts_at=now()-interval '1 hour',
+         preorder_ends_at=now()+interval '1 day',
+         preorder_reward_type='package',
+         preorder_reward_zip=decode('504b0304','hex')
+     WHERE id=$1\`,
+    [paidId],
+  );
+  try {
+    const info = await guest.request("/preorders/free", { language: "pt-BR" });
+    assert.equal(info.status, 200, JSON.stringify(info.body));
+    assert.equal(Object.hasOwn(info.body.data, "preorderAgeRatings"), false);
+    assert.equal(Object.hasOwn(info.body.data, "minAge"), false);
+
+    const publicGame = await guest.request("/games/free", { language: "pt-BR" });
+    assert.equal(publicGame.status, 200);
+    assert.equal(Object.hasOwn(publicGame.body.data, "preorderAgeRatings"), false);
+
+    const deniedAge = await guest.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "Player", lastName: "One", age: 17, email: "too-young@example.test", locale: "pt-BR" },
+    });
+    assert.equal(deniedAge.status, 403);
+    assert.equal(deniedAge.body.error.code, "PREORDER_AGE_RESTRICTED");
+    assert.equal(
+      (await pool.query("SELECT count(*) AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "too-young@example.test"])).rows[0].count,
+      0,
+    );
+
+    const paidInfo = await guest.request("/preorders/paid");
+    assert.equal(paidInfo.status, 404);
+    const paidSignup = await guest.request("/preorders/paid", {
+      method: "POST",
+      body: { firstName: "Player", lastName: "Paid", age: 30, email: "paid-preorder@example.test" },
+    });
+    assert.equal(paidSignup.status, 404);
+
+    const rawToken = "one-time-preorder-confirmation-token-123456";
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    await pool.query(
+      \`INSERT INTO game_preorders
+       (game_id, first_name, last_name, age, locale, email, confirmation_token_hash, confirmation_expires_at)
+       VALUES ($1,'Pending','Player',18,'pt-BR','pending-preorder@example.test',$2,now()+interval '1 hour')\`,
+      [freeId, tokenHash],
+    );
+    const confirmed = await guest.request("/preorders/confirm/" + rawToken, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+    assert.equal(confirmed.body.data.confirmed, true);
+    assert.equal(confirmed.body.data.slug, "free");
+    const registration = (await pool.query(
+      "SELECT confirmed_at, confirmation_token_hash, confirmation_expires_at FROM game_preorders WHERE game_id=$1 AND email=$2",
+      [freeId, "pending-preorder@example.test"],
+    )).rows[0];
+    assert(registration.confirmed_at);
+    assert.equal(registration.confirmation_token_hash, null);
+    assert.equal(registration.confirmation_expires_at, null);
+
+    const duplicate = await guest.request("/preorders/free", {
+      method: "POST",
+      language: "pt-BR",
+      body: { firstName: "Pending", lastName: "Player", age: 18, email: "pending-preorder@example.test", locale: "pt-BR" },
+    });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.error.code, "PREORDER_ALREADY_REGISTERED");
+    assert.equal(
+      (await pool.query("SELECT count(*) AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "pending-preorder@example.test"])).rows[0].count,
+      1,
+    );
+
+    const reusedToken = await guest.request("/preorders/confirm/" + rawToken, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(reusedToken.status, 410);
+  } finally {
+    await pool.query("DELETE FROM game_preorders WHERE game_id IN ($1,$2)", [freeId, paidId]);
+    await pool.query(
+      "UPDATE games SET preorder_enabled=false, preorder_starts_at=NULL, preorder_ends_at=NULL, preorder_age_ratings=$2::jsonb, preorder_reward_type=NULL, preorder_reward_zip=NULL WHERE id IN ($1,$3)",
+      [freeId, JSON.stringify({ en: 13, "pt-BR": 13, es: 13 }), paidId],
+    );
+  }
+});

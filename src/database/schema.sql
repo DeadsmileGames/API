@@ -552,9 +552,14 @@ CREATE TABLE IF NOT EXISTS "game_preorders" (
   "reward_download_token_hash" char(64) UNIQUE,
   "redeemed_at" timestamp with time zone,
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "confirmation_token_hash" char(64),
+  "confirmation_expires_at" timestamp with time zone,
+  "confirmed_at" timestamp with time zone,
   UNIQUE (game_id, email)
 );
+CREATE INDEX IF NOT EXISTS game_preorders_confirmation_token_uidx ON game_preorders(confirmation_token_hash) WHERE confirmation_token_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS game_preorders_email_queue_idx ON game_preorders(email_status, created_at) WHERE email_status IN ('waiting','failed');
+CREATE INDEX IF NOT EXISTS game_preorders_confirmed_queue_idx ON game_preorders(email_status, created_at) WHERE confirmed_at IS NOT NULL AND email_status IN ('waiting','failed');
 CREATE TABLE IF NOT EXISTS "preorder_email_batches" (
   "id" boolean PRIMARY KEY DEFAULT true CHECK (id = true),
   "last_batch_at" timestamp with time zone
