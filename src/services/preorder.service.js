@@ -57,6 +57,20 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug
  await sendTransactionalEmail({ to: email, subject: copy.subject, text: copy.text, html });
 }
 
+export async function listAvailablePreorders() {
+ const { rows } = await query(
+  "SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at FROM games WHERE preorder_enabled=true AND access_type='free' AND preorder_starts_at IS NOT NULL AND preorder_ends_at IS NOT NULL AND now() >= preorder_starts_at AND now() < preorder_ends_at ORDER BY preorder_starts_at ASC,title ASC",
+ );
+ return rows.map((game) => ({
+  id: game.id,
+  slug: game.slug,
+  title: game.title,
+  coverImage: game.cover_image,
+  startsAt: game.preorder_starts_at,
+  endsAt: game.preorder_ends_at,
+ }));
+}
+
 export async function getPreorderInfo(slug, locale="en") {
  const { rows } = await query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free'",[slug]);
  const game=rows[0]; if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");

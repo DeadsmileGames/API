@@ -1,14 +1,36 @@
 import { query } from "../config/database.js";
+import { env } from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
+import { verifyMobileAccessToken } from "../utils/mobile-access-token.js";
 
 export async function requireAuth(req, res, next) {
   res.set("Cache-Control", "private, no-store");
-  const userId = req.session?.userId;
-  if (!userId) {
-    return sendError(res, 401, "UNAUTHENTICATED");
+  let userId = req.session?.userId;
+  let tokenClaims = null;
+  const authorization = req.get("authorization");
+
+  if (authorization) {
+    const match = /^Bearer ([A-Za-z0-9._~-]+)$/i.exec(authorization);
+    if (!match) return sendError(res, 401, "INVALID_ACCESS_TOKEN");
+    try {
+      tokenClaims = verifyMobileAccessToken(match[1], { sessionSecret: env.sessionSecret });
+      userId = tokenClaims.sub;
+    } catch (error) {
+      return sendError(res, 401, error?.code || "INVALID_ACCESS_TOKEN");
+    }
   }
 
+  if (!userId) return sendError(res, 401, "UNAUTHENTICATED");
+
   try {
+    if (tokenClaims) {
+      const { rows: sessions } = await query(
+        "SELECT sid FROM user_sessions WHERE sid = $1 AND expire > now()",
+        [tokenClaims.sid],
+      );
+      if (!sessions.length) return sendError(res, 401, "SESSION_EXPIRED");
+    }
+
     const { rows } = await query(
       `SELECT id, role, email_verified_at
       FROM users
@@ -17,36 +39,30 @@ export async function requireAuth(req, res, next) {
     );
     const user = rows[0];
     if (!user) {
-      req.session.destroy(() => {});
+      if (!tokenClaims) req.session.destroy(() => {});
       return sendError(res, 401, "UNAUTHENTICATED");
     }
     if (!user.email_verified_at) {
-      req.session.destroy(() => {});
-
+      if (!tokenClaims) req.session.destroy(() => {});
       return sendError(res, 403, "EMAIL_NOT_VERIFIED");
     }
     req.auth = { userId: user.id, role: user.role };
-    if (req.session.role && req.session.role !== user.role) {
-      const previousDevice = req.session.device;
 
-      await new Promise((resolve, reject) => {
-        req.session.regenerate((error) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
+    if (req.session?.userId) {
+      if (req.session.role && req.session.role !== user.role) {
+        const previousDevice = req.session.device;
+        await new Promise((resolve, reject) => {
+          req.session.regenerate((error) => {
+            if (error) reject(error);
+            else resolve();
+          });
         });
-      });
-
-      req.session.userId = user.id;
-      req.session.role = user.role;
-
-      if (previousDevice) {
-        req.session.device = previousDevice;
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        if (previousDevice) req.session.device = previousDevice;
+      } else if (req.session.role !== user.role) {
+        req.session.role = user.role;
       }
-    } else if (req.session.role !== user.role) {
-      req.session.role = user.role;
     }
     return next();
   } catch (error) {
@@ -56,12 +72,8 @@ export async function requireAuth(req, res, next) {
 
 export function requireRole(role) {
   return (req, res, next) => {
-    if (!req.auth?.userId) {
-      return sendError(res, 401, "UNAUTHENTICATED");
-    }
-    if (req.auth.role !== role) {
-      return sendError(res, 403, "FORBIDDEN");
-    }
+    if (!req.auth?.userId) return sendError(res, 401, "UNAUTHENTICATED");
+    if (req.auth.role !== role) return sendError(res, 403, "FORBIDDEN");
     return next();
   };
 }

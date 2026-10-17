@@ -27,6 +27,7 @@ import {
   register,
   login,
   mobileLogin,
+  mobileToken,
   logout,
   me,
   mobileRegister,
@@ -69,6 +70,7 @@ authRouter.post(
   verifyTwoFactor,
 );
 authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
+authRouter.post("/mobile-token", requireAuth, mobileToken);
 authRouter.post(
   "/mobile-register",
   registerLimiter,

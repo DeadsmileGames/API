@@ -24,6 +24,7 @@ import { env } from "../config/env.js";
 import { verifyTotpLogin } from "../services/totp.service.js";
 
 import { AppError } from "../utils/AppError.js";
+import { issueMobileAccessToken } from "../utils/mobile-access-token.js";
 
 const TWO_FACTOR_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
@@ -59,6 +60,7 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
 
   const pendingUserId = req.session?.pendingTwoFactorUserId;
   const expiresAt = req.session?.pendingTwoFactorExpiresAt;
+  const pendingClient = req.session?.pendingTwoFactorClient;
 
   if (!pendingUserId || !expiresAt || Date.now() >= expiresAt) {
     throw new AppError(401, "TWO_FACTOR_CHALLENGE_EXPIRED");
@@ -73,6 +75,7 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
       delete req.session.pendingTwoFactorUserId;
       delete req.session.pendingTwoFactorExpiresAt;
       delete req.session.pendingTwoFactorAttempts;
+      delete req.session.pendingTwoFactorClient;
       throw new AppError(401, "TWO_FACTOR_CHALLENGE_EXPIRED");
     }
     throw new AppError(400, "INVALID_TOTP");
@@ -82,6 +85,7 @@ export const verifyTwoFactor = asyncHandler(async (req, res) => {
 
   req.session.userId = account.id;
   req.session.role = account.role;
+  if (pendingClient === "mobile") req.session.client = "mobile";
   attachDeviceSession(req);
 
   return sendSuccess(res, account);
@@ -109,7 +113,7 @@ export const login = asyncHandler(async (req, res) => {
     await regenerateSession(req);
 
     req.session.pendingTwoFactorUserId = result.userId;
-
+    req.session.pendingTwoFactorClient = client;
     req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
 
@@ -142,7 +146,7 @@ export const logout = asyncHandler(async (req, res) => {
   });
 });
 
-async function performLogin(req, res, { requireRecaptcha = false } = {}) {
+async function performLogin(req, res, { requireRecaptcha = false, client = "site" } = {}) {
   const { email, password, recaptchaToken } = req.body;
 
   if (requireRecaptcha) {
@@ -171,6 +175,7 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 
   req.session.userId = result.id;
   req.session.role = result.role;
+  if (client === "mobile") req.session.client = "mobile";
   attachDeviceSession(req);
 
   return sendSuccess(res, result);
@@ -179,6 +184,7 @@ async function performLogin(req, res, { requireRecaptcha = false } = {}) {
 export const mobileLogin = asyncHandler(async (req, res) => {
   return performLogin(req, res, {
     requireRecaptcha: false,
+    client: "mobile",
   });
 });
 
@@ -188,8 +194,21 @@ export const mobileRegister = asyncHandler(async (req, res) => {
   return sendSuccess(res, result, 201);
 });
 
+export const mobileToken = asyncHandler(async (req, res) => {
+  if (req.session?.client !== "mobile" || req.get("authorization")) {
+    throw new AppError(403, "MOBILE_SESSION_REQUIRED");
+  }
+  const accessToken = issueMobileAccessToken({
+    userId: req.auth.userId,
+    sessionId: req.sessionID,
+    sessionSecret: env.sessionSecret,
+  });
+  res.set("Cache-Control", "no-store");
+  return sendSuccess(res, { accessToken, tokenType: "Bearer", expiresIn: 900 });
+});
+
 export const me = asyncHandler(async (req, res) => {
-  const user = await getAccount(req.session.userId);
+  const user = await getAccount(req.auth.userId);
 
   return sendSuccess(res, user);
 });

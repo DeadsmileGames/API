@@ -3,6 +3,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import { AppError } from "../utils/AppError.js";
 import { query } from "../config/database.js";
 import * as service from "../services/preorder.service.js";
+export const listAvailable=asyncHandler(async(_req,res)=>sendSuccess(res,await service.listAvailablePreorders()));
 export const info=asyncHandler(async(req,res)=>sendSuccess(res,await service.getPreorderInfo(req.params.slug,res.locals.locale)));
 export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service.createPreorder(req.params.slug,req.body,res.locals.locale,req.auth.userId),202));
 export const status=asyncHandler(async(req,res)=>{res.set("Cache-Control","private, no-store");sendSuccess(res,await service.getPreorderStatus(req.params.slug,req.auth.userId));});

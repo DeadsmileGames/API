@@ -126,7 +126,7 @@ export function createApp() {
     origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language"],
+    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language", "Authorization"],
     maxAge: 600,
   };
   app.options("*", cors(corsOptions));
