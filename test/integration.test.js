@@ -1241,6 +1241,7 @@ test("Android login, library, sessions and achievements share the existing accou
 
 test("pre-orders are free-only, keep age ratings private, require email confirmation and reject duplicates", async () => {
   const { createHash } = await import("node:crypto");
+  const preorderGuest = client();
   await pool.query(
     `UPDATE games
      SET access_type='free',
@@ -1266,16 +1267,16 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     [paidId],
   );
   try {
-    const info = await guest.request("/preorders/free", { language: "pt-BR" });
+    const info = await preorderGuest.request("/preorders/free", { language: "pt-BR" });
     assert.equal(info.status, 200, JSON.stringify(info.body));
     assert.equal(Object.hasOwn(info.body.data, "preorderAgeRatings"), false);
     assert.equal(Object.hasOwn(info.body.data, "minAge"), false);
 
-    const publicGame = await guest.request("/games/free", { language: "pt-BR" });
+    const publicGame = await preorderGuest.request("/games/free", { language: "pt-BR" });
     assert.equal(publicGame.status, 200);
     assert.equal(Object.hasOwn(publicGame.body.data, "preorderAgeRatings"), false);
 
-    const deniedAge = await guest.request("/preorders/free", {
+    const deniedAge = await preorderGuest.request("/preorders/free", {
       method: "POST",
       language: "pt-BR",
       body: { firstName: "Player", lastName: "One", age: 17, email: "too-young@example.test", locale: "pt-BR" },
@@ -1287,9 +1288,9 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
       0,
     );
 
-    const paidInfo = await guest.request("/preorders/paid");
+    const paidInfo = await preorderGuest.request("/preorders/paid");
     assert.equal(paidInfo.status, 404);
-    const paidSignup = await guest.request("/preorders/paid", {
+    const paidSignup = await preorderGuest.request("/preorders/paid", {
       method: "POST",
       body: { firstName: "Player", lastName: "Paid", age: 30, email: "paid-preorder@example.test" },
     });
@@ -1303,7 +1304,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
        VALUES ($1,'Pending','Player',18,'pt-BR','pending-preorder@example.test',$2,now()+interval '1 hour')`,
       [freeId, tokenHash],
     );
-    const confirmed = await guest.request("/preorders/confirm/" + rawToken, {
+    const confirmed = await preorderGuest.request("/preorders/confirm/" + rawToken, {
       method: "POST",
       body: {},
     });
@@ -1318,7 +1319,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
 
-    const duplicate = await guest.request("/preorders/free", {
+    const duplicate = await preorderGuest.request("/preorders/free", {
       method: "POST",
       language: "pt-BR",
       body: { firstName: "Pending", lastName: "Player", age: 18, email: "pending-preorder@example.test", locale: "pt-BR" },
@@ -1330,7 +1331,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
       1,
     );
 
-    const reusedToken = await guest.request("/preorders/confirm/" + rawToken, {
+    const reusedToken = await preorderGuest.request("/preorders/confirm/" + rawToken, {
       method: "POST",
       body: {},
     });
