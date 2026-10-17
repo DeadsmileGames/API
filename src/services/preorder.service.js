@@ -249,9 +249,9 @@ export async function redeemPreorderCode(code, account) {
            g.slug,g.preorder_ends_at
     FROM game_preorders p
     JOIN games g ON g.id = p.game_id
-    WHERE p.code_hash = $1 OR (p.reward_code = $2 AND p.code_hash IS NULL)
+    WHERE p.reward_code = $1
     FOR UPDATE OF p`,
-   [hash(normalized), normalized],
+   [normalized],
   );
   const preorder = found.rows[0];
   const belongsToAccount = preorder && (
