@@ -4,11 +4,13 @@ import { AppError } from "../utils/AppError.js";
 import { query } from "../config/database.js";
 import * as service from "../services/preorder.service.js";
 export const info=asyncHandler(async(req,res)=>sendSuccess(res,await service.getPreorderInfo(req.params.slug,res.locals.locale)));
-export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service.createPreorder(req.params.slug,req.body,res.locals.locale),202));
+export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service.createPreorder(req.params.slug,req.body,res.locals.locale,req.auth.userId),202));
+export const status=asyncHandler(async(req,res)=>{res.set("Cache-Control","private, no-store");sendSuccess(res,await service.getPreorderStatus(req.params.slug,req.auth.userId));});
+export const cancel=asyncHandler(async(req,res)=>sendSuccess(res,await service.cancelPreorder(req.params.slug,req.auth.userId)));
 export const confirm=asyncHandler(async(req,res)=>sendSuccess(res,await service.confirmPreorder(req.params.token)));
 export const redeem=asyncHandler(async(req,res)=>{
  if(!req.session?.userId) throw new AppError(401,"UNAUTHENTICATED");
- const {rows}=await query("SELECT email FROM users WHERE id=$1",[req.session.userId]);
+ const {rows}=await query("SELECT id,email FROM users WHERE id=$1",[req.session.userId]);
  if(!rows[0]) throw new AppError(401,"UNAUTHENTICATED");
  sendSuccess(res,await service.redeemPreorderCode(req.body.code,rows[0]));
 });
