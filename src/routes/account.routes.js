@@ -72,16 +72,35 @@ accountRouter.get(
 accountRouter.get("/", requireAuth, show);
 accountRouter.patch("/", requireAuth, validate(updateAccountSchema), update);
 accountRouter.delete("/", requireAuth, validate(deleteAccountSchema), remove);
-accountRouter.get("/totp/status", requireAuth, totpController.status);
+accountRouter.get("/totp/status", rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), requireAuth, totpController.status);
 accountRouter.get(
   "/totp/setup",
   requireAuth,
   trustedFrontendOrigin,
   totpController.setup,
 );
-accountRouter.post("/totp/setup", requireAuth, twoFactorLimiter, totpController.setup);
+accountRouter.post("/totp/setup", rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), requireAuth, twoFactorLimiter, totpController.setup);
 accountRouter.post(
   "/totp/enable",
+  rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }),
   requireAuth,
   twoFactorLimiter,
   validate(totpTokenSchema),
@@ -89,6 +108,13 @@ accountRouter.post(
 );
 accountRouter.delete(
   "/totp/disable",
+  rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }),
   requireAuth,
   twoFactorLimiter,
   validate(totpTokenSchema),
