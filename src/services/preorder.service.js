@@ -9,6 +9,7 @@ import { env } from "../config/env.js";
 const LOCALES = new Set(["en","pt-BR","es"]);
 const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const codeHash = (value) => crypto.createHmac("sha256", env.dataEncryptionKey || env.sessionSecret).update("deadsmile:preorder-reward-code:v1:").update(String(value)).digest("hex");
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
 
@@ -225,7 +226,7 @@ export async function confirmPreorder(token) {
        AND confirmation_expires_at > now()
        AND confirmed_at IS NULL
      RETURNING id`,
-    [preorder.id, hash(code), code, tokenHash],
+    [preorder.id, codeHash(code), code, tokenHash],
    );
    if (!updated.rows[0]) throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
    return { confirmed: true, slug: preorder.slug };
