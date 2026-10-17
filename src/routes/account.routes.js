@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import {
@@ -19,7 +20,7 @@ import * as totpController from "../controllers/totp.controller.js";
 import { totpTokenSchema } from "../validators/totp.validators.js";
 import { env } from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
-import { authenticatedApiLimiter, twoFactorLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
+import { twoFactorLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
 import {
   changeEmailSchema,
   privacySchema,
@@ -42,7 +43,13 @@ function trustedFrontendOrigin(req, res, next) {
 }
 
 export const accountRouter = Router();
-accountRouter.use(authenticatedApiLimiter);
+accountRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}));
 
 accountRouter.post(
   "/email/change",
