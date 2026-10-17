@@ -342,6 +342,7 @@ CREATE TABLE "users" (
 	"bio" text DEFAULT '' NOT NULL,
 	"website_url" text,
 	"location" text,
+	"profile_banner_url" text,
 	"telemetry_consent" boolean DEFAULT false NOT NULL,
 	"email_verified_at" timestamp with time zone,
 	"share_game_activity" boolean DEFAULT false NOT NULL,
