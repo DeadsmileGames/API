@@ -65,6 +65,14 @@ export const gameDetails = asyncHandler(async (req, res) => {
   sendSuccess(res, {
     ...game,
     description: rows[0].description,
+    preorderEnabled: Boolean(rows[0].preorder_enabled),
+    preorderStartsAt: rows[0].preorder_starts_at,
+    preorderEndsAt: rows[0].preorder_ends_at,
+    preorderAgeRatings: rows[0].preorder_age_ratings || { en: 13, "pt-BR": 13, es: 13 },
+    preorderRewardType: rows[0].preorder_reward_type,
+    preorderRewardDescription: rows[0].preorder_reward_description || "",
+    preorderRewardWallpapers: rows[0].preorder_reward_wallpapers || [],
+    preorderRewardZipExisting: Boolean(rows[0].preorder_reward_zip),
     genres: genres.rows.map((row) => row.name),
     platforms: platforms.rows.map((row) => row.name),
     microsoftStoreBadgeHtml: badge

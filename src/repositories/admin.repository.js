@@ -87,6 +87,14 @@ export async function createGame({
   microsoftStoreBadge,
   genres = [],
   platforms = [],
+  preorderEnabled = false,
+  preorderStartsAt,
+  preorderEndsAt,
+  preorderAgeRatings = { en: 13, "pt-BR": 13, es: 13 },
+  preorderRewardType,
+  preorderRewardDescription = "",
+  preorderRewardZipBase64,
+  preorderRewardWallpapers = [],
 }) {
   const badge = parseStoreBadge(microsoftStoreBadge);
   const client = await pool.connect();
@@ -98,8 +106,10 @@ export async function createGame({
       `INSERT INTO games
         (title, slug, short_description, description, status,
           release_date, hero_image, cover_image, trailer_url, featured,
-          purchase_url, download_url, itch_game_id, access_type, itch_url, microsoft_product_id, microsoft_badge_image)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          purchase_url, download_url, itch_game_id, access_type, itch_url, microsoft_product_id, microsoft_badge_image,
+          preorder_enabled, preorder_starts_at, preorder_ends_at, preorder_age_ratings, preorder_reward_type,
+          preorder_reward_description, preorder_reward_zip, preorder_reward_wallpapers)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb, $22, $23, $24, $25::jsonb)
       RETURNING *`,
       [
         title,
@@ -119,6 +129,14 @@ export async function createGame({
         itchUrl || null,
         badge?.productId || null,
         badge?.imageUrl || null,
+        Boolean(preorderEnabled),
+        preorderStartsAt || null,
+        preorderEndsAt || null,
+        JSON.stringify(preorderAgeRatings || { en: 13, "pt-BR": 13, es: 13 }),
+        preorderRewardType || null,
+        preorderRewardDescription || null,
+        preorderRewardZipBase64 ? Buffer.from(preorderRewardZipBase64, "base64") : null,
+        JSON.stringify(preorderRewardWallpapers || []),
       ],
     );
 
@@ -233,6 +251,14 @@ export async function updateGame(
     featured,
     genres = [],
     platforms = [],
+    preorderEnabled = false,
+    preorderStartsAt,
+    preorderEndsAt,
+    preorderAgeRatings = { en: 13, "pt-BR": 13, es: 13 },
+    preorderRewardType,
+    preorderRewardDescription = "",
+    preorderRewardZipBase64,
+    preorderRewardWallpapers = [],
   },
 ) {
   const badge = parseStoreBadge(microsoftStoreBadge);
@@ -256,7 +282,12 @@ export async function updateGame(
                  purchase_url = $12,
                  download_url = $13,
                  itch_game_id = $14, access_type = $15, itch_url = $16,
-                 microsoft_product_id = $17, microsoft_badge_image = $18, updated_at = now()
+                 microsoft_product_id = $17, microsoft_badge_image = $18,
+                 preorder_enabled = $19, preorder_starts_at = $20, preorder_ends_at = $21,
+                 preorder_age_ratings = $22::jsonb, preorder_reward_type = $23,
+                 preorder_reward_description = $24,
+                 preorder_reward_zip = COALESCE($25, preorder_reward_zip),
+                 preorder_reward_wallpapers = $26::jsonb, updated_at = now()
              WHERE id = $1
              RETURNING *`,
       [
@@ -278,6 +309,14 @@ export async function updateGame(
         itchUrl || null,
         badge?.productId || null,
         badge?.imageUrl || null,
+        Boolean(preorderEnabled),
+        preorderStartsAt || null,
+        preorderEndsAt || null,
+        JSON.stringify(preorderAgeRatings || { en: 13, "pt-BR": 13, es: 13 }),
+        preorderRewardType || null,
+        preorderRewardDescription || null,
+        preorderRewardZipBase64 ? Buffer.from(preorderRewardZipBase64, "base64") : null,
+        JSON.stringify(preorderRewardWallpapers || []),
       ],
     );
 

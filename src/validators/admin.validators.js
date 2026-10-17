@@ -104,9 +104,39 @@ export const gamePostSchema = z
     purchaseUrl: itchPurchaseUrl,
     itchGameId: z.coerce.number().int().positive().safe().optional().nullable(),
     downloadUrl: httpsUrl,
+    preorderEnabled: z.boolean().default(false),
+    preorderStartsAt: z.string().datetime({ offset: true }).optional().nullable(),
+    preorderEndsAt: z.string().datetime({ offset: true }).optional().nullable(),
+    preorderAgeRatings: z.object({
+      en: z.number().int().min(0).max(21),
+      "pt-BR": z.number().int().min(0).max(21),
+      es: z.number().int().min(0).max(21),
+    }).strict().default({ en: 13, "pt-BR": 13, es: 13 }),
+    preorderRewardType: z.enum(["video", "wallpapers", "package", "other"]).optional().nullable(),
+    preorderRewardDescription: z.string().trim().max(2000).optional().default(""),
+    preorderRewardZipBase64: z.string().max(1_800_000).optional().nullable(),
+    preorderRewardZipExisting: z.boolean().optional().default(false),
+    preorderRewardWallpapers: z.array(imageUrl).max(20).default([]),
   })
   .strict()
   .superRefine((data, ctx) => {
+    if (data.preorderEnabled) {
+      if (!data.preorderStartsAt || !data.preorderEndsAt ||
+          new Date(data.preorderEndsAt).getTime() <= new Date(data.preorderStartsAt).getTime()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preorderEndsAt"], message: "Preorder end must be after its start." });
+      }
+      if (!data.preorderRewardType || (!data.preorderRewardZipBase64 && !data.preorderRewardZipExisting)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preorderRewardZipBase64"], message: "Choose a reward type and upload a ZIP reward." });
+      } else {
+        try {
+          const zip = Buffer.from(data.preorderRewardZipBase64, "base64");
+          if (zip.length < 4 || zip.subarray(0, 2).toString("ascii") !== "PK") throw new Error("Invalid ZIP");
+        } catch {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preorderRewardZipBase64"], message: "Reward must be a valid ZIP file." });
+        }
+      }
+    }
+
     if (
       data.accessType === "paid" &&
       data.downloadUrl &&

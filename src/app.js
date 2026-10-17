@@ -21,6 +21,7 @@ import { accountRouter } from "./routes/account.routes.js";
 import { newsletterRouter } from "./routes/newsletter.routes.js";
 import { supportRouter } from "./routes/support.routes.js";
 import { wishlistRouter } from "./routes/wishlist.routes.js";
+import { preorderRouter } from "./routes/preorder.routes.js";
 import {
   newsRouter,
   videosRouter,
@@ -191,6 +192,7 @@ export function createApp() {
   app.use("/api/downloads", downloadsRouter);
   app.use("/api/products", productsRouter);
   app.use("/api/wishlist", wishlistRouter);
+  app.use("/api/preorders", preorderRouter);
   app.use("/api/integrations/itch", itchIntegrationRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/platform", platformRouter);
@@ -206,6 +208,11 @@ const app = createApp();
 const server = createServer(app);
 
 const realtime = attachRealtimeServer(server);
+
+const preorderEmailTimer = setInterval(() => {
+  import("./services/preorder.service.js").then(({ sendPreorderEmailBatch }) => sendPreorderEmailBatch()).catch(() => {});
+}, 60_000);
+preorderEmailTimer.unref?.();
 
 if (!process.env.VERCEL) {
   server.listen(env.port);
