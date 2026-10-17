@@ -12,7 +12,7 @@ import { sendRegistrationEmail } from "./account-email.service.js";
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
-export async function registerUser({ username, email, password }) {
+export async function registerUser({ username, email, password, locale = "en" }) {
   const [existingEmail, existingUsername] = await Promise.all([
     findUserByEmail(email),
     findUserByUsername(username),
@@ -34,7 +34,7 @@ export async function registerUser({ username, email, password }) {
     passwordHash,
   });
 
-  await sendRegistrationEmail(user);
+  await sendRegistrationEmail(user, locale);
 
   return {
     verificationRequired: true,

@@ -21,7 +21,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function requestPasswordReset(email) {
+export async function requestPasswordReset(email, locale = "en") {
   const startedAt = Date.now();
   const user = await findUserByEmail(email);
 
@@ -38,6 +38,7 @@ export async function requestPasswordReset(email) {
         to: user.email,
         username: user.username,
         resetUrl,
+        locale,
       });
     } catch (error) {
       console.error("Password reset delivery failed", { code: error?.code || null });

@@ -92,7 +92,7 @@ export const register = asyncHandler(async (req, res) => {
 
   await verifyRecaptcha(recaptchaToken, req.ip);
 
-  const result = await registerUser(account);
+  const result = await registerUser({ ...account, locale: res.locals.locale });
 
   return sendSuccess(res, result, 201);
 });
@@ -183,7 +183,7 @@ export const mobileLogin = asyncHandler(async (req, res) => {
 });
 
 export const mobileRegister = asyncHandler(async (req, res) => {
-  const result = await registerUser(req.body);
+  const result = await registerUser({ ...req.body, locale: res.locals.locale });
 
   return sendSuccess(res, result, 201);
 });
@@ -197,7 +197,7 @@ export const me = asyncHandler(async (req, res) => {
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email, recaptchaToken } = req.body;
   await verifyRecaptcha(recaptchaToken, req.ip);
-  await requestPasswordReset(email);
+  await requestPasswordReset(email, res.locals.locale);
   return sendSuccess(res, { sent: true });
 });
 
@@ -208,13 +208,13 @@ export const resetPasswordHandler = asyncHandler(async (req, res) => {
 });
 
 export const confirmEmail = asyncHandler(async (req, res) => {
-  const result = await confirmAccountEmail(req.body.token);
+  const result = await confirmAccountEmail(req.body.token, res.locals.locale);
 
   return sendSuccess(res, result);
 });
 
 export const resendEmail = asyncHandler(async (req, res) => {
-  const result = await resendRegistrationEmail(req.body);
+  const result = await resendRegistrationEmail(req.body, res.locals.locale);
 
   return sendSuccess(res, result);
 });

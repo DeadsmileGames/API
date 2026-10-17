@@ -41,7 +41,7 @@ export const remove = asyncHandler(async (req, res) => {
   sendSuccess(res, { deleted: true });
 });
 export const changeEmail = asyncHandler(async (req, res) => {
-  const result = await requestEmailChange(req.session.userId, req.body);
+  const result = await requestEmailChange(req.session.userId, req.body, res.locals.locale);
 
   sendSuccess(res, result);
 });
