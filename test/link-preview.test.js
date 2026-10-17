@@ -13,6 +13,10 @@ test("prefers social title metadata and decodes HTML entities", () => {
     ),
     "A & B Game",
   );
+  assert.equal(
+    extractPageTitle('<meta property="og:title" content="&amp;lt;script&amp;gt;">'),
+    "&lt;script&gt;",
+  );
 });
 
 test("falls back to the document title and normalizes whitespace", () => {
