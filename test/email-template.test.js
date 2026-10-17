@@ -27,7 +27,7 @@ test("the legacy template escapes text and action URLs", () => {
     actionUrl: "https://example.test/?q=\"unsafe",
   });
 
-  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<script>/i);
   assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
