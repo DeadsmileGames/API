@@ -137,6 +137,7 @@ export const searchLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
   handler: rateLimitHandler,
 });
 
@@ -145,6 +146,7 @@ export const apiRequestLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
   handler: rateLimitHandler,
 });
 
@@ -153,5 +155,6 @@ export const authenticatedApiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
   handler: rateLimitHandler,
 });
