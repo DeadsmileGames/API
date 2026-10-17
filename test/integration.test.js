@@ -592,6 +592,49 @@ test("only the reserved Deadsmile and luxjson accounts can configure verified pu
     await pool.query("UPDATE users SET username='other', profile_banner_url=NULL WHERE id=$1", [otherId]);
   }
 });
+test("public profile hides exact last-played time when playtime sharing is disabled", async () => {
+  const previous = await pool.query(
+    "SELECT share_game_activity,share_playtime FROM users WHERE id=$1",
+    [userId],
+  );
+  try {
+    await pool.query(
+      "UPDATE users SET share_game_activity=true,share_playtime=false WHERE id=$1",
+      [userId],
+    );
+    await pool.query(
+      `INSERT INTO game_activity(user_id,game_id,total_ms,sessions,last_played_at,public)
+       VALUES($1,$2,3600000,3,now()-interval '1 hour',true)
+       ON CONFLICT(user_id,game_id)
+       DO UPDATE SET total_ms=EXCLUDED.total_ms,sessions=EXCLUDED.sessions,
+         last_played_at=EXCLUDED.last_played_at,public=EXCLUDED.public`,
+      [userId, freeId],
+    );
+
+    let result = await guest.request("/account/profile/player");
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    let game = result.body.data.recentGames.find((item) => item.id === freeId);
+    assert(game);
+    assert.equal(game.totalMs, null);
+    assert.equal(game.sessions, null);
+    assert.equal(game.lastPlayedAt, null);
+
+    await pool.query("UPDATE users SET share_playtime=true WHERE id=$1", [userId]);
+    result = await guest.request("/account/profile/player");
+    game = result.body.data.recentGames.find((item) => item.id === freeId);
+    assert(game);
+    assert.equal(game.totalMs, 3600000);
+    assert.equal(game.sessions, 3);
+    assert.equal(typeof game.lastPlayedAt, "string");
+  } finally {
+    await pool.query("DELETE FROM game_activity WHERE user_id=$1 AND game_id=$2", [userId, freeId]);
+    await pool.query(
+      "UPDATE users SET share_game_activity=$2,share_playtime=$3 WHERE id=$1",
+      [userId, previous.rows[0].share_game_activity, previous.rows[0].share_playtime],
+    );
+  }
+});
+
 test("privacy defaults hide activity and telemetry consent rejects collection", async () => {
   let result = await player.request("/platform/telemetry", {
     method: "POST",
