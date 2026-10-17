@@ -8,6 +8,14 @@ export const register=asyncHandler(async(req,res)=>sendSuccess(res,await service
 export const status=asyncHandler(async(req,res)=>{res.set("Cache-Control","private, no-store");sendSuccess(res,await service.getPreorderStatus(req.params.slug,req.auth.userId));});
 export const cancel=asyncHandler(async(req,res)=>sendSuccess(res,await service.cancelPreorder(req.params.slug,req.auth.userId)));
 export const confirm=asyncHandler(async(req,res)=>sendSuccess(res,await service.confirmPreorder(req.params.token)));
+export const ownerReward=asyncHandler(async(req,res)=>{res.set("Cache-Control","private, no-store");sendSuccess(res,await service.getOwnedPreorderReward(req.params.slug,req.auth.userId));});
+export const ownerDownload=asyncHandler(async(req,res)=>{
+ const zip=await service.downloadOwnedPreorderReward(req.params.slug,req.auth.userId);
+ res.set("Content-Type","application/zip");
+ res.set("Content-Disposition",'attachment; filename="deadsmile-preorder-reward.zip"');
+ res.set("Cache-Control","private, no-store");
+ res.send(zip);
+});
 export const redeem=asyncHandler(async(req,res)=>{
  if(!req.session?.userId) throw new AppError(401,"UNAUTHENTICATED");
  const {rows}=await query("SELECT id,email FROM users WHERE id=$1",[req.session.userId]);
