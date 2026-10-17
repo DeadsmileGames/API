@@ -25,7 +25,7 @@ itchIntegrationRouter.post(
   validate(completeItchSchema),
   controller.complete,
 );
-itchIntegrationRouter.get("/", requireAuth, controller.status);
+itchIntegrationRouter.get("/", requireAuth, integrationLimiter, controller.status);
 itchIntegrationRouter.post(
   "/connect",
   requireAuth,
