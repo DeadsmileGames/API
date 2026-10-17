@@ -3,7 +3,6 @@ import { randomInt } from "node:crypto";
 import { pool, query } from "../config/database.js";
 import { AppError } from "../utils/AppError.js";
 import { sendTransactionalEmail } from "./brevo.service.js";
-import { escapeHtml } from "../utils/html.js";
 import { brandedEmail } from "./email-template.js";
 
 const LOCALES = new Set(["en","pt-BR","es"]);
