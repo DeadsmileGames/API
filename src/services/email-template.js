@@ -14,6 +14,7 @@ export function brandedEmail({
   preheader = "",
   eyebrow = "",
   heroImageUrl = "",
+  variant = "default",
   heading,
   intro = "",
   bodyHtml = "",
@@ -32,6 +33,16 @@ export function brandedEmail({
   const safeSecurity = escapeHtml(sharedCopy.security);
   const safeAutomated = escapeHtml(sharedCopy.automated);
   const safePreheader = escapeHtml(preheader);
+  const newswireLayout = variant === "newswire";
+  const innerTableStyle = newswireLayout
+    ? "width:100%;max-width:600px;background:" + COLORS.background + ";border:0;border-radius:0;overflow:visible"
+    : "width:100%;max-width:600px;background:" + COLORS.panel + ";border:1px solid " + COLORS.border + ";border-radius:14px;overflow:hidden";
+  const mastheadStyle = "padding:" + (newswireLayout ? "16px 0 18px" : "22px 28px") + ";border-bottom:1px solid " + COLORS.border;
+  const headlinePadding = newswireLayout ? "28px 0 18px" : "30px 28px 10px";
+  const heroPadding = newswireLayout ? "0 0 24px" : "0 28px 22px";
+  const bodyPadding = newswireLayout ? "0 0 14px" : "0 28px 8px";
+  const actionPadding = newswireLayout ? "0" : "0 28px";
+  const footerPadding = "padding:" + (newswireLayout ? "20px 0 24px" : "20px 28px 24px") + ";border-top:1px solid " + COLORS.border + ";color:#8c8c8c;font-size:11px;line-height:1.7";
   const safeEyebrow = escapeHtml(eyebrow);
   let safeHeroImageUrl = "";
   try {
@@ -44,7 +55,7 @@ export function brandedEmail({
     ? `<p style="margin:0 0 10px;color:${COLORS.red};font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase">${safeEyebrow}</p>`
     : "";
   const heroImageHtml = safeHeroImageUrl
-    ? `<tr><td style="padding:0 28px 22px"><img src="${safeHeroImageUrl}" width="544" alt="" style="display:block;width:100%;max-width:544px;height:auto;max-height:310px;object-fit:cover;border-radius:6px;border:0"></td></tr>`
+    ? `<tr><td style="padding:${heroPadding}"><img src="${safeHeroImageUrl}" width="${newswireLayout ? "600" : "544"}" alt="" style="display:block;width:100%;max-width:${newswireLayout ? "600" : "544"}px;height:auto;max-height:310px;object-fit:cover;border-radius:6px;border:0"></td></tr>`
     : "";
   const safeHeading = escapeHtml(heading);
   const safeIntro = escapeHtml(intro);
@@ -54,5 +65,5 @@ export function brandedEmail({
   const action = actionLabel && actionUrl
     ? `<tr><td style="padding:8px 0 26px"><a href="${safeActionUrl}" style="display:inline-block;background:${COLORS.accent};color:#0f0f0f;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px">${safeActionLabel}</a></td></tr>`
     : "";
-  return `<!doctype html><html lang="${safeLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${safeHeading}</title></head><body style="margin:0;padding:0;background:${COLORS.background};color:${COLORS.text};font-family:Poppins,Arial,Helvetica,sans-serif"><div style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden">${safePreheader}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${COLORS.background};padding:28px 12px"><tr><td align="center"><table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:${COLORS.panel};border:1px solid ${COLORS.border};border-radius:14px;overflow:hidden"><tr><td style="padding:22px 28px;border-bottom:1px solid ${COLORS.border}"><div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;letter-spacing:.3px;color:${COLORS.text}">DEADSMILE <span style="color:${COLORS.red}">GAMES</span></div><div style="margin-top:5px;color:${COLORS.muted};font-size:11px;letter-spacing:1.8px;text-transform:uppercase">${safeStudio}</div></td></tr><tr><td style="padding:30px 28px 10px">${eyebrowHtml}<h1 style="margin:0 0 16px;font-family:Poppins,Arial,Helvetica,sans-serif;font-size:25px;line-height:1.25;color:${COLORS.text}">${safeHeading}</h1>${safeIntro ? `<p style="margin:0 0 18px;color:${COLORS.muted};font-size:15px;line-height:1.75">${safeIntro}</p>` : ""}</td></tr>${heroImageHtml}<tr><td style="padding:0 28px 8px;color:${COLORS.text};font-size:14px;line-height:1.8">${bodyHtml}</td></tr>${action ? `<tr><td style="padding:0 28px">${action}</td></tr>` : ""}<tr><td style="padding:20px 28px 24px;border-top:1px solid ${COLORS.border};color:#8c8c8c;font-size:11px;line-height:1.7">${safeFooter}<br>${safeSecurity}</td></tr></table><div style="max-width:600px;padding:14px 10px;color:#777;font-size:11px;line-height:1.6;text-align:center">${safeAutomated}</div></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="${safeLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${safeHeading}</title></head><body style="margin:0;padding:0;background:${COLORS.background};color:${COLORS.text};font-family:Poppins,Arial,Helvetica,sans-serif"><div style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden">${safePreheader}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${COLORS.background};padding:28px 12px"><tr><td align="center"><table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="${innerTableStyle}"><tr><td style="${mastheadStyle}"><div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;letter-spacing:.3px;color:${COLORS.text}">DEADSMILE <span style="color:${COLORS.red}">GAMES</span></div><div style="margin-top:5px;color:${COLORS.muted};font-size:11px;letter-spacing:1.8px;text-transform:uppercase">${safeStudio}</div></td></tr><tr><td style="padding:${headlinePadding}">${eyebrowHtml}<h1 style="margin:0 0 16px;font-family:Poppins,Arial,Helvetica,sans-serif;font-size:25px;line-height:1.25;color:${COLORS.text}">${safeHeading}</h1>${safeIntro ? `<p style="margin:0 0 18px;color:${COLORS.muted};font-size:15px;line-height:1.75">${safeIntro}</p>` : ""}</td></tr>${heroImageHtml}<tr><td style="padding:${bodyPadding};color:${COLORS.text};font-size:14px;line-height:1.8">${bodyHtml}</td></tr>${action ? `<tr><td style="padding:${actionPadding}">${action}</td></tr>` : ""}<tr><td style="${footerPadding}">${safeFooter}<br>${safeSecurity}</td></tr></table><div style="max-width:600px;padding:14px 10px;color:#777;font-size:11px;line-height:1.6;text-align:center">${safeAutomated}</div></td></tr></table></body></html>`;
 }
