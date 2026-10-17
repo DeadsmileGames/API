@@ -94,7 +94,7 @@ export async function getPreorderStatus(slug, userId) {
   hasPreorderRecord: Boolean(preorder),
   attemptsUsed,
   attemptsRemaining: Math.max(0, 2 - attemptsUsed),
-  
+
   rewardCode: rewardRedeemable ? preorder.reward_code : null,
   rewardRedeemable,
   rewardRedeemed: Boolean(preorder?.redeemed_at),
@@ -208,14 +208,14 @@ export async function confirmPreorder(token) {
  const preorder = pending.rows[0];
  if (!preorder) throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
 
- 
- 
- 
+
+
+
  for (let attempt = 0; attempt < 20; attempt += 1) {
   const code = newCode();
   try {
-   
-   
+
+
    const collision = await query(
     "SELECT id FROM game_preorders WHERE code_hash IN ($1,$2) OR reward_code=$3 LIMIT 1",
     [codeHash(code), hash(code), code],
@@ -267,8 +267,8 @@ export async function redeemPreorderCode(code, account) {
   const preorder = found.rows[0];
   if (!preorder) throw new AppError(404, "PREORDER_CODE_INVALID");
 
-  
-  
+
+
   if (preorder.redeemed_at) {
    if (String(preorder.user_id || "") !== String(account.id)) {
     throw new AppError(409, "PREORDER_CODE_ALREADY_REDEEMED");
