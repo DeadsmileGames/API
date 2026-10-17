@@ -66,7 +66,7 @@ function cspDirectives() {
 function sessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: env.isProduction,
+    secure: "auto",
     sameSite: env.cookieSameSite,
     maxAge: 7 * 24 * 60 * 60 * 1_000,
     partitioned: env.isProduction && env.cookieSameSite === "none",
