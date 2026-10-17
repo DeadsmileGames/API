@@ -1,5 +1,6 @@
 import { query } from "../config/database.js";
 import { toClientGame } from "../utils/clientGame.js";
+import { isGameDownloadUnlocked } from "../utils/gameRelease.js";
 
 export async function getPreorderedLibraryItems(userId) {
   const { rows } = await query(
@@ -20,7 +21,7 @@ export async function getPreorderedLibraryItems(userId) {
   );
   return rows.map((row) => {
     const game = toClientGame(row);
-    const locked = Boolean(row.preorder_ends_at && Date.now() < new Date(row.preorder_ends_at).getTime());
+    const locked = !isGameDownloadUnlocked(row);
     return {
       ...game,
       owned: false,

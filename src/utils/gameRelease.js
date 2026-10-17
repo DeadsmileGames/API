@@ -44,3 +44,8 @@ export function getEffectiveGameStatus(game, now = new Date()) {
 
   return game?.status;
 }
+
+
+export function isGameDownloadUnlocked(game, now = new Date()) {
+  return getEffectiveGameStatus(game, now) === "released";
+}
