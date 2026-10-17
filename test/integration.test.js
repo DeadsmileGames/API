@@ -124,7 +124,7 @@ function client() {
   let token;
   return {
     cookies,
-    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor } = {}) {
+    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor, origin } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -135,6 +135,7 @@ function client() {
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
+          ...(origin ? { Origin: origin } : {}),
           ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
           ...(method !== "GET" && csrf ? { "X-CSRF-Token": token } : {}),
         },
@@ -431,6 +432,43 @@ test("itch OAuth flow reveals only the allowed frontend redirect and keeps state
   assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
 });
 
+
+test("itch OAuth initiation rejects untrusted origins and binds valid flows to the requested frontend", async () => {
+  const payload = {
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+  };
+  const rejected = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://evil.example",
+  });
+  assert.equal(rejected.status, 403);
+
+  const created = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://deadsmilegames.onrender.com",
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const authorizeUrl = new URL(created.body.data.authorizeUrl);
+  const state = authorizeUrl.searchParams.get("state");
+  assert.equal(authorizeUrl.origin, "https://itch.io");
+  assert.equal(authorizeUrl.pathname, "/user/oauth");
+  assert.equal(authorizeUrl.searchParams.get("response_type"), "token");
+  assert(state);
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+  });
+});
 
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
   const origin = new URL(base).origin;
