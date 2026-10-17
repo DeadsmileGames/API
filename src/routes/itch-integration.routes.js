@@ -16,6 +16,7 @@ const itchOAuthRouteLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
   handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
 });
 
