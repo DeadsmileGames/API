@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { integrationLimiter } from "../middleware/rateLimiters.js";
+import { authenticatedApiLimiter, integrationLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import {
   completeItchSchema,
@@ -9,6 +9,7 @@ import {
 import * as controller from "../controllers/itch-integration.controller.js";
 
 export const itchIntegrationRouter = Router();
+itchIntegrationRouter.use(authenticatedApiLimiter);
 
 itchIntegrationRouter.get("/callback", controller.callback);
 itchIntegrationRouter.post(
