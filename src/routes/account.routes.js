@@ -19,7 +19,7 @@ import * as totpController from "../controllers/totp.controller.js";
 import { totpTokenSchema } from "../validators/totp.validators.js";
 import { env } from "../config/env.js";
 import { sendError } from "../utils/apiResponse.js";
-import { twoFactorLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
+import { authenticatedApiLimiter, twoFactorLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
 import {
   changeEmailSchema,
   privacySchema,
@@ -42,6 +42,7 @@ function trustedFrontendOrigin(req, res, next) {
 }
 
 export const accountRouter = Router();
+accountRouter.use(authenticatedApiLimiter);
 
 accountRouter.post(
   "/email/change",
