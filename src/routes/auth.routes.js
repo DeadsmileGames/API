@@ -73,7 +73,7 @@ authRouter.post(
   verifyTwoFactor,
 );
 authRouter.post("/mobile-login", loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post("/mobile-token", requireAuth, integrationLimiter, mobileToken);
+authRouter.post("/mobile-token", authenticatedApiLimiter, requireAuth, integrationLimiter, mobileToken);
 authRouter.post(
   "/mobile-register",
   registerLimiter,
