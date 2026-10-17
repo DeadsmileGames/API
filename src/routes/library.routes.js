@@ -14,6 +14,7 @@ libraryRouter.use(rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
   handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
 }), requireAuth);
 libraryRouter.get("/", rateLimit({
@@ -21,6 +22,7 @@ libraryRouter.get("/", rateLimit({
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), controller.list);
 libraryRouter.get("/catalog", rateLimit({
@@ -28,6 +30,7 @@ libraryRouter.get("/catalog", rateLimit({
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), controller.catalog);
 libraryRouter.post("/sync", rateLimit({
@@ -35,6 +38,7 @@ libraryRouter.post("/sync", rateLimit({
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), integrationLimiter, controller.sync);
 libraryRouter.post(
@@ -44,6 +48,7 @@ libraryRouter.post(
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   integrationLimiter,
@@ -63,6 +68,7 @@ libraryRouter.post(
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   integrationLimiter,
@@ -76,6 +82,7 @@ libraryRouter.post(
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   integrationLimiter,
