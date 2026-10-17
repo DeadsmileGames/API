@@ -545,28 +545,7 @@ CREATE TABLE IF NOT EXISTS "game_preorders" (
   "locale" varchar(10) NOT NULL CHECK (locale IN ('en','pt-BR','es')),
   "email" varchar(254),
   "code_hash" char(64) UNIQUE,
-  "reward_code" varchar(6) CHECK (reward_code IS NULL OR reward_code ~ '^[0-9]{6}  "claim_token_hash" char(64) UNIQUE,
-  "claim_token_expires_at" timestamp with time zone,
-  "reward_accessed_at" timestamp with time zone,
-  "reward_download_token_hash" char(64) UNIQUE,
-  "redeemed_at" timestamp with time zone,
-  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
-  "confirmation_token_hash" char(64),
-  "confirmation_expires_at" timestamp with time zone,
-  "confirmed_at" timestamp with time zone,
-  UNIQUE (game_id, email)
-);
-CREATE INDEX IF NOT EXISTS game_preorders_confirmation_token_uidx ON game_preorders(confirmation_token_hash) WHERE confirmation_token_hash IS NOT NULL;
-CREATE INDEX IF NOT EXISTS game_preorders_user_game_idx ON game_preorders(user_id, game_id) WHERE user_id IS NOT NULL;
-CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
-  "user_id" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  "activity_date" date NOT NULL,
-  "attempts" smallint NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
-  "updated_at" timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, game_id, activity_date)
-);
-),
+  "reward_code" varchar(6) CHECK (reward_code IS NULL OR reward_code ~ '^[0-9]{6}$'),
   "claim_token_hash" char(64) UNIQUE,
   "claim_token_expires_at" timestamp with time zone,
   "reward_accessed_at" timestamp with time zone,
@@ -580,8 +559,6 @@ CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
 );
 CREATE INDEX IF NOT EXISTS game_preorders_confirmation_token_uidx ON game_preorders(confirmation_token_hash) WHERE confirmation_token_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS game_preorders_user_game_idx ON game_preorders(user_id, game_id) WHERE user_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS game_preorders_email_queue_idx ON game_preorders(email_status, created_at) WHERE email_status IN ('waiting','failed');
-CREATE INDEX IF NOT EXISTS game_preorders_confirmed_queue_idx ON game_preorders(email_status, created_at) WHERE confirmed_at IS NOT NULL AND email_status IN ('waiting','failed');
 CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
   "user_id" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -589,8 +566,4 @@ CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
   "attempts" smallint NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
   "updated_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, game_id, activity_date)
-);
-CREATE TABLE IF NOT EXISTS "preorder_email_batches" (
-  "id" boolean PRIMARY KEY DEFAULT true CHECK (id = true),
-  "last_batch_at" timestamp with time zone
 );
