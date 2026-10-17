@@ -264,6 +264,7 @@ export async function getItchStatus(userId) {
 
 export async function beginItchConnection(userId, { client, locale, returnPath }) {
   requireConfigured();
+  if (client !== "site") throw new AppError(400, "ITCH_LINK_EXPIRED");
   const state = crypto.randomBytes(48).toString("base64url");
   await createOAuthState({
     stateHash: stateHash(state),
@@ -284,10 +285,14 @@ export async function beginItchConnection(userId, { client, locale, returnPath }
 
 export async function completeItchConnection(
   { state, accessToken },
+  userId,
   setLocale = () => {},
 ) {
   requireConfigured();
-  const flow = await consumeOAuthState(stateHash(state));
+  if (typeof userId !== "string" || !userId) {
+    throw new AppError(401, "UNAUTHENTICATED");
+  }
+  const flow = await consumeOAuthState(stateHash(state), userId);
   if (!flow) throw new AppError(400, "ITCH_LINK_EXPIRED");
   setLocale(flow.locale);
   const [credentials, profile] = await Promise.all([

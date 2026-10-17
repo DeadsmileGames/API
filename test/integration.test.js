@@ -386,6 +386,40 @@ test("newswire returns the persisted original in every interface language", asyn
     "<p>English story.</p>",
   );
 });
+test("itch OAuth completion cannot be consumed by a different account or a launcher client", async () => {
+  const { createHash, randomBytes } = await import("node:crypto");
+  const { createOAuthState } = await import("../src/repositories/itch-integration.repository.js");
+  const state = randomBytes(48).toString("base64url");
+  const stateHash = createHash("sha256").update(state).digest("hex");
+  await createOAuthState({
+    stateHash,
+    userId,
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "a-test-access-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+  const row = await pool.query(
+    "SELECT consumed_at FROM itch_oauth_states WHERE state_hash=$1",
+    [stateHash],
+  );
+  assert.equal(row.rows[0].consumed_at, null);
+
+  const blockedLauncherFlow = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: { client: "launcher", locale: "en" },
+  });
+  assert.equal(blockedLauncherFlow.status, 400);
+  assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
+});
+
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
   const origin = new URL(base).origin;
   const response = await originalFetch(`${base}/integrations/itch/callback`);
@@ -402,9 +436,10 @@ test("itch callback reuses website CSS and ships bounded accessible connection s
   );
   assert.equal((await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status, 200);
   const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
-  assert(script.includes("controller.abort()"));
   assert(script.includes("location.hash.slice(1)"));
   assert(script.includes("history.replaceState"));
+  assert(script.includes("/itch-callback"));
+  assert(!script.includes("/api/integrations/itch/complete"));
 });
 
 test("CSRF, role checks and malicious payloads fail with localized safe errors", async () => {

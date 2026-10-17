@@ -74,7 +74,7 @@ export const connect = asyncHandler(async (req, res) => {
 export const complete = asyncHandler(async (req, res) => {
   sendSuccess(
     res,
-    await completeItchConnection(req.body, (locale) => {
+    await completeItchConnection(req.body, req.auth.userId, (locale) => {
       res.locals.locale = resolveLocale(locale);
       res.set("Content-Language", res.locals.locale);
     }),

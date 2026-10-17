@@ -18,13 +18,17 @@ export async function createOAuthState({
   );
 }
 
-export async function consumeOAuthState(stateHash) {
+export async function consumeOAuthState(stateHash, userId) {
   const { rows } = await query(
     `UPDATE itch_oauth_states
      SET consumed_at = now()
-     WHERE state_hash = $1 AND consumed_at IS NULL AND expires_at > now()
+     WHERE state_hash = $1
+       AND client = 'site'
+       AND user_id = $2
+       AND consumed_at IS NULL
+       AND expires_at > now()
      RETURNING user_id, client, locale, return_path`,
-    [stateHash],
+    [stateHash, userId],
   );
   return rows[0] || null;
 }

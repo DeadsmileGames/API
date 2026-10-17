@@ -52,66 +52,32 @@ state("loading");
 const params = new URLSearchParams(location.hash.slice(1));
 const oauthState = params.get("state");
 const accessToken = params.get("access_token");
+const returnLink = document.getElementById("returnLink");
+let frontendOrigin = "";
+try {
+  frontendOrigin = new URL(returnLink.href).origin;
+} catch {
+  frontendOrigin = "";
+}
 history.replaceState({}, document.title, location.pathname);
-async function request(url, options = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    let payload;
-    try {
-      payload = await response.json();
-    } catch {
-      throw { code: "INVALID_RESPONSE" };
-    }
-    if (!response.ok) throw payload?.error || { code: "INTERNAL_ERROR" };
-    return payload;
-  } catch (error) {
-    if (error.name === "AbortError") throw { code: "REQUEST_TIMEOUT" };
-    throw error;
-  } finally {
-    clearTimeout(timer);
+function run() {
+  if (
+    !oauthState ||
+    !accessToken ||
+    !frontendOrigin ||
+    !/^[A-Za-z0-9_-]{40,200}$/.test(oauthState) ||
+    accessToken.length < 20 ||
+    accessToken.length > 1000
+  ) {
+    throw { code: "ITCH_LINK_EXPIRED" };
   }
+  const target = new URL("/itch-callback", frontendOrigin);
+  target.hash = new URLSearchParams({ state: oauthState, access_token: accessToken }).toString();
+  location.replace(target.toString());
 }
-async function run() {
-  if (!oauthState || !accessToken) throw { code: "ITCH_LINK_EXPIRED" };
-  const csrfPayload = await request("/api/csrf", {
-    credentials: "include",
-    headers: { "Accept-Language": locale },
-  });
-  if (!csrfPayload?.data?.token) throw { code: "CSRF_INIT_FAILED" };
-  const payload = await request("/api/integrations/itch/complete", {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": csrfPayload.data.token,
-      "Accept-Language": locale,
-    },
-    body: JSON.stringify({ state: oauthState, accessToken }),
-  });
-  if (!payload?.data) throw { code: "INVALID_RESPONSE" };
-  locale = payload.data?.locale || locale;
-  strings = copy[locale] || copy.en;
-  messages = window.deadsmileErrors[locale] || window.deadsmileErrors.en;
-  document.documentElement.lang = locale;
-  state("done");
-  if (payload.data?.returnUrl) {
-    const url = new URL(payload.data.returnUrl);
-    if (
-      (url.protocol === "https:" ||
-        (url.protocol === "http:" &&
-          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) &&
-      !url.username &&
-      !url.password &&
-      url.origin === new URL(document.getElementById("returnLink").href).origin
-    ) {
-      document.getElementById("returnLink").href = url.toString();
-      setTimeout(() => location.replace(url.toString()), 900);
-    }
-  }
-}
-run().catch((error) => {
+try {
+  run();
+} catch (error) {
   locale = error.locale || locale;
   strings = copy[locale] || copy.en;
   messages = window.deadsmileErrors[locale] || window.deadsmileErrors.en;
@@ -122,4 +88,4 @@ run().catch((error) => {
       ? error.message
       : messages[error.code] || messages.NETWORK_ERROR,
   );
-});
+}

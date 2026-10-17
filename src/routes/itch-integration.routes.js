@@ -13,6 +13,7 @@ export const itchIntegrationRouter = Router();
 itchIntegrationRouter.get("/callback", controller.callback);
 itchIntegrationRouter.post(
   "/complete",
+  requireAuth,
   integrationLimiter,
   validate(completeItchSchema),
   controller.complete,
