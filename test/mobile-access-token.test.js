@@ -16,10 +16,10 @@ test("mobile access tokens include a short-lived identity bound to the session",
 
 test("tampered tokens are rejected", () => {
   const token = issueMobileAccessToken({ userId: "account-1", sessionId: "session-1", sessionSecret, now });
-  assert.throws(
-    () => verifyMobileAccessToken(token.slice(0, -1) + (token.endsWith("a") ? "b" : "a"), { sessionSecret, now }),
-    { code: "INVALID_ACCESS_TOKEN" },
-  );
+  const parts = token.split(".");
+  const index = 5;
+  parts[2] = parts[2].slice(0, index) + (parts[2][index] === "a" ? "b" : "a") + parts[2].slice(index + 1);
+  assert.throws(() => verifyMobileAccessToken(parts.join("."), { sessionSecret, now }), { code: "INVALID_ACCESS_TOKEN" });
 });
 
 test("expired tokens are rejected", () => {

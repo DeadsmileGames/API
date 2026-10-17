@@ -84,6 +84,8 @@ export function verifyMobileAccessToken(token, { sessionSecret, now = Date.now()
     !payload.sid ||
     !Number.isInteger(payload?.iat) ||
     !Number.isInteger(payload?.nbf) ||
+    !Number.isInteger(payload?.exp) ||
+    payload.exp <= payload.iat ||
     payload.nbf > current ||
     payload.iat > current + 60 ||
     payload.exp - payload.iat > TOKEN_TTL_SECONDS

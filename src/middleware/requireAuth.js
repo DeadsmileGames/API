@@ -48,7 +48,7 @@ export async function requireAuth(req, res, next) {
     }
     req.auth = { userId: user.id, role: user.role };
 
-    if (req.session?.userId) {
+    if (req.session?.userId === user.id) {
       if (req.session.role && req.session.role !== user.role) {
         const previousDevice = req.session.device;
         await new Promise((resolve, reject) => {
