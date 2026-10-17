@@ -92,7 +92,7 @@ export async function sendPreorderEmailBatch() {
    for(let i=0;i<10;i++){const candidate=newCode();const exists=await query("SELECT 1 FROM game_preorders WHERE code_hash=$1",[hash(candidate)]);if(!exists.rows.length){code=candidate;break;}}
    if(!code) throw new AppError(503,"PREORDER_CODE_GENERATION_FAILED");
    await query("UPDATE game_preorders SET code_hash=$2 WHERE id=$1",[p.id,hash(code)]);
-   const name=escapeHtml(p.first_name), title=escapeHtml(p.title);
+   const name=p.first_name, title=p.title;
    const copy=p.locale==="pt-BR"?{subject:"Sua recompensa de pré-venda: "+p.title,text:"Olá "+p.first_name+", a pré-venda terminou. Seu código único de resgate é "+code+". Entre na conta Deadsmile Games e selecione Resgatar código."}:p.locale==="es"?{subject:"Tu recompensa de reserva: "+p.title,text:"Hola "+p.first_name+", la reserva terminó. Tu código único es "+code+". Inicia sesión en Deadsmile Games y elige Canjear código."}:{subject:"Your preorder reward: "+p.title,text:"Hi "+p.first_name+", the preorder has ended. Your unique redemption code is "+code+". Sign in to Deadsmile Games and choose Redeem code."};
    const emailCopy = p.locale === "pt-BR"
     ? { heading: "Sua recompensa está pronta", intro: `Olá ${name}! A pré-venda de ${title} terminou. Use este código único na sua conta Deadsmile Games para resgatar a recompensa.`, action: "Resgatar código", footer: "Este código só pode ser usado uma vez e deve ser resgatado na conta associada a este e-mail." }
