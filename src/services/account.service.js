@@ -12,6 +12,8 @@ import {
   publicActivity,
 } from "../repositories/platform.repository.js";
 
+const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
+
 export async function getAccount(userId) {
   const user = await findUserById(userId);
   if (!user) throw new AppError(404, "USER_NOT_FOUND");
@@ -24,9 +26,11 @@ export async function updateAccount(userId, payload) {
 
   const currentUsername = String(current.username || "").toLowerCase();
   const requestedUsername = String(payload.username || current.username || "").toLowerCase();
+  const currentHasReservedProfile = PERSONALIZED_PROFILE_HANDLES.has(currentUsername);
+  const requestedHasReservedProfile = PERSONALIZED_PROFILE_HANDLES.has(requestedUsername);
   if (
-    (currentUsername === "deadsmilegames" && requestedUsername !== "deadsmilegames") ||
-    (currentUsername !== "deadsmilegames" && requestedUsername === "deadsmilegames")
+    (currentHasReservedProfile && requestedUsername !== currentUsername) ||
+    (!currentHasReservedProfile && requestedHasReservedProfile)
   ) {
     throw new AppError(409, "USERNAME_TAKEN");
   }
@@ -43,9 +47,10 @@ export async function updateAccount(userId, payload) {
   }
 
   const nextUsername = payload.username?.toLowerCase() || current.username;
-  const isOfficialAccount =
-    current.username?.toLowerCase() === "deadsmilegames" &&
-    nextUsername === "deadsmilegames";
+  const isPersonalizedAccount =
+    PERSONALIZED_PROFILE_HANDLES.has(currentUsername) &&
+    PERSONALIZED_PROFILE_HANDLES.has(nextUsername) &&
+    nextUsername === currentUsername;
 
   await updateProfile(userId, {
     username: nextUsername,
@@ -54,7 +59,7 @@ export async function updateAccount(userId, payload) {
     websiteUrl: payload.websiteUrl ?? current.website_url,
     location: payload.location ?? current.location,
     avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : current.avatar_url,
-    profileBannerUrl: isOfficialAccount
+    profileBannerUrl: isPersonalizedAccount
       ? (payload.profileBannerUrl !== undefined ? payload.profileBannerUrl : current.profile_banner_url)
       : null,
   });
@@ -78,8 +83,10 @@ export async function getPublicProfile(username) {
     bio: user.bio || "",
     websiteUrl: user.website_url || null,
     location: user.location || null,
-    bannerUrl: user.username?.toLowerCase() === "deadsmilegames" ? user.profile_banner_url || null : null,
-    isVerified: user.username?.toLowerCase() === "deadsmilegames",
+    bannerUrl: PERSONALIZED_PROFILE_HANDLES.has(String(user.username || "").toLowerCase())
+      ? user.profile_banner_url || null
+      : null,
+    isVerified: PERSONALIZED_PROFILE_HANDLES.has(String(user.username || "").toLowerCase()),
     createdAt: user.created_at,
     recentGames: recentGames.map((item) => ({
       id: item.id,
