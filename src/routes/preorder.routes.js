@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { authenticatedApiLimiter, integrationLimiter, publicWriteLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
+import { authenticatedApiLimiter, publicWriteLimiter, publicEmailLimiter } from "../middleware/rateLimiters.js";
 import * as controller from "../controllers/preorder.controller.js";
 const slug=z.object({slug:z.string().min(2).max(120).regex(/^[a-z0-9-]+$/)}).strict();
 const token=z.object({token:z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/)}).strict();
@@ -10,7 +10,7 @@ const registration=z.object({firstName:z.string().trim().min(1).max(100),lastNam
 const redeem=z.object({code:z.string().trim().regex(/^\d{6}$/)}).strict();
 export const preorderRouter=Router();
 preorderRouter.use(authenticatedApiLimiter);
-preorderRouter.get("/",integrationLimiter,controller.listAvailable);
+preorderRouter.get("/",controller.listAvailable);
 preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),requireAuth,controller.redeem);
 preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
 preorderRouter.get("/:slug/status",validate(slug,"params"),requireAuth,controller.status);
