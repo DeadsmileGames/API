@@ -41,6 +41,7 @@ export const updateAccountSchema = z
     websiteUrl: httpsUrl,
     location: z.string().trim().max(120).optional(),
     avatarUrl,
+    profileBannerUrl: httpsUrl,
   })
   .strict();
 

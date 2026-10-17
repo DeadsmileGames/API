@@ -141,6 +141,39 @@ export function createApp() {
     }
   });
 
+  app.get("/api/time", (req, res) => {
+    const epochMs = Date.now();
+    const requestedTimeZone =
+      typeof req.query.timeZone === "string" && req.query.timeZone.length <= 100
+        ? req.query.timeZone.trim()
+        : "";
+    let timeZone = "UTC";
+    if (requestedTimeZone) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: requestedTimeZone }).format(new Date(epochMs));
+        timeZone = requestedTimeZone;
+      } catch {
+        // Unknown time zones fall back to UTC rather than trusting client clock data.
+      }
+    }
+    const now = new Date(epochMs);
+    const localTime = new Intl.DateTimeFormat(res.locals.locale || "en", {
+      timeZone,
+      dateStyle: "medium",
+      timeStyle: "medium",
+    }).format(now);
+    res.set("Cache-Control", "no-store");
+    res.json({
+      success: true,
+      data: {
+        epochMs,
+        utc: now.toISOString(),
+        timeZone,
+        localTime,
+      },
+    });
+  });
+
   app.use(hpp());
 
   const standardJson = express.json({ limit: "2mb", strict: true });

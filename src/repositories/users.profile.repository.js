@@ -9,6 +9,7 @@ export async function findPublicProfile(username) {
        bio,
        website_url,
        location,
+       profile_banner_url,
        created_at,
        share_playtime
      FROM users
@@ -22,7 +23,7 @@ export async function findPublicProfile(username) {
 
 export async function updateProfile(
   userId,
-  { username, email, bio, websiteUrl, location, avatarUrl },
+  { username, email, bio, websiteUrl, location, avatarUrl, profileBannerUrl },
 ) {
   const { rows } = await query(
     `UPDATE users
@@ -32,10 +33,11 @@ export async function updateProfile(
          website_url = $4,
          location   = $5,
          avatar_url = $6,
+         profile_banner_url = $7,
          updated_at = now()
-     WHERE id = $7
+     WHERE id = $8
      RETURNING id, email, username, role, avatar_url, bio, website_url, location,
-               created_at, updated_at, last_login_at`,
+               profile_banner_url, created_at, updated_at, last_login_at`,
     [
       username,
       email,
@@ -43,6 +45,7 @@ export async function updateProfile(
       websiteUrl || null,
       location || null,
       avatarUrl || null,
+      profileBannerUrl || null,
       userId,
     ],
   );

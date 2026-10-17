@@ -93,6 +93,8 @@ export function sanitizeUser(user) {
     bio: user.bio || "",
     websiteUrl: user.website_url || null,
     location: user.location || null,
+    profileBannerUrl: user.username?.toLowerCase() === "deadsmilegames" ? user.profile_banner_url || null : null,
+    isVerified: user.username?.toLowerCase() === "deadsmilegames",
     createdAt: user.created_at,
     updatedAt: user.updated_at,
     lastLoginAt: user.last_login_at,

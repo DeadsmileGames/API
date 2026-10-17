@@ -2,7 +2,7 @@ import { query } from "../config/database.js";
 
 const USER_FIELDS = `
   id, email, username, role,
-  avatar_url, bio, website_url, location,
+  avatar_url, bio, website_url, location, profile_banner_url,
   created_at, updated_at, last_login_at,
   email_verified_at,
   share_game_activity,

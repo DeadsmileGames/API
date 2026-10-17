@@ -33,18 +33,21 @@ export async function updateAccount(userId, payload) {
     throw new AppError(400, "EMAIL_CHANGE_REQUIRES_VERIFICATION");
   }
 
+  const nextUsername = payload.username?.toLowerCase() || current.username;
+  const isOfficialAccount =
+    current.username?.toLowerCase() === "deadsmilegames" &&
+    nextUsername === "deadsmilegames";
+
   await updateProfile(userId, {
-    username: payload.username?.toLowerCase() || current.username,
-
+    username: nextUsername,
     email: current.email,
-
     bio: payload.bio ?? current.bio,
-
     websiteUrl: payload.websiteUrl ?? current.website_url,
-
     location: payload.location ?? current.location,
-
     avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : current.avatar_url,
+    profileBannerUrl: isOfficialAccount
+      ? (payload.profileBannerUrl !== undefined ? payload.profileBannerUrl : current.profile_banner_url)
+      : null,
   });
 
   return getAccount(userId);
@@ -66,6 +69,8 @@ export async function getPublicProfile(username) {
     bio: user.bio || "",
     websiteUrl: user.website_url || null,
     location: user.location || null,
+    bannerUrl: user.username?.toLowerCase() === "deadsmilegames" ? user.profile_banner_url || null : null,
+    isVerified: user.username?.toLowerCase() === "deadsmilegames",
     createdAt: user.created_at,
     recentGames: recentGames.map((item) => ({
       id: item.id,

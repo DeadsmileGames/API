@@ -512,6 +512,48 @@ test("newsletter Store badge survives creation, persistence, editing and public 
   assert.match(detail.body.data.body, /pt-br%20dark\.svg/);
   assert.doesNotMatch(detail.body.data.body, /onerror|steal/);
 });
+test("server time endpoint returns authoritative time formatted for the visitor time zone", async () => {
+  const result = await guest.request("/time?timeZone=America%2FNew_York");
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.success, true);
+  assert.equal(result.body.data.timeZone, "America/New_York");
+  assert.equal(Number.isFinite(result.body.data.epochMs), true);
+  assert.equal(Number.isNaN(Date.parse(result.body.data.utc)), false);
+  assert.equal(typeof result.body.data.localTime, "string");
+  const fallback = await guest.request("/time?timeZone=not-a-real-zone");
+  assert.equal(fallback.body.data.timeZone, "UTC");
+});
+
+test("only the canonical studio account can configure a public profile banner and verified mark", async () => {
+  await pool.query("UPDATE users SET username='deadsmilegames', profile_banner_url=NULL WHERE id=$1", [adminId]);
+  try {
+    const saved = await admin.request("/account", {
+      method: "PATCH",
+      body: { profileBannerUrl: "https://images.example.test/deadsmile-banner.webp" },
+    });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.data.profileBannerUrl, "https://images.example.test/deadsmile-banner.webp");
+    assert.equal(saved.body.data.isVerified, true);
+
+    const publicOfficial = await guest.request("/account/profile/deadsmilegames");
+    assert.equal(publicOfficial.status, 200, JSON.stringify(publicOfficial.body));
+    assert.equal(publicOfficial.body.data.bannerUrl, "https://images.example.test/deadsmile-banner.webp");
+    assert.equal(publicOfficial.body.data.isVerified, true);
+
+    const attemptedImpersonation = await player.request("/account", {
+      method: "PATCH",
+      body: { profileBannerUrl: "https://images.example.test/fake-banner.webp" },
+    });
+    assert.equal(attemptedImpersonation.status, 200, JSON.stringify(attemptedImpersonation.body));
+    assert.equal(attemptedImpersonation.body.data.profileBannerUrl, null);
+    const publicPlayer = await guest.request("/account/profile/player");
+    assert.equal(publicPlayer.body.data.bannerUrl, null);
+    assert.equal(publicPlayer.body.data.isVerified, false);
+  } finally {
+    await pool.query("UPDATE users SET username='admin', profile_banner_url=NULL WHERE id=$1", [adminId]);
+  }
+});
+
 test("privacy defaults hide activity and telemetry consent rejects collection", async () => {
   let result = await player.request("/platform/telemetry", {
     method: "POST",
