@@ -345,22 +345,24 @@ export async function downloadOwnedPreorderReward(slug, userId) {
  return rows[0].preorder_reward_zip;
 }
 
-export async function consumePreorderReward(token) {
+export async function consumePreorderReward(token, userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
  if(typeof token!=="string"||token.length<32||token.length>128) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  const downloadKey=crypto.randomBytes(32).toString("base64url");
  const {rows}=await query(`UPDATE game_preorders p SET reward_accessed_at=now(),reward_download_token_hash=$2
  FROM games g WHERE p.game_id=g.id AND p.claim_token_hash=$1 AND p.redeemed_at IS NOT NULL
- AND p.reward_accessed_at IS NULL AND p.claim_token_expires_at>now()
- RETURNING p.id,g.slug,g.title,g.preorder_reward_type,g.preorder_reward_description,g.preorder_reward_wallpapers,(g.preorder_reward_zip IS NOT NULL) AS has_zip`,[hash(token),hash(downloadKey)]);
+ AND p.reward_accessed_at IS NULL AND p.claim_token_expires_at>now() AND p.user_id=$3
+ RETURNING p.id,g.slug,g.title,g.preorder_reward_type,g.preorder_reward_description,g.preorder_reward_wallpapers,(g.preorder_reward_zip IS NOT NULL) AS has_zip`,[hash(token),hash(downloadKey),userId]);
  const row=rows[0]; if(!row) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  return {id:row.id,slug:row.slug,title:row.title,rewardType:row.preorder_reward_type,description:row.preorder_reward_description||"",wallpapers:row.preorder_reward_wallpapers||[],downloadAvailable:row.has_zip,downloadUrl:row.has_zip?"/api/preorders/reward/"+token+"/download?key="+downloadKey:null};
 }
-export async function downloadPreorderReward(token,key) {
+export async function downloadPreorderReward(token,key,userId) {
+ if (!userId) throw new AppError(401, "UNAUTHENTICATED");
  if(typeof token!=="string"||typeof key!=="string"||token.length<32||key.length<32) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  const {rows}=await query(`UPDATE game_preorders p SET reward_download_token_hash=NULL FROM games g
  WHERE p.game_id=g.id AND p.claim_token_hash=$1 AND p.reward_download_token_hash=$2
- AND p.claim_token_expires_at>now()
- RETURNING g.preorder_reward_zip`,[hash(token),hash(key)]);
+ AND p.claim_token_expires_at>now() AND p.user_id=$3
+ RETURNING g.preorder_reward_zip`,[hash(token),hash(key),userId]);
  if(!rows[0]?.preorder_reward_zip) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  return rows[0].preorder_reward_zip;
 }
