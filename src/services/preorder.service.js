@@ -70,7 +70,7 @@ export async function getPreorderStatus(slug, userId) {
  const game = gameResult.rows[0];
  if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
  const { rows: preorderRows } = await query(
-  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at,p.reward_code,(g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended FROM game_preorders p JOIN games g ON g.id=p.game_id JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
+  "SELECT p.id,p.confirmed_at,p.confirmation_expires_at,p.created_at,p.reward_code,p.redeemed_at,(g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended FROM game_preorders p JOIN games g ON g.id=p.game_id JOIN users account ON account.id=$2 WHERE p.game_id=$1 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) ORDER BY p.created_at DESC LIMIT 1",
   [game.id, userId],
  );
  const preorder = preorderRows[0] || null;
@@ -84,6 +84,7 @@ export async function getPreorderStatus(slug, userId) {
  const rewardRedeemable = Boolean(
   preorder?.confirmed_at &&
   preorder.reward_code &&
+  !preorder.redeemed_at &&
   preorder.preorder_ended
  );
  return {
@@ -95,6 +96,7 @@ export async function getPreorderStatus(slug, userId) {
   // Keep the code in storage, but never expose it before the preorder ends.
   rewardCode: rewardRedeemable ? preorder.reward_code : null,
   rewardRedeemable,
+  rewardRedeemed: Boolean(preorder?.redeemed_at),
  };
 }
 
@@ -249,9 +251,9 @@ export async function redeemPreorderCode(code, account) {
            (g.preorder_ends_at IS NOT NULL AND g.preorder_ends_at <= now()) AS preorder_ended
     FROM game_preorders p
     JOIN games g ON g.id = p.game_id
-    WHERE p.reward_code = $1
+    WHERE p.code_hash = $1 OR (p.code_hash IS NULL AND p.reward_code = $2)
     FOR UPDATE OF p`,
-   [normalized],
+   [hash(normalized), normalized],
   );
   const preorder = found.rows[0];
   const belongsToAccount = preorder && (
@@ -267,8 +269,21 @@ export async function redeemPreorderCode(code, account) {
   }
   const token = crypto.randomBytes(32).toString("base64url");
   await client.query(
-   "UPDATE game_preorders SET redeemed_at=now(),claim_token_hash=$2,claim_token_expires_at=now()+interval '15 minutes' WHERE id=$1",
-   [preorder.id, hash(token)],
+   `UPDATE game_preorders
+     SET user_id=COALESCE(user_id,$3),
+         redeemed_at=now(),
+         claim_token_hash=$2,
+         claim_token_expires_at=now()+interval '15 minutes',
+         first_name=NULL,
+         last_name=NULL,
+         age=NULL,
+         email=NULL,
+         code_hash=NULL,
+         reward_code=NULL,
+         confirmation_token_hash=NULL,
+         confirmation_expires_at=NULL
+     WHERE id=$1`,
+   [preorder.id, hash(token), account.id],
   );
   await client.query("COMMIT");
   return { rewardUrl: "/games/" + encodeURIComponent(preorder.slug) + "/preorder/reward/" + token };
@@ -294,6 +309,7 @@ export async function downloadPreorderReward(token,key) {
  if(typeof token!=="string"||typeof key!=="string"||token.length<32||key.length<32) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  const {rows}=await query(`UPDATE game_preorders p SET reward_download_token_hash=NULL FROM games g
  WHERE p.game_id=g.id AND p.claim_token_hash=$1 AND p.reward_download_token_hash=$2
+ AND p.claim_token_expires_at>now()
  RETURNING g.preorder_reward_zip`,[hash(token),hash(key)]);
  if(!rows[0]?.preorder_reward_zip) throw new AppError(404,"PREORDER_REWARD_NOT_FOUND");
  return rows[0].preorder_reward_zip;

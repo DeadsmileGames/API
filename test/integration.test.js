@@ -1387,12 +1387,41 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const endedStatus = await player.request("/preorders/free/status");
     assert.equal(endedStatus.body.data.rewardRedeemable, true);
     assert.equal(endedStatus.body.data.rewardCode, registration.reward_code, "the code appears once the preorder has ended");
+    // Verify redemption can match the submitted code by its digest even if the
+    // display-only copy is absent, then erase personal details and code material.
+    await pool.query(
+      "UPDATE game_preorders SET reward_code=NULL WHERE game_id=$1 AND user_id IS NULL AND email=$2",
+      [freeId, "player@example.test"],
+    );
     const successfulRedemption = await player.request("/preorders/redeem", {
       method: "POST",
       body: { code: registration.reward_code },
     });
     assert.equal(successfulRedemption.status, 200, JSON.stringify(successfulRedemption.body));
     assert.equal(successfulRedemption.body.data.rewardUrl.startsWith("/games/free/preorder/reward/"), true);
+
+    const redeemedRecord = (await pool.query(
+      "SELECT user_id,first_name,last_name,age,email,code_hash,reward_code,redeemed_at FROM game_preorders WHERE game_id=$1",
+      [freeId],
+    )).rows[0];
+    assert.equal(String(redeemedRecord.user_id), String(userId));
+    assert.equal(redeemedRecord.first_name, null);
+    assert.equal(redeemedRecord.last_name, null);
+    assert.equal(redeemedRecord.age, null);
+    assert.equal(redeemedRecord.email, null);
+    assert.equal(redeemedRecord.code_hash, null);
+    assert.equal(redeemedRecord.reward_code, null);
+    assert(redeemedRecord.redeemed_at);
+
+    const redeemedStatus = await player.request("/preorders/free/status");
+    assert.equal(redeemedStatus.body.data.rewardRedeemed, true);
+    assert.equal(redeemedStatus.body.data.rewardCode, null);
+    const rewardToken = successfulRedemption.body.data.rewardUrl.split("/").pop();
+    const claimedReward = await player.request("/preorders/reward/" + rewardToken);
+    assert.equal(claimedReward.status, 200, JSON.stringify(claimedReward.body));
+    assert.equal(claimedReward.body.data.downloadAvailable, true);
+    const replayedClaim = await player.request("/preorders/reward/" + rewardToken);
+    assert.equal(replayedClaim.status, 404);
   } finally {
     await pool.query("DELETE FROM game_preorders WHERE game_id IN ($1,$2)", [freeId, paidId]);
     await pool.query(
