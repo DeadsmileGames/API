@@ -538,6 +538,7 @@ CREATE TABLE microsoft_store_products (
 CREATE TABLE IF NOT EXISTS "game_preorders" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  "user_id" uuid REFERENCES users(id) ON DELETE CASCADE,
   "first_name" varchar(100) NOT NULL,
   "last_name" varchar(100) NOT NULL,
   "age" smallint NOT NULL CHECK (age BETWEEN 1 AND 120),
@@ -558,8 +559,17 @@ CREATE TABLE IF NOT EXISTS "game_preorders" (
   UNIQUE (game_id, email)
 );
 CREATE INDEX IF NOT EXISTS game_preorders_confirmation_token_uidx ON game_preorders(confirmation_token_hash) WHERE confirmation_token_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS game_preorders_user_game_idx ON game_preorders(user_id, game_id) WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS game_preorders_email_queue_idx ON game_preorders(email_status, created_at) WHERE email_status IN ('waiting','failed');
 CREATE INDEX IF NOT EXISTS game_preorders_confirmed_queue_idx ON game_preorders(email_status, created_at) WHERE confirmed_at IS NOT NULL AND email_status IN ('waiting','failed');
+CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
+  "user_id" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  "activity_date" date NOT NULL,
+  "attempts" smallint NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
+  "updated_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, game_id, activity_date)
+);
 CREATE TABLE IF NOT EXISTS "preorder_email_batches" (
   "id" boolean PRIMARY KEY DEFAULT true CHECK (id = true),
   "last_batch_at" timestamp with time zone
