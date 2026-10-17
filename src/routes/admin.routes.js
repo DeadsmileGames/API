@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/requireAuth.js";
+import { authenticatedApiLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import {
   newsletterPostSchema,
@@ -21,7 +22,7 @@ import {
 
 export const adminRouter = Router();
 
-adminRouter.use(requireAuth, requireRole("admin"));
+adminRouter.use(authenticatedApiLimiter, requireAuth, requireRole("admin"));
 
 adminRouter.post("/newsletter", validate(newsletterPostSchema), controller.newsletter);
 adminRouter.post("/video", validate(videoPostSchema), controller.video);
