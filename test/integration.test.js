@@ -527,6 +527,18 @@ test("server time endpoint returns authoritative time formatted for the visitor 
 test("only the canonical studio account can configure a public profile banner and verified mark", async () => {
   await pool.query("UPDATE users SET username='deadsmilegames', profile_banner_url=NULL WHERE id=$1", [adminId]);
   try {
+    const officialRename = await admin.request("/account", {
+      method: "PATCH",
+      body: { username: "deadsmilegames_renamed" },
+    });
+    assert.equal(officialRename.status, 409, JSON.stringify(officialRename.body));
+
+    const claimedOfficialName = await player.request("/account", {
+      method: "PATCH",
+      body: { username: "deadsmilegames" },
+    });
+    assert.equal(claimedOfficialName.status, 409, JSON.stringify(claimedOfficialName.body));
+
     const saved = await admin.request("/account", {
       method: "PATCH",
       body: { profileBannerUrl: "https://images.example.test/deadsmile-banner.webp" },
