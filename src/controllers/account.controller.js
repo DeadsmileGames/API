@@ -17,17 +17,17 @@ export const publicProfile = asyncHandler(async (req, res) => {
 });
 
 export const show = asyncHandler(async (req, res) => {
-  const account = await getAccount(req.session.userId);
+  const account = await getAccount(req.auth.userId);
   sendSuccess(res, account);
 });
 
 export const update = asyncHandler(async (req, res) => {
-  const account = await updateAccount(req.session.userId, req.body);
+  const account = await updateAccount(req.auth.userId, req.body);
   sendSuccess(res, account);
 });
 
 export const remove = asyncHandler(async (req, res) => {
-  await deleteAccount(req.session.userId, req.body.password);
+  await deleteAccount(req.auth.userId, req.body.password);
   await new Promise((resolve, reject) =>
     req.session.destroy((err) => (err ? reject(err) : resolve())),
   );
@@ -41,18 +41,18 @@ export const remove = asyncHandler(async (req, res) => {
   sendSuccess(res, { deleted: true });
 });
 export const changeEmail = asyncHandler(async (req, res) => {
-  const result = await requestEmailChange(req.session.userId, req.body, res.locals.locale);
+  const result = await requestEmailChange(req.auth.userId, req.body, res.locals.locale);
 
   sendSuccess(res, result);
 });
 export const privacy = asyncHandler(async (req, res) => {
-  const result = await getPrivacy(req.session.userId);
+  const result = await getPrivacy(req.auth.userId);
 
   sendSuccess(res, result);
 });
 
 export const changePrivacy = asyncHandler(async (req, res) => {
-  const result = await setPrivacy(req.session.userId, req.body);
+  const result = await setPrivacy(req.auth.userId, req.body);
 
   sendSuccess(res, result);
 });
