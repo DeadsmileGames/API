@@ -179,7 +179,7 @@ export async function cancelPreorder(slug, userId) {
  const game = gameResult.rows[0];
  if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
  const { rows } = await query(
-  "DELETE FROM game_preorders p USING users account WHERE p.game_id=$1 AND account.id=$2 AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) RETURNING p.id",
+  "DELETE FROM game_preorders p USING users account WHERE p.game_id=$1 AND account.id=$2 AND p.redeemed_at IS NULL AND (p.user_id=$2 OR (p.user_id IS NULL AND lower(p.email)=lower(account.email))) RETURNING p.id",
   [game.id, userId],
  );
  if (!rows.length) throw new AppError(404, "PREORDER_NOT_FOUND");
