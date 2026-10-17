@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { errorCatalog, resolveLocale } from "./utils/publicErrors.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -13,6 +14,7 @@ import { pool, directPool } from "./config/database.js";
 import { csrfCookie, csrfToken, verifyCsrf } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminBodyLimiter } from "./middleware/bodyLimiter.js";
+import { sendError } from "./utils/apiResponse.js";
 import { apiRequestLimiter } from "./middleware/rateLimiters.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { gamesRouter } from "./routes/games.routes.js";
@@ -134,7 +136,13 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.use("/api", apiRequestLimiter);
 
-  app.get("/api/health", async (_req, res) => {
+  app.get("/api/health", rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), async (_req, res) => {
     res.set("Cache-Control", "no-store");
     try {
       await pool.query("SELECT 1");
@@ -203,6 +211,7 @@ export function createApp() {
       cookie: sessionCookieOptions(),
     }),
   );
+  app.use("/api", verifyCsrf);
 
   app.get("/api/errors", (_req, res) =>
     res.json({
@@ -211,7 +220,6 @@ export function createApp() {
     }),
   );
   app.get("/api/csrf", csrfToken);
-  app.use("/api", verifyCsrf);
 
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminBodyLimiter, adminRouter);
