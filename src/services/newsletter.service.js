@@ -45,7 +45,7 @@ export async function subscribe(email, locale = "en") {
     en: {
       subject: "Confirm your Deadsmile Games newsletter",
       preheader: "Confirm your email to receive games, Newswire stories and videos.",
-      heading: "Confirm your newsletter",
+      heading: "Confirm your subscription",
       intro: "Confirm this address to receive new games, Newswire stories and videos from Deadsmile Games.",
       action: "Confirm email",
       footer: "Newsletter subscription confirmation",
@@ -78,7 +78,7 @@ export async function subscribe(email, locale = "en") {
     intro: copy.intro,
     actionLabel: copy.action,
     actionUrl: confirmationUrl,
-    footer: copy.footer + ". " + copy.ignore,
+    footer: copy.ignore,
   });
   await sendTransactionalEmail({
     to: normalized,
