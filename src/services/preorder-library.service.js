@@ -35,3 +35,15 @@ export async function getPreorderedLibraryItems(userId) {
     };
   });
 }
+
+export async function hasPreorderForUser(userId, gameId) {
+  const { rows } = await query(
+    `SELECT 1
+     FROM game_preorders p
+     JOIN users u ON lower(u.email) = lower(p.email)
+     WHERE u.id = $1 AND p.game_id = $2
+     LIMIT 1`,
+    [userId, gameId],
+  );
+  return rows.length > 0;
+}
