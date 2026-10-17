@@ -28,7 +28,13 @@ export async function sendTicketNotification(ticket) {
       replyTo: userEmail,
       subject: `[Support Ticket #${id}] ${category}`,
       text: `New support ticket:\n\nID: ${id}\nUser: ${userEmail}\nCategory: ${category}\nDate: ${new Date(created_at).toISOString()}\n\nMessage:\n${message}\n\nTo reply, simply reply to this email – it will go directly to the user.`,
-      html: `<h2>New support ticket</h2><p><strong>ID:</strong> ${safeId}</p><p><strong>User:</strong> ${safeEmail}</p><p><strong>Category:</strong> ${safeCategory}</p><p><strong>Date:</strong> ${safeDate}</p><h3>Message:</h3><p>${safeMessage}</p><p><em>To reply, simply reply to this email – it will go directly to the user.</em></p>`,
+      html: brandedEmail({
+        preheader: `New support request #${id}` ,
+        heading: `Support request #${id}`,
+        intro: "A player sent a message to Deadsmile Games Support.",
+        bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 0 18px"><tr><td style="padding:8px 0;color:#b8b8b8;width:110px">From</td><td style="padding:8px 0;color:#f0f0f0;overflow-wrap:anywhere">${safeEmail}</td></tr><tr><td style="padding:8px 0;color:#b8b8b8">Category</td><td style="padding:8px 0;color:#f0f0f0">${safeCategory}</td></tr><tr><td style="padding:8px 0;color:#b8b8b8">Received</td><td style="padding:8px 0;color:#f0f0f0">${safeDate}</td></tr></table><div style="padding:16px;background:#0f0f0f;border:1px solid #3d3d3d;border-radius:8px;white-space:normal;overflow-wrap:anywhere">${safeMessage}</div><p style="margin:18px 0;color:#b8b8b8">Reply to this email to respond directly to the player.</p>`,
+        footer: `Support ticket #${id} · Replies go to the player who submitted this request.`,
+      }),
     });
     if (error) return;
   } catch {}
