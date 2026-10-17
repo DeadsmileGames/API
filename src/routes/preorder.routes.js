@@ -1,5 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 import { sendError } from "../utils/apiResponse.js";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
@@ -18,7 +19,13 @@ preorderRouter.use(rateLimit({
   legacyHeaders: false,
   handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
 }));
-preorderRouter.get("/",controller.listAvailable);
+preorderRouter.get("/", rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}), controller.listAvailable);
 preorderRouter.post("/redeem",publicEmailLimiter,validate(redeem),requireAuth,controller.redeem);
 preorderRouter.post("/confirm/:token",publicEmailLimiter,validate(token,"params"),controller.confirm);
 preorderRouter.get("/:slug/status",validate(slug,"params"),requireAuth,controller.status);
