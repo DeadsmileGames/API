@@ -11,8 +11,18 @@ const DEFAULT_AGE = { en: 13, "pt-BR": 13, es: 13 };
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const localeOf = (value) => LOCALES.has(value) ? value : "en";
 const newCode = () => String(randomInt(0, 1_000_000)).padStart(6,"0");
+const absoluteEmailImageUrl = (value) => {
+ const raw = String(value || "").trim();
+ if (!raw) return "";
+ try {
+  const parsed = new URL(raw, env.frontendUrl);
+  return ["https:", "http:"].includes(parsed.protocol) ? parsed.href : "";
+ } catch {
+  return "";
+ }
+};
 
-async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug, token, locale }) {
+async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, coverImage, slug, token, locale }) {
  const confirmUrl = `${env.frontendUrl}/games/${encodeURIComponent(slug)}/preorder/confirm/${token}`;
  const copy = locale === "pt-BR"
   ? {
@@ -49,8 +59,11 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug
  const html = brandedEmail({
   lang: locale,
   preheader: copy.preheader,
+  eyebrow: locale === "pt-BR" ? "PRÉ-VENDA" : locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
+  heroImageUrl: absoluteEmailImageUrl(coverImage),
   heading: copy.heading,
-  intro: `${copy.intro} ${copy.expiry}`,
+  intro: copy.intro,
+  bodyHtml: `<p style="margin:0;color:#b8b8b8;line-height:1.8">${copy.expiry}</p>`,
   actionLabel: copy.action,
   actionUrl: confirmUrl,
   footer: copy.footer
@@ -110,7 +123,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
  let attemptsUsed = 0;
  try {
   await client.query("BEGIN");
-  const found = await client.query("SELECT id,slug,title,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE", [slug]);
+  const found = await client.query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at,preorder_age_ratings,access_type FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free' FOR SHARE", [slug]);
   game = found.rows[0];
   if (!game) throw new AppError(404, "PREORDER_NOT_FOUND");
   const now = Date.now();
@@ -161,7 +174,7 @@ export async function createPreorder(slug, payload, requestLocale = "en", userId
  } finally {
   client.release();
  }
- await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, slug: game.slug, token: rawToken, locale });
+ await sendPreorderConfirmationEmail({ email, firstName: first, gameTitle: game.title, coverImage: game.cover_image, slug: game.slug, token: rawToken, locale });
  return { confirmationSent: true, attemptsRemaining: Math.max(0, 2 - attemptsUsed) };
 }
 
@@ -236,7 +249,7 @@ export async function sendPreorderEmailBatch() {
   await client.query("BEGIN");
   const gate=await client.query("UPDATE preorder_email_batches SET last_batch_at=now() WHERE id=true AND (last_batch_at IS NULL OR last_batch_at<now()-interval '1 day') RETURNING id");
   if(!gate.rows.length){await client.query("ROLLBACK");return {sent:0};}
-  const result=await client.query(`SELECT p.id,p.email,p.first_name,p.locale,p.game_id,g.title FROM game_preorders p JOIN games g ON g.id=p.game_id
+  const result=await client.query(`SELECT p.id,p.email,p.first_name,p.locale,p.game_id,g.title,g.cover_image FROM game_preorders p JOIN games g ON g.id=p.game_id
   WHERE p.confirmed_at IS NOT NULL AND p.email_status IN ('waiting','failed') AND g.access_type='free' AND g.preorder_ends_at<=now() AND g.preorder_reward_zip IS NOT NULL
   ORDER BY p.created_at LIMIT 100 FOR UPDATE OF p SKIP LOCKED`);
   batch=result.rows; await client.query("COMMIT");
@@ -263,6 +276,8 @@ export async function sendPreorderEmailBatch() {
    const html = brandedEmail({
     lang: p.locale,
     preheader: copy.subject,
+    eyebrow: p.locale === "pt-BR" ? "PRÉ-VENDA" : p.locale === "es" ? "RESERVA ANTICIPADA" : "PRE-ORDER",
+    heroImageUrl: absoluteEmailImageUrl(p.cover_image),
     heading: emailCopy.heading,
     intro: emailCopy.intro,
     bodyHtml: "<p style=\"margin:12px 0 8px;color:#b8b8b8;font-size:13px\">" + rewardDetails.label + "</p>" +
