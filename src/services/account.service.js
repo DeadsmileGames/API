@@ -22,6 +22,15 @@ export async function updateAccount(userId, payload) {
   const current = await findUserById(userId);
   if (!current) throw new AppError(404, "USER_NOT_FOUND");
 
+  const currentUsername = String(current.username || "").toLowerCase();
+  const requestedUsername = String(payload.username || current.username || "").toLowerCase();
+  if (
+    (currentUsername === "deadsmilegames" && requestedUsername !== "deadsmilegames") ||
+    (currentUsername !== "deadsmilegames" && requestedUsername === "deadsmilegames")
+  ) {
+    throw new AppError(409, "USERNAME_TAKEN");
+  }
+
   if (payload.username && payload.username !== current.username) {
     const existing = await findUserByUsername(payload.username);
     if (existing && existing.id !== userId) {
