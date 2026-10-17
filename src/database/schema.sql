@@ -545,8 +545,28 @@ CREATE TABLE IF NOT EXISTS "game_preorders" (
   "locale" varchar(10) NOT NULL CHECK (locale IN ('en','pt-BR','es')),
   "email" varchar(254) NOT NULL,
   "code_hash" char(64) UNIQUE,
-  "code_sent_at" timestamp with time zone,
-  "email_status" text NOT NULL DEFAULT 'waiting' CHECK (email_status IN ('waiting','sent','failed')),
+  "reward_code" varchar(6) CHECK (reward_code IS NULL OR reward_code ~ '^[0-9]{6}  "claim_token_hash" char(64) UNIQUE,
+  "claim_token_expires_at" timestamp with time zone,
+  "reward_accessed_at" timestamp with time zone,
+  "reward_download_token_hash" char(64) UNIQUE,
+  "redeemed_at" timestamp with time zone,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "confirmation_token_hash" char(64),
+  "confirmation_expires_at" timestamp with time zone,
+  "confirmed_at" timestamp with time zone,
+  UNIQUE (game_id, email)
+);
+CREATE INDEX IF NOT EXISTS game_preorders_confirmation_token_uidx ON game_preorders(confirmation_token_hash) WHERE confirmation_token_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS game_preorders_user_game_idx ON game_preorders(user_id, game_id) WHERE user_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS "game_preorder_daily_limits" (
+  "user_id" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "game_id" uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  "activity_date" date NOT NULL,
+  "attempts" smallint NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
+  "updated_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, game_id, activity_date)
+);
+),
   "claim_token_hash" char(64) UNIQUE,
   "claim_token_expires_at" timestamp with time zone,
   "reward_accessed_at" timestamp with time zone,
