@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { getGithubGameDownload } from "./github-game-releases.service.js";
 import { toClientGame } from "../utils/clientGame.js";
+import { isGameDownloadUnlocked } from "../utils/gameRelease.js";
 import { AppError } from "../utils/AppError.js";
 import { decryptToken, encryptToken } from "../utils/tokenCipher.js";
 import {
@@ -432,6 +433,7 @@ export async function removeGameFromLibrary(userId, gameId) {
 export async function getInstallMetadata(userId, gameId) {
   const game = await findItchGame(gameId);
   if (!game) throw new AppError(404, "GAME_NOT_FOUND");
+  if (!isGameDownloadUnlocked(game)) throw new AppError(409, "GAME_NOT_RELEASED");
   if (!game.download_url) throw new AppError(409, "GAME_RELEASE_NOT_CONFIGURED");
   await addGameToLibrary(userId, gameId);
   const build = await findInstallBuild(userId, gameId);
