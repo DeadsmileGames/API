@@ -1313,7 +1313,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     await pool.query(
       `INSERT INTO game_preorders
        (game_id, first_name, last_name, age, locale, email, confirmation_token_hash, confirmation_expires_at)
-       VALUES ($1,'Pending','Player',18,'pt-BR','pending-preorder@example.test',$2,now()+interval '1 hour')`,
+       VALUES ($1,'Pending','Player',18,'pt-BR','player@example.test',$2,now()+interval '1 hour')`,
       [freeId, tokenHash],
     );
     const confirmed = await preorderGuest.request("/preorders/confirm/" + rawToken, {
@@ -1325,24 +1325,24 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(confirmed.body.data.slug, "free");
     const registration = (await pool.query(
       "SELECT confirmed_at, confirmation_token_hash, confirmation_expires_at FROM game_preorders WHERE game_id=$1 AND email=$2",
-      [freeId, "pending-preorder@example.test"],
+      [freeId, "player@example.test"],
     )).rows[0];
     assert(registration.confirmed_at);
     assert.equal(registration.confirmation_token_hash, null);
     assert.equal(registration.confirmation_expires_at, null);
     assert.equal(await hasPreorderForUser(userId, freeId), true);
-    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), false,
-      "the test registration is not the player account; only a confirmed matching email belongs in the library");
+    assert.equal((await getPreorderedLibraryItems(userId)).some((item) => item.id === freeId), true,
+      "a confirmed matching email belongs in the reserved library");
 
     const duplicate = await preorderGuest.request("/preorders/free", {
       method: "POST",
       language: "pt-BR",
-      body: { firstName: "Pending", lastName: "Player", age: 18, email: "pending-preorder@example.test", locale: "pt-BR" },
+      body: { firstName: "Pending", lastName: "Player", age: 18, email: "player@example.test", locale: "pt-BR" },
     });
     assert.equal(duplicate.status, 409);
     assert.equal(duplicate.body.error.code, "PREORDER_ALREADY_REGISTERED");
     assert.equal(
-      (await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "pending-preorder@example.test"])).rows[0].count,
+      (await pool.query("SELECT count(*)::int AS count FROM game_preorders WHERE game_id=$1 AND email=$2", [freeId, "player@example.test"])).rows[0].count,
       1,
     );
 
