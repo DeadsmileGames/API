@@ -1409,7 +1409,7 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(earlyGameDownload.status, 409, JSON.stringify(earlyGameDownload.body));
     assert.equal(earlyGameDownload.body.error.code, "GAME_NOT_RELEASED");
 
-    const earlyLauncherDownload = await player.request(`/library/${freeId}/install-metadata`);
+    const earlyLauncherDownload = await player.request(`/library/${freeId}/install-metadata`, { method: "POST" });
     assert.equal(earlyLauncherDownload.status, 409, JSON.stringify(earlyLauncherDownload.body));
     assert.equal(earlyLauncherDownload.body.error.code, "GAME_NOT_RELEASED");
     // Keep only the digest after redemption: it identifies later attempts without retaining
