@@ -205,7 +205,7 @@ await player.login("player");
 await other.login("other");
 await admin.login("admin");
 
-test("Windows launcher login uses an HttpOnly server session and no mobile-only route", async () => {
+test("Windows launcher login uses an HttpOnly server session cookie", async () => {
   const launcher = client();
   const result = await launcher.request("/auth/launcher-login", {
     method: "POST",
@@ -213,7 +213,7 @@ test("Windows launcher login uses an HttpOnly server session and no mobile-only 
   });
   assert.equal(result.status, 200, JSON.stringify(result.body));
   assert.ok(
-    result.headers.getSetCookie().some((cookie) => /deadsmile\\.sid=.*httponly/i.test(cookie)),
+    result.headers.getSetCookie().some((cookie) => /deadsmile\.sid=.*httponly/i.test(cookie)),
     "launcher session cookie must be HttpOnly",
   );
   const me = await launcher.request("/auth/me");
