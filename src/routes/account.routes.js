@@ -48,7 +48,7 @@ accountRouter.use(rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+  skip: () => process.env.NODE_ENV === "test",
   handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
 }));
 
@@ -78,7 +78,7 @@ accountRouter.get("/totp/status", rateLimit({
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), requireAuth, totpController.status);
 accountRouter.get(
@@ -92,7 +92,7 @@ accountRouter.post("/totp/setup", rateLimit({
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), requireAuth, twoFactorLimiter, totpController.setup);
 accountRouter.post(
@@ -102,7 +102,7 @@ accountRouter.post(
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   requireAuth,
@@ -117,7 +117,7 @@ accountRouter.delete(
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   requireAuth,
