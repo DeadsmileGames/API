@@ -3,7 +3,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import * as service from "../services/content.service.js";
 
 export const news = asyncHandler(async (req, res) => {
-  const data = await service.getNews(req.query);
+  const data = await service.getNews(req.validatedQuery ?? req.query);
   sendSuccess(res, data);
 });
 
@@ -13,7 +13,7 @@ export const newsDetails = asyncHandler(async (req, res) => {
 });
 
 export const videos = asyncHandler(async (req, res) => {
-  const data = await service.getVideos(req.query, res.locals.locale);
+  const data = await service.getVideos(req.validatedQuery ?? req.query, res.locals.locale);
   sendSuccess(res, data);
 });
 
