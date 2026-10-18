@@ -186,7 +186,6 @@ export function createApp() {
   });
 
   app.use(cookieParser(env.sessionSecret));
-  app.use(csrfCookie);
   const sessionOptions = {
     store: new PgSession({
       pool,
@@ -212,6 +211,7 @@ export function createApp() {
     sessionOptions.cookie.secure = true;
   }
   app.use(session(sessionOptions));
+  app.use(csrfCookie);
   app.use("/api", verifyCsrf);
 
   app.get("/api/errors", (_req, res) =>
