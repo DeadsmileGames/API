@@ -200,7 +200,7 @@ export function createApp() {
     rolling: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: env.isProduction,
       sameSite: env.cookieSameSite,
       maxAge: 7 * 24 * 60 * 60 * 1_000,
       partitioned: env.isProduction && env.cookieSameSite === "none",
