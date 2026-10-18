@@ -14,15 +14,6 @@ on:
       - ".github/workflows/api-verification.yml"
   pull_request:
     branches: [main, Beta]
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "test/**"
-      - "package.json"
-      - "package-lock.json"
-      - "render.yaml"
-      - ".env.example"
-      - ".github/workflows/api-verification.yml"
 
 permissions:
   contents: read
