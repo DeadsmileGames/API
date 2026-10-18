@@ -994,6 +994,8 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     (await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [userId]))
       .rows[0].count,
   );
+  // Fetch the CSRF token before the concurrent reset requests share this client.
+  await attacker.request("/csrf");
   const results = await Promise.all(
     [1, 2].map(() =>
       attacker.request("/auth/reset-password", {
