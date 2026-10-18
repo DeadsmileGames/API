@@ -1,46 +1,46 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { requireAuth } from "../middleware/requireAuth.js";
 import { sendError } from "../utils/apiResponse.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import { integrationLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import { libraryGameSchema } from "../validators/itch-integration.validators.js";
 import * as controller from "../controllers/library.controller.js";
 
 export const libraryRouter = Router();
+
 libraryRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}), requireAuth);
+libraryRouter.get("/", rateLimit({
     windowMs: 60_000,
-    limit: 300,
+    limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }), requireAuth);
-
-libraryRouter.get("/", rateLimit({
-  windowMs: 60_000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), controller.list);
+  }), controller.list);
 libraryRouter.get("/catalog", rateLimit({
-  windowMs: 60_000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), controller.catalog);
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), controller.catalog);
 libraryRouter.post("/sync", rateLimit({
-  windowMs: 60_000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), integrationLimiter, controller.sync);
+    windowMs: 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), integrationLimiter, controller.sync);
 libraryRouter.post(
   "/:gameId",
   rateLimit({
@@ -57,14 +57,6 @@ libraryRouter.post(
 );
 libraryRouter.delete(
   "/:gameId",
-  rateLimit({
-    windowMs: 60_000,
-    limit: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test",
-    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }),
   integrationLimiter,
   validate(libraryGameSchema, "params"),
   controller.remove,

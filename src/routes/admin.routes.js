@@ -1,5 +1,7 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { requireAuth, requireRole } from "../middleware/requireAuth.js";
+import { sendError } from "../utils/apiResponse.js";
 import { validate } from "../middleware/validate.js";
 import {
   newsletterPostSchema,
@@ -21,7 +23,14 @@ import {
 
 export const adminRouter = Router();
 
-adminRouter.use(requireAuth, requireRole("admin"));
+adminRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}), requireAuth, requireRole("admin"));
 
 adminRouter.post("/newsletter", validate(newsletterPostSchema), controller.newsletter);
 adminRouter.post("/video", validate(videoPostSchema), controller.video);

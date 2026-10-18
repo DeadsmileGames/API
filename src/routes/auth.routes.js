@@ -16,8 +16,7 @@ import { totpTokenSchema } from "../validators/totp.validators.js";
 import {
   registerSchema,
   loginSchema,
-  mobileLoginSchema,
-  mobileRegisterSchema,
+  launcherLoginSchema,
 } from "../validators/auth.validators.js";
 
 import {
@@ -28,10 +27,9 @@ import {
 import {
   register,
   login,
-  mobileLogin,
+  launcherLogin,
   logout,
   me,
-  mobileRegister,
   verifyTwoFactor,
   forgotPassword,
   confirmEmail,
@@ -45,14 +43,16 @@ import {
 } from "../validators/account-email.validators.js";
 
 export const authRouter = Router();
-authRouter.use(rateLimit({
+authRouter.use(
+  rateLimit({
     windowMs: 60_000,
     limit: 300,
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }));
+  }),
+);
 authRouter.post(
   "/confirm-email",
   rateLimit({
@@ -84,37 +84,52 @@ authRouter.post(
 );
 
 authRouter.post("/register", rateLimit({
-  windowMs: 60 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), registerLimiter, validate(registerSchema), register);
+    windowMs: 60 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), registerLimiter, validate(registerSchema), register);
 authRouter.post("/login", rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), loginLimiter, validate(loginSchema), login);
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), loginLimiter, validate(loginSchema), login);
+
+authRouter.post(
+  "/launcher-login",
+  rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }),
+  loginLimiter,
+  validate(launcherLoginSchema),
+  launcherLogin,
+);
 authRouter.post("/logout", rateLimit({
-  windowMs: 60_000,
-  limit: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), requireAuth, logout);
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), requireAuth, logout);
 authRouter.get("/me", rateLimit({
-  windowMs: 60_000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), requireAuth, me);
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), requireAuth, me);
 authRouter.post(
   "/verify-2fa",
   rateLimit({
@@ -129,28 +144,6 @@ authRouter.post(
   twoFactorAccountLimiter,
   validate(totpTokenSchema),
   verifyTwoFactor,
-);
-authRouter.post("/mobile-login", rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-}), loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post(
-  "/mobile-register",
-  rateLimit({
-    windowMs: 60 * 60_000,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test",
-    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }),
-  registerLimiter,
-  validate(mobileRegisterSchema),
-  mobileRegister,
 );
 authRouter.post(
   "/forgot-password",

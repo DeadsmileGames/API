@@ -98,34 +98,33 @@ export const register = asyncHandler(async (req, res) => {
   return sendSuccess(res, result, 201);
 });
 
-export const login = asyncHandler(async (req, res) => {
+async function performLogin(req, res, { requireRecaptcha }) {
   const { email, password, recaptchaToken } = req.body;
-  await verifyRecaptcha(recaptchaToken, req.ip);
+  if (requireRecaptcha) await verifyRecaptcha(recaptchaToken, req.ip);
 
-  const result = await authenticateUser({
-    email,
-    password,
-  });
+  const result = await authenticateUser({ email, password });
   if (result.requiresTwoFactor) {
     await regenerateSession(req);
-
     req.session.pendingTwoFactorUserId = result.userId;
-
     req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
     req.session.pendingTwoFactorAttempts = 0;
-
-    return sendSuccess(res, {
-      requiresTwoFactor: true,
-    });
+    return sendSuccess(res, { requiresTwoFactor: true });
   }
-  await regenerateSession(req);
 
+  await regenerateSession(req);
   req.session.userId = result.id;
   req.session.role = result.role;
   attachDeviceSession(req);
-
   return sendSuccess(res, result);
-});
+}
+
+export const login = asyncHandler(async (req, res) =>
+  performLogin(req, res, { requireRecaptcha: true }),
+);
+
+export const launcherLogin = asyncHandler(async (req, res) =>
+  performLogin(req, res, { requireRecaptcha: false }),
+);
 
 export const logout = asyncHandler(async (req, res) => {
   await destroySession(req);
@@ -143,54 +142,8 @@ export const logout = asyncHandler(async (req, res) => {
   });
 });
 
-async function performLogin(req, res, { requireRecaptcha = false } = {}) {
-  const { email, password, recaptchaToken } = req.body;
-
-  if (requireRecaptcha) {
-    await verifyRecaptcha(recaptchaToken, req.ip);
-  }
-
-  const result = await authenticateUser({
-    email,
-    password,
-  });
-
-  if (result.requiresTwoFactor) {
-    await regenerateSession(req);
-
-    req.session.pendingTwoFactorUserId = result.userId;
-
-    req.session.pendingTwoFactorExpiresAt = Date.now() + TWO_FACTOR_CHALLENGE_TTL_MS;
-    req.session.pendingTwoFactorAttempts = 0;
-
-    return sendSuccess(res, {
-      requiresTwoFactor: true,
-    });
-  }
-
-  await regenerateSession(req);
-
-  req.session.userId = result.id;
-  req.session.role = result.role;
-  attachDeviceSession(req);
-
-  return sendSuccess(res, result);
-}
-
-export const mobileLogin = asyncHandler(async (req, res) => {
-  return performLogin(req, res, {
-    requireRecaptcha: false,
-  });
-});
-
-export const mobileRegister = asyncHandler(async (req, res) => {
-  const result = await registerUser({ ...req.body, locale: res.locals.locale });
-
-  return sendSuccess(res, result, 201);
-});
-
 export const me = asyncHandler(async (req, res) => {
-  const user = await getAccount(req.session.userId);
+  const user = await getAccount(req.auth.userId);
 
   return sendSuccess(res, user);
 });

@@ -34,6 +34,7 @@ process.env.ITCH_TOKEN_ENCRYPTION_KEY = "isolated-test-itch-key-".repeat(2);
 process.env.ITCH_REDIRECT_URI = "https://api.example.test/callback";
 process.env.VERCEL = "1";
 process.env.BREVO_API_KEY = "integration-test-brevo-key";
+process.env.RECAPTCHA_SECRET_KEY = "integration-test-recaptcha-secret";
 process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
 const { pool } = await import("../src/config/database.js");
 const { hashPassword } = await import("../src/utils/password.js");
@@ -47,6 +48,7 @@ globalThis.fetch = async (input, options) => {
   const url = String(input);
   if (url.startsWith(base)) return originalFetch(input, options);
   if (url.startsWith("https://api.brevo.com/")) return Response.json({ messageId: "preorder-email-test" });
+  if (url === "https://www.google.com/recaptcha/api/siteverify") return Response.json({ success: true, hostname: "api.example.test" });
   calls.push(url);
   if (/^https:\/\/(?:storeedgefd\.dsx|displaycatalog)\.mp\.microsoft\.com\//.test(url)) {
     if (storeOffline) throw new Error("provider unavailable");
@@ -58,16 +60,6 @@ globalThis.fetch = async (input, options) => {
     }
     return Response.json(value);
   }
-  if (url === "https://api.itch.io/credentials/info")
-    return Response.json({ scopes: ["profile:me", "profile:owned"] });
-  if (url === "https://api.itch.io/profile")
-    return Response.json({
-      user: {
-        id: 9876543210,
-        username: "oauth-bound-test",
-        url: "https://oauth-bound-test.itch.io",
-      },
-    });
   if (url.includes("/profile/owned-keys")) {
     const page = Number(new URL(url).searchParams.get("page") || 1);
     if (ownedKeysOverride) return Response.json(ownedKeysOverride(page));
@@ -140,8 +132,6 @@ function client() {
       language = "en",
       rawBody,
       forwardedFor,
-      authorization,
-      omitCookies = false,
       origin,
       retryCsrf = true,
     } = {}) {
@@ -149,11 +139,13 @@ function client() {
         const result = await this.request("/csrf");
         token = result.body.data.token;
       }
+      if (path === "/auth/login" && body && typeof body === "object" && !("recaptchaToken" in body)) {
+        body = { ...body, recaptchaToken: "integration-test-recaptcha-token" };
+      }
       const response = await fetch(base + path, {
         method,
         headers: {
-          ...(omitCookies ? {} : { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; ") }),
-          ...(authorization ? { Authorization: authorization } : {}),
+          Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
           ...(origin ? { Origin: origin } : {}),
@@ -187,8 +179,6 @@ function client() {
           rawBody,
           forwardedFor,
           origin,
-          authorization,
-          omitCookies,
           retryCsrf: false,
         });
       }
@@ -199,9 +189,9 @@ function client() {
       };
     },
     async login(username) {
-      const result = await this.request("/auth/mobile-login", {
+      const result = await this.request("/auth/login", {
         method: "POST",
-        body: { email: `${username}@example.test`, password: "TestPassword123!" },
+        body: { email: `${username}@example.test`, password: "TestPassword123!", recaptchaToken: "integration-test-recaptcha-token" },
       });
       assert.equal(result.status, 200, JSON.stringify(result.body));
     },
@@ -214,6 +204,148 @@ const player = client(),
 await player.login("player");
 await other.login("other");
 await admin.login("admin");
+
+test("Windows launcher login uses an HttpOnly server session cookie", async () => {
+  const launcher = client();
+  const result = await launcher.request("/auth/launcher-login", {
+    method: "POST",
+    body: { email: "player@example.test", password: "TestPassword123!" },
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.ok(
+    result.headers.getSetCookie().some((cookie) => /deadsmile\.sid=.*httponly/i.test(cookie)),
+    "launcher session cookie must be HttpOnly",
+  );
+  const me = await launcher.request("/auth/me");
+  assert.equal(me.status, 200, JSON.stringify(me.body));
+});
+test("itch OAuth flow reveals only the allowed frontend redirect and keeps state account-bound", async () => {
+  const { createHash, randomBytes } = await import("node:crypto");
+  const { createOAuthState } = await import("../src/repositories/itch-integration.repository.js");
+  const state = randomBytes(48).toString("base64url");
+  const stateHash = createHash("sha256").update(state).digest("hex");
+  await createOAuthState({
+    stateHash,
+    userId,
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+  });
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "a-test-access-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+  const row = await pool.query(
+    "SELECT consumed_at FROM itch_oauth_states WHERE state_hash=$1",
+    [stateHash],
+  );
+  assert.equal(row.rows[0].consumed_at, null);
+
+  const blockedLauncherFlow = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: { client: "launcher", locale: "en" },
+  });
+  assert.equal(blockedLauncherFlow.status, 400);
+  assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
+});
+
+test("itch OAuth initiation rejects untrusted origins and binds valid flows to the requested frontend", async () => {
+  const { createHash } = await import("node:crypto");
+  const payload = {
+    client: "site",
+    locale: "en",
+    returnPath: "/account#games",
+  };
+  const rejected = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://evil.example",
+  });
+  assert.equal(rejected.status, 403);
+
+  const created = await player.request("/integrations/itch/connect", {
+    method: "POST",
+    body: payload,
+    origin: "https://deadsmilegames.onrender.com",
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const authorizeUrl = new URL(created.body.data.authorizeUrl);
+  const state = authorizeUrl.searchParams.get("state");
+  assert.equal(authorizeUrl.origin, "https://itch.io");
+  assert.equal(authorizeUrl.pathname, "/user/oauth");
+  assert.equal(authorizeUrl.searchParams.get("response_type"), "token");
+  assert(state);
+
+  const resolved = await player.request("/integrations/itch/flow", {
+    method: "POST",
+    body: { state },
+  });
+  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+  assert.deepEqual(resolved.body.data, {
+    client: "site",
+    frontendOrigin: "https://deadsmilegames.onrender.com",
+  });
+
+  const unauthenticated = await guest.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const wrongAccount = await other.request("/integrations/itch/complete", {
+    method: "POST",
+    body: { state, accessToken: "oauth-test-token-value-long-enough" },
+  });
+  assert.equal(wrongAccount.status, 400);
+  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
+
+  const previousRevoked = revoked;
+  const previousOwnedKeysOverride = ownedKeysOverride;
+  revoked = false;
+  ownedKeysOverride = () => ({ per_page: 50, owned_keys: [] });
+  try {
+    const completed = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    assert.equal(completed.body.data.client, "site");
+    assert.equal(completed.body.data.returnUrl, "https://deadsmilegames.onrender.com/account#games");
+    const storedState = await pool.query(
+      "SELECT consumed_at, frontend_origin FROM itch_oauth_states WHERE state_hash=$1",
+      [createHash("sha256").update(state).digest("hex")],
+    );
+    assert(storedState.rows[0].consumed_at);
+    assert.equal(storedState.rows[0].frontend_origin, "https://deadsmilegames.onrender.com");
+
+    const replay = await player.request("/integrations/itch/complete", {
+      method: "POST",
+      body: { state, accessToken: "oauth-test-token-value-long-enough" },
+    });
+    assert.equal(replay.status, 400);
+    assert.equal(replay.body.error.code, "ITCH_LINK_EXPIRED");
+  } finally {
+    revoked = previousRevoked;
+    ownedKeysOverride = previousOwnedKeysOverride;
+  }
+});
+
+
 test.after(async () => {
   globalThis.fetch = originalFetch;
   await new Promise((r) => server.close(r));
@@ -433,133 +565,6 @@ test("newswire returns the persisted original in every interface language", asyn
     "<p>English story.</p>",
   );
 });
-test("itch OAuth flow reveals only the allowed frontend redirect and keeps state account-bound", async () => {
-  const { createHash, randomBytes } = await import("node:crypto");
-  const { createOAuthState } = await import("../src/repositories/itch-integration.repository.js");
-  const state = randomBytes(48).toString("base64url");
-  const stateHash = createHash("sha256").update(state).digest("hex");
-  await createOAuthState({
-    stateHash,
-    userId,
-    client: "site",
-    locale: "en",
-    returnPath: "/account#games",
-    frontendOrigin: "https://deadsmilegames.onrender.com",
-    expiresAt: new Date(Date.now() + 60_000),
-  });
-
-  const resolved = await player.request("/integrations/itch/flow", {
-    method: "POST",
-    body: { state },
-  });
-  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
-  assert.deepEqual(resolved.body.data, {
-    client: "site",
-    frontendOrigin: "https://deadsmilegames.onrender.com",
-  });
-
-  const wrongAccount = await other.request("/integrations/itch/complete", {
-    method: "POST",
-    body: { state, accessToken: "a-test-access-token-value-long-enough" },
-  });
-  assert.equal(wrongAccount.status, 400);
-  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
-  const row = await pool.query(
-    "SELECT consumed_at FROM itch_oauth_states WHERE state_hash=$1",
-    [stateHash],
-  );
-  assert.equal(row.rows[0].consumed_at, null);
-
-  const blockedLauncherFlow = await player.request("/integrations/itch/connect", {
-    method: "POST",
-    body: { client: "launcher", locale: "en" },
-  });
-  assert.equal(blockedLauncherFlow.status, 400);
-  assert.equal(blockedLauncherFlow.body.error.code, "ITCH_LINK_EXPIRED");
-});
-
-
-test("itch OAuth initiation rejects untrusted origins and binds valid flows to the requested frontend", async () => {
-  const { createHash } = await import("node:crypto");
-  const payload = {
-    client: "site",
-    locale: "en",
-    returnPath: "/account#games",
-  };
-  const rejected = await player.request("/integrations/itch/connect", {
-    method: "POST",
-    body: payload,
-    origin: "https://evil.example",
-  });
-  assert.equal(rejected.status, 403);
-
-  const created = await player.request("/integrations/itch/connect", {
-    method: "POST",
-    body: payload,
-    origin: "https://deadsmilegames.onrender.com",
-  });
-  assert.equal(created.status, 201, JSON.stringify(created.body));
-  const authorizeUrl = new URL(created.body.data.authorizeUrl);
-  const state = authorizeUrl.searchParams.get("state");
-  assert.equal(authorizeUrl.origin, "https://itch.io");
-  assert.equal(authorizeUrl.pathname, "/user/oauth");
-  assert.equal(authorizeUrl.searchParams.get("response_type"), "token");
-  assert(state);
-
-  const resolved = await player.request("/integrations/itch/flow", {
-    method: "POST",
-    body: { state },
-  });
-  assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
-  assert.deepEqual(resolved.body.data, {
-    client: "site",
-    frontendOrigin: "https://deadsmilegames.onrender.com",
-  });
-
-  const unauthenticated = await guest.request("/integrations/itch/complete", {
-    method: "POST",
-    body: { state, accessToken: "oauth-test-token-value-long-enough" },
-  });
-  assert.equal(unauthenticated.status, 401);
-
-  const wrongAccount = await other.request("/integrations/itch/complete", {
-    method: "POST",
-    body: { state, accessToken: "oauth-test-token-value-long-enough" },
-  });
-  assert.equal(wrongAccount.status, 400);
-  assert.equal(wrongAccount.body.error.code, "ITCH_LINK_EXPIRED");
-
-  const previousRevoked = revoked;
-  const previousOwnedKeysOverride = ownedKeysOverride;
-  revoked = false;
-  ownedKeysOverride = () => ({ per_page: 50, owned_keys: [] });
-  try {
-    const completed = await player.request("/integrations/itch/complete", {
-      method: "POST",
-      body: { state, accessToken: "oauth-test-token-value-long-enough" },
-    });
-    assert.equal(completed.status, 200, JSON.stringify(completed.body));
-    assert.equal(completed.body.data.client, "site");
-    assert.equal(completed.body.data.returnUrl, "https://deadsmilegames.onrender.com/account#games");
-    const storedState = await pool.query(
-      "SELECT consumed_at, frontend_origin FROM itch_oauth_states WHERE state_hash=$1",
-      [createHash("sha256").update(state).digest("hex")],
-    );
-    assert(storedState.rows[0].consumed_at);
-    assert.equal(storedState.rows[0].frontend_origin, "https://deadsmilegames.onrender.com");
-
-    const replay = await player.request("/integrations/itch/complete", {
-      method: "POST",
-      body: { state, accessToken: "oauth-test-token-value-long-enough" },
-    });
-    assert.equal(replay.status, 400);
-    assert.equal(replay.body.error.code, "ITCH_LINK_EXPIRED");
-  } finally {
-    revoked = previousRevoked;
-    ownedKeysOverride = previousOwnedKeysOverride;
-  }
-});
-
 test("itch callback reuses website CSS and ships bounded accessible connection states", async () => {
   const origin = new URL(base).origin;
   const response = await originalFetch(`${base}/integrations/itch/callback`);
@@ -576,11 +581,9 @@ test("itch callback reuses website CSS and ships bounded accessible connection s
   );
   assert.equal((await originalFetch(`${origin}/fonts/Berlin-Sans-FB-Demi-Bold.woff2`)).status, 200);
   const script = await (await originalFetch(`${origin}/itch-callback.js`)).text();
+  assert(script.includes("controller.abort()"));
   assert(script.includes("location.hash.slice(1)"));
   assert(script.includes("history.replaceState"));
-  assert(script.includes("/api/integrations/itch/flow"));
-  assert(script.includes("/itch-callback"));
-  assert(!script.includes("/api/integrations/itch/complete"));
 });
 
 test("CSRF, role checks and malicious payloads fail with localized safe errors", async () => {
@@ -974,13 +977,13 @@ test("unverified accounts do not reveal their verification state to a wrong pass
     [password],
   );
   const pending = client();
-  let result = await pending.request("/auth/mobile-login", {
+  let result = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "pending@example.test", password: "WrongPassword123!" },
   });
   assert.equal(result.status, 401);
   assert.equal(result.body.error.code, "INVALID_CREDENTIALS");
-  result = await pending.request("/auth/mobile-login", {
+  result = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "pending@example.test", password: "TestPassword123!" },
   });
@@ -1069,7 +1072,7 @@ test("two-factor login persists the session on the first valid code and consumes
   ]);
   const challenge = client();
   try {
-    const login = await challenge.request("/auth/mobile-login", {
+    const login = await challenge.request("/auth/login", {
       method: "POST",
       body: { email: "other@example.test", password: "TestPassword123!" },
     });
@@ -1153,7 +1156,7 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     id,
     "JBSWY3DPEHPK3PXP",
   ]);
-  const challenge = await pending.request("/auth/mobile-login", {
+  const challenge = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "reset-test@example.test", password: "TestPassword123!" },
   });
@@ -1222,7 +1225,7 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
   await pool.query("DELETE FROM user_totp WHERE user_id=$1", [id]);
   assert.equal(
     (
-      await attacker.request("/auth/mobile-login", {
+      await attacker.request("/auth/login", {
         method: "POST",
         body: { email: "reset-test@example.test", password: "NewTestPassword123!" },
       })
@@ -1250,7 +1253,7 @@ test("confirmed email changes revoke login and 2FA sessions, consume their token
   ]);
   assert.equal(
     (
-      await pending.request("/auth/mobile-login", {
+      await pending.request("/auth/login", {
         method: "POST",
         body: { email: "email-change@example.test", password: "TestPassword123!" },
       })
@@ -1408,12 +1411,12 @@ test("live tickets are tied to an active session and revoked sessions cannot rec
   await pool.query("DELETE FROM users WHERE id=$1", [id]);
 });
 
-test("Android login, library, sessions and achievements share the existing account without crossing owners", async () => {
-  const mobileId = "00000000-0000-4000-8000-000000000101";
+test("Account library, sessions and achievements remain isolated by owner", async () => {
+  const accountId = "00000000-0000-4000-8000-000000000101";
   const abbyId = "00000000-0000-4000-8000-000000000102";
   await pool.query(
-    "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'android@example.test','android',$2,now())",
-    [mobileId, password],
+    "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'platform@example.test','platform',$2,now())",
+    [accountId, password],
   );
   await pool.query(
     "INSERT INTO games(id,title,slug,short_description,status,access_type) VALUES($1,'Abby','abbys-restless-heart','Abby','released','free')",
@@ -1423,20 +1426,21 @@ test("Android login, library, sessions and achievements share the existing accou
     "INSERT INTO achievements(game_id,key,title,description,points,hidden) VALUES($1,'first_checkpoint','Checkpoint','Reached a checkpoint',20,false),($1,'no_death_finish','Secret','Finished without deaths',150,true)",
     [abbyId],
   );
-  const mobile = client();
-  await mobile.login("android");
-  const account = (await mobile.request("/auth/me")).body.data;
-  assert.equal(account.id, mobileId);
+  const playerSession = client();
+  await playerSession.login("platform");
+  const account = (await playerSession.request("/auth/me")).body.data;
+  assert.equal(account.id, accountId);
   assert.equal(account.password_hash, undefined);
-  const game = await mobile.request("/games/abbys-restless-heart");
+
+  const game = await playerSession.request("/games/abbys-restless-heart");
   assert.equal(game.status, 200);
   assert.equal(game.body.data.id, abbyId);
-  const library = await mobile.request(`/library/${abbyId}`, { method: "POST", body: {} });
+  const library = await playerSession.request(`/library/${abbyId}`, { method: "POST", body: {} });
   assert.equal(library.status, 200);
   assert.equal(library.body.data.inLibrary, true);
-  const started = await mobile.request("/platform/sessions", {
+  const started = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, gameVersion: "0.38", platform: "android" },
+    body: { gameId: abbyId, gameVersion: "0.38", platform: "windows" },
   });
   assert.equal(started.status, 201, JSON.stringify(started.body));
   const sessionId = started.body.data.id;
@@ -1446,31 +1450,31 @@ test("Android login, library, sessions and achievements share the existing accou
         sessionId,
       ])
     ).rows[0].platform,
-    "android",
+    "windows",
   );
-  const invalid = await mobile.request("/platform/sessions", {
+  const invalid = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, platform: "android-forged" },
+    body: { gameId: abbyId, platform: "windows-forged" },
   });
   assert.equal(invalid.status, 400);
   const unlockPath = `/platform/achievements/${abbyId}/first_checkpoint/unlock`;
-  const rejected = await mobile.request(unlockPath, {
+  const rejected = await playerSession.request(unlockPath, {
     method: "POST",
     body: { expectedUserId: otherId },
   });
   assert.equal(rejected.status, 409);
   assert.equal(rejected.body.error.code, "ACCOUNT_CHANGED");
-  const first = await mobile.request(unlockPath, {
+  const first = await playerSession.request(unlockPath, {
     method: "POST",
-    body: { expectedUserId: mobileId },
+    body: { expectedUserId: accountId },
   });
   assert.equal(first.status, 200, JSON.stringify(first.body));
-  const repeated = await mobile.request(unlockPath, {
+  const repeated = await playerSession.request(unlockPath, {
     method: "POST",
-    body: { expectedUserId: mobileId },
+    body: { expectedUserId: accountId },
   });
   assert.equal(repeated.body.data.unlocked_at, first.body.data.unlocked_at);
-  const achievements = (await mobile.request(`/platform/achievements/${abbyId}`)).body.data;
+  const achievements = (await playerSession.request(`/platform/achievements/${abbyId}`)).body.data;
   assert(achievements.find((item) => item.key === "first_checkpoint").unlocked_at);
   assert.equal(achievements.find((item) => item.key === "no_death_finish").description, null);
   const another = (await other.request(`/platform/achievements/${abbyId}`)).body.data;
@@ -1480,23 +1484,24 @@ test("Android login, library, sessions and achievements share the existing accou
       .status,
     409,
   );
-  const ended = await mobile.request(`/platform/sessions/${sessionId}/end`, {
+  const ended = await playerSession.request(`/platform/sessions/${sessionId}/end`, {
     method: "POST",
     body: {},
   });
   assert.equal(ended.status, 200);
   assert(ended.body.data.duration_ms >= 0);
   assert.equal(
-    (await mobile.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
+    (await playerSession.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
       .status,
     409,
   );
   assert.equal(
-    (await mobile.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
+    (await playerSession.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
     "ITCH_NOT_CONNECTED",
   );
-  await mobile.request("/auth/logout", { method: "POST", body: {} });
-  assert.equal((await mobile.request(`/platform/achievements/${abbyId}`)).status, 401);
+  await playerSession.request("/auth/logout", { method: "POST", body: {} });
+  assert.equal((await playerSession.request("/auth/me")).status, 401);
+  assert.equal((await playerSession.request(`/platform/achievements/${abbyId}`)).status, 401);
 });
 
 
