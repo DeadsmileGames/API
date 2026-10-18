@@ -8,6 +8,7 @@ import { decryptToken, encryptToken } from "../utils/tokenCipher.js";
 import {
   consumeOAuthState,
   createOAuthState,
+  findOAuthStateFlow,
   findItchAccount,
   findItchGame,
   findInstallBuild,
@@ -262,15 +263,30 @@ export async function getItchStatus(userId) {
   return publicAccount(await findItchAccount(userId));
 }
 
-export async function beginItchConnection(userId, { client, locale, returnPath }) {
+function validFrontendOrigin(origin) {
+  if (typeof origin !== "string") return false;
+  if (env.frontendOrigins.includes(origin)) return true;
+  return !env.isProduction && [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:8081",
+  ].includes(origin);
+}
+
+export async function beginItchConnection(userId, { client, locale, returnPath }, frontendOrigin) {
   requireConfigured();
+  if (client !== "site") throw new AppError(400, "ITCH_LINK_EXPIRED");
+  if (!validFrontendOrigin(frontendOrigin)) throw new AppError(403, "CSRF_VALIDATION_FAILED");
   const state = crypto.randomBytes(48).toString("base64url");
   await createOAuthState({
     stateHash: stateHash(state),
     userId,
     client,
     locale,
-    returnPath: client === "site" ? returnPath || "/account" : null,
+    returnPath: returnPath || "/account#games",
+    frontendOrigin,
     expiresAt: new Date(Date.now() + 10 * 60 * 1_000),
   });
   const url = new URL("https://itch.io/user/oauth");
@@ -282,12 +298,27 @@ export async function beginItchConnection(userId, { client, locale, returnPath }
   return { authorizeUrl: url.toString(), expiresIn: 600 };
 }
 
+export async function getItchOAuthFlow(state) {
+  if (typeof state !== "string" || !/^[A-Za-z0-9_-]{40,200}$/.test(state)) {
+    throw new AppError(400, "ITCH_LINK_EXPIRED");
+  }
+  const flow = await findOAuthStateFlow(stateHash(state));
+  if (!flow || flow.client !== "site" || !validFrontendOrigin(flow.frontend_origin)) {
+    throw new AppError(400, "ITCH_LINK_EXPIRED");
+  }
+  return { client: "site", frontendOrigin: flow.frontend_origin };
+}
+
 export async function completeItchConnection(
   { state, accessToken },
+  userId,
   setLocale = () => {},
 ) {
   requireConfigured();
-  const flow = await consumeOAuthState(stateHash(state));
+  if (typeof userId !== "string" || !userId) {
+    throw new AppError(401, "UNAUTHENTICATED");
+  }
+  const flow = await consumeOAuthState(stateHash(state), userId);
   if (!flow) throw new AppError(400, "ITCH_LINK_EXPIRED");
   setLocale(flow.locale);
   const [credentials, profile] = await Promise.all([
@@ -334,7 +365,7 @@ export async function completeItchConnection(
   return {
     client: flow.client,
     locale: flow.locale,
-    returnUrl: flow.client === "site" ? `${env.frontendUrl}${flow.return_path}` : null,
+    returnUrl: flow.client === "site" ? `${flow.frontend_origin}${flow.return_path || "/account#games"}` : null,
   };
 }
 

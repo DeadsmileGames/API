@@ -28,6 +28,7 @@ export async function requireAuth(req, res, next) {
     req.auth = { userId: user.id, role: user.role };
     if (req.session.role && req.session.role !== user.role) {
       const previousDevice = req.session.device;
+      const previousCsrfToken = req.session.csrfToken;
 
       await new Promise((resolve, reject) => {
         req.session.regenerate((error) => {
@@ -41,6 +42,7 @@ export async function requireAuth(req, res, next) {
 
       req.session.userId = user.id;
       req.session.role = user.role;
+      if (previousCsrfToken) req.session.csrfToken = previousCsrfToken;
 
       if (previousDevice) {
         req.session.device = previousDevice;

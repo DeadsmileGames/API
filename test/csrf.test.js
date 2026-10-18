@@ -31,6 +31,7 @@ function run({ site, origin, cookieToken = token, headerToken = token, method = 
   };
   const request = {
     method,
+    session: { csrfToken: cookieToken },
     signedCookies: { "deadsmile.csrf": cookieToken },
     get(name) {
       return values[String(name).toLowerCase()] ?? undefined;

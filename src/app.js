@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { errorCatalog, resolveLocale } from "./utils/publicErrors.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -13,6 +14,7 @@ import { pool, directPool } from "./config/database.js";
 import { csrfCookie, csrfToken, verifyCsrf } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminBodyLimiter } from "./middleware/bodyLimiter.js";
+import { sendError } from "./utils/apiResponse.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { gamesRouter } from "./routes/games.routes.js";
 import { launcherRouter } from "./routes/launcher.routes.js";
@@ -60,16 +62,7 @@ function cspDirectives() {
   return directives;
 }
 
-function sessionCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: env.isProduction,
-    sameSite: env.cookieSameSite,
-    maxAge: 7 * 24 * 60 * 60 * 1_000,
-    partitioned: env.isProduction && env.cookieSameSite === "none",
-    priority: "high",
-  };
-}
+
 
 export function createApp() {
   const app = express();
@@ -126,13 +119,20 @@ export function createApp() {
     origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language"],
+    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language", "Authorization"],
     maxAge: 600,
   };
   app.options("*", cors(corsOptions));
   app.use(cors(corsOptions));
 
-  app.get("/api/health", async (_req, res) => {
+  app.get("/api/health", rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }), async (_req, res) => {
     res.set("Cache-Control", "no-store");
     try {
       await pool.query("SELECT 1");
@@ -154,8 +154,7 @@ export function createApp() {
         new Intl.DateTimeFormat("en-US", { timeZone: requestedTimeZone }).format(new Date(epochMs));
         timeZone = requestedTimeZone;
       } catch {
-        // Unknown time zones fall back to UTC rather than trusting client clock data.
-      }
+            }
     }
     const now = new Date(epochMs);
     const localTime = new Intl.DateTimeFormat(res.locals.locale || "en", {
@@ -184,23 +183,31 @@ export function createApp() {
   });
 
   app.use(cookieParser(env.sessionSecret));
-  app.use(csrfCookie);
-  app.use(
-    session({
-      store: new PgSession({
-        pool,
-        tableName: "user_sessions",
-        createTableIfMissing: false,
-        pruneSessionInterval: 60 * 60,
-      }),
-      name: "deadsmile.sid",
-      secret: env.sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      rolling: false,
-      cookie: sessionCookieOptions(),
+  const sessionOptions = {
+    store: new PgSession({
+      pool,
+      tableName: "user_sessions",
+      createTableIfMissing: false,
+      pruneSessionInterval: 60 * 60,
     }),
-  );
+    name: "deadsmile.sid",
+    secret: env.sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    rolling: false,
+    cookie: {
+      httpOnly: true,
+      secure: env.isProduction,
+      sameSite: env.cookieSameSite,
+      maxAge: 7 * 24 * 60 * 60 * 1_000,
+      partitioned: env.isProduction && env.cookieSameSite === "none",
+      priority: "high",
+    },
+  };
+  app.use(session(sessionOptions));
+
+  app.use(csrfCookie);
+  app.use("/api", verifyCsrf);
 
   app.get("/api/errors", (_req, res) =>
     res.json({
@@ -209,8 +216,6 @@ export function createApp() {
     }),
   );
   app.get("/api/csrf", csrfToken);
-  app.use("/api", verifyCsrf);
-
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminBodyLimiter, adminRouter);
   app.use("/api/special-thanks", specialThanksRouter);

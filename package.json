@@ -9,7 +9,7 @@
     "db:migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seed-admin.js",
     "db:check-abby": "node scripts/check-abby-integration.js",
-    "test": "node --test test/*.test.js",
+    "test": "node scripts/run-tests.js",
     "errors:sync": "node scripts/sync-error-catalog.js",
     "db:bootstrap": "node scripts/bootstrap.js",
     "db:encrypt": "node scripts/encrypt-data.js",

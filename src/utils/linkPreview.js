@@ -74,13 +74,11 @@ export function isPublicAddress(address) {
     if (!hextets) return false;
 
     const [first, second] = hextets;
-    // Only global-unicast space is considered. Reject IANA special-use blocks,
-    // documentation prefixes, and transition ranges that can tunnel to IPv4.
     if (first < 0x2000 || first > 0x3fff) return false;
-    if (first === 0x2001 && second <= 0x01ff) return false; // IETF assignments, Teredo, ORCHID, benchmarking, etc.
-    if (first === 0x2001 && second === 0x0db8) return false; // Documentation
-    if (first === 0x2002) return false; // 6to4 transition
-    if (first === 0x3fff && second <= 0x000f) return false; // Documentation
+    if (first === 0x2001 && second <= 0x01ff) return false;
+    if (first === 0x2001 && second === 0x0db8) return false;
+    if (first === 0x2002) return false;
+    if (first === 0x3fff && second <= 0x000f) return false;
     return true;
   }
 
@@ -126,23 +124,30 @@ function attribute(tag, name) {
 }
 
 function decodeEntities(value) {
-  return value
-    .replace(/&#(x[0-9a-f]+|[0-9]+);?/gi, (_match, code) => {
-      const hexadecimal = /^x/i.test(code);
-      const number = Number.parseInt(hexadecimal ? code.slice(1) : code, hexadecimal ? 16 : 10);
+  const entities = {
+    amp: "&",
+    nbsp: " ",
+    quot: '"',
+    apos: "'",
+    lt: "<",
+    gt: ">",
+  };
+  return String(value || "").replace(
+    /&(#(?:x[0-9a-f]+|[0-9]+)|amp|nbsp|quot|apos|lt|gt);?/gi,
+    (_match, entity) => {
+      const normalized = entity.toLowerCase();
+      if (!normalized.startsWith("#")) return entities[normalized] ?? _match;
+      const hexadecimal = normalized.startsWith("#x");
+      const digits = hexadecimal ? normalized.slice(2) : normalized.slice(1);
+      const number = Number.parseInt(digits, hexadecimal ? 16 : 10);
       if (!Number.isFinite(number) || number < 1 || number > 0x10ffff) return "";
       try {
         return String.fromCodePoint(number);
       } catch {
         return "";
       }
-    })
-    .replace(/&nbsp;?/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&apos;|&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+    },
+  );
 }
 
 function cleanTitle(value) {

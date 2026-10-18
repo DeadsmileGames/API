@@ -31,6 +31,11 @@ export function csrfCookie(req, res, next) {
     if (!req.signedCookies) req.signedCookies = {};
     req.signedCookies[CSRF_COOKIE] = token;
   }
+
+  if (req.path === "/api/csrf" && req.session && req.session.csrfToken !== token) {
+    req.session.csrfToken = token;
+  }
+
   res.locals.csrfToken = token;
   next();
 }
@@ -56,17 +61,28 @@ export function verifyCsrf(req, res, next) {
 
   const cookieToken = req.signedCookies?.[CSRF_COOKIE];
   const headerToken = req.get(CSRF_HEADER);
+  const sessionToken = req.session?.csrfToken;
   if (
     !cookieToken ||
     !headerToken ||
+    !sessionToken ||
     !/^[a-f0-9]{64}$/i.test(cookieToken) ||
-    !/^[a-f0-9]{64}$/i.test(headerToken)
+    !/^[a-f0-9]{64}$/i.test(headerToken) ||
+    !/^[a-f0-9]{64}$/i.test(sessionToken) ||
+    sessionToken !== cookieToken
   ) {
     return sendError(res, 403, "CSRF_VALIDATION_FAILED");
   }
-  const a = Buffer.from(cookieToken, "hex");
-  const b = Buffer.from(headerToken, "hex");
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+
+  const cookieBytes = Buffer.from(cookieToken, "hex");
+  const headerBytes = Buffer.from(headerToken, "hex");
+  const sessionBytes = Buffer.from(sessionToken, "hex");
+  if (
+    cookieBytes.length !== headerBytes.length ||
+    !crypto.timingSafeEqual(cookieBytes, headerBytes) ||
+    sessionBytes.length !== headerBytes.length ||
+    !crypto.timingSafeEqual(sessionBytes, headerBytes)
+  ) {
     return sendError(res, 403, "CSRF_VALIDATION_FAILED");
   }
   next();

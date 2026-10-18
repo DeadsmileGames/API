@@ -113,12 +113,9 @@ function normalizedCacheKey(query, source) {
 }
 
 function decodeTranslation(value) {
+  const entities = { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", "#39": "'" };
   return String(value || "")
-    .replace(/&amp;/gu, "&")
-    .replace(/&quot;/gu, '"')
-    .replace(/&#39;|&apos;/giu, "'")
-    .replace(/&lt;/gu, "<")
-    .replace(/&gt;/gu, ">")
+    .replace(/&(amp|quot|apos|lt|gt|#39);/giu, (match, entity) => entities[entity.toLowerCase()] ?? match)
     .trim();
 }
 
