@@ -98,7 +98,7 @@ export async function getPublicProfile(username) {
       totalMs: user.share_playtime ? Number(item.total_ms) : null,
 
       sessions: user.share_playtime ? item.sessions : null,
-      lastPlayedAt: item.last_played_at,
+      lastPlayedAt: user.share_playtime ? item.last_played_at : null,
       screenshots: item.screenshots.map((shot) => shot.url),
     })),
     achievements: achievements.map((item) => ({
