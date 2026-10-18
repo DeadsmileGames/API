@@ -138,7 +138,7 @@ export function createApp() {
     res.set("Cache-Control", "no-store");
     try {
       await pool.query("SELECT 1");
-      res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
+      res.status(200).json({ status: "ok", service: "Deadsmile Games API", features: { preorders: true } });
     } catch {
       res.status(503).json({ status: "unavailable", service: "Deadsmile Games API" });
     }
