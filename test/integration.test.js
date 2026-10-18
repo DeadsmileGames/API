@@ -124,7 +124,18 @@ function client() {
   let token;
   return {
     cookies,
-    async request(path, { method = "GET", body, csrf = true, language = "en", rawBody, forwardedFor, authorization, omitCookies = false } = {}) {
+    async request(path, {
+      method = "GET",
+      body,
+      csrf = true,
+      language = "en",
+      rawBody,
+      forwardedFor,
+      authorization,
+      omitCookies = false,
+      origin,
+      retryCsrf = true,
+    } = {}) {
       if (method !== "GET" && csrf && !token) {
         const result = await this.request("/csrf");
         token = result.body.data.token;
@@ -136,6 +147,7 @@ function client() {
           ...(authorization ? { Authorization: authorization } : {}),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
+          ...(origin ? { Origin: origin } : {}),
           ...(body !== undefined || rawBody ? { "Content-Type": "application/json" } : {}),
           ...(method !== "GET" && csrf ? { "X-CSRF-Token": token } : {}),
         },
@@ -146,9 +158,34 @@ function client() {
         const i = pair.indexOf("=");
         cookies.set(pair.slice(0, i), pair.slice(i + 1));
       }
+      const responseBody = await response.json();
+      if (path === "/csrf" && response.ok && responseBody?.success === true && typeof responseBody?.data?.token === "string") {
+        token = responseBody.data.token;
+      }
+      if (
+        method !== "GET" &&
+        csrf &&
+        retryCsrf &&
+        response.status === 403 &&
+        responseBody?.error?.code === "CSRF_VALIDATION_FAILED"
+      ) {
+        await this.request("/csrf");
+        return this.request(path, {
+          method,
+          body,
+          csrf,
+          language,
+          rawBody,
+          forwardedFor,
+          origin,
+          authorization,
+          omitCookies,
+          retryCsrf: false,
+        });
+      }
       return {
         status: response.status,
-        body: await response.json(),
+        body: responseBody,
         headers: response.headers,
       };
     },
