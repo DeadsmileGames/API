@@ -53,7 +53,7 @@ authRouter.use(
     limit: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
 );
@@ -64,7 +64,7 @@ authRouter.post(
     limit: 6,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   publicEmailLimiter,
@@ -79,7 +79,7 @@ authRouter.post(
     limit: 6,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   publicEmailLimiter,
@@ -92,7 +92,7 @@ authRouter.post("/register", rateLimit({
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), registerLimiter, validate(registerSchema), register);
 authRouter.post("/login", rateLimit({
@@ -100,7 +100,7 @@ authRouter.post("/login", rateLimit({
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), loginLimiter, validate(loginSchema), login);
 authRouter.post("/logout", rateLimit({
@@ -108,7 +108,7 @@ authRouter.post("/logout", rateLimit({
     limit: 60,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), requireAuth, logout);
 authRouter.get("/me", rateLimit({
@@ -116,7 +116,7 @@ authRouter.get("/me", rateLimit({
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), requireAuth, me);
 authRouter.post(
@@ -126,7 +126,7 @@ authRouter.post(
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   twoFactorLimiter,
@@ -139,7 +139,7 @@ authRouter.post("/mobile-login", rateLimit({
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), loginLimiter, validate(mobileLoginSchema), mobileLogin);
 authRouter.post(
@@ -149,7 +149,7 @@ authRouter.post(
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   requireAuth,
@@ -163,7 +163,7 @@ authRouter.post(
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   registerLimiter,
@@ -177,7 +177,7 @@ authRouter.post(
     limit: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   forgotPasswordLimiter,
@@ -192,7 +192,7 @@ authRouter.post(
     limit: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test" || process.env.CI === "true",
+    skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
   resetPasswordLimiter,
