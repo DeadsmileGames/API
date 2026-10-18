@@ -55,7 +55,8 @@ export function validate(schema, source = "body") {
           : undefined;
       return sendError(res, 400, "VALIDATION_ERROR", fields);
     }
-    req[source] = result.data;
+    if (source === "query") req.validatedQuery = result.data;
+    else req[source] = result.data;
     next();
   };
 }
