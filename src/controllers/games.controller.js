@@ -8,7 +8,7 @@ import {
 } from "../services/games.service.js";
 
 export const list = asyncHandler(async (req, res) => {
-  const data = await getGamesList(req.query);
+  const data = await getGamesList(req.validatedQuery ?? req.query);
   sendSuccess(res, data);
 });
 
@@ -23,5 +23,5 @@ export const download = asyncHandler(async (req, res) => {
 });
 
 export const latestNews = asyncHandler(async (req, res) => {
-  sendSuccess(res, await getGameLatestNews(req.params.slug, req.query));
+  sendSuccess(res, await getGameLatestNews(req.params.slug, req.validatedQuery ?? req.query));
 });
