@@ -32,8 +32,7 @@ export function csrfCookie(req, res, next) {
     req.signedCookies[CSRF_COOKIE] = token;
   }
 
-  const needsSessionBinding = req.path === "/api/csrf" || !SAFE_METHODS.has(req.method);
-  if (needsSessionBinding && req.session && req.session.csrfToken !== token) {
+  if (req.path === "/api/csrf" && req.session && req.session.csrfToken !== token) {
     req.session.csrfToken = token;
   }
 
