@@ -1308,7 +1308,7 @@ test("Account library, sessions and achievements remain isolated by owner", asyn
         sessionId,
       ])
     ).rows[0].platform,
-    "android",
+    "windows",
   );
   const invalid = await playerSession.request("/platform/sessions", {
     method: "POST",
