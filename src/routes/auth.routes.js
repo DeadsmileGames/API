@@ -17,6 +17,7 @@ import { totpTokenSchema } from "../validators/totp.validators.js";
 import {
   registerSchema,
   loginSchema,
+  launcherLoginSchema,
 } from "../validators/auth.validators.js";
 
 import {
@@ -27,6 +28,7 @@ import {
 import {
   register,
   login,
+  launcherLogin,
   logout,
   me,
   verifyTwoFactor,
@@ -98,6 +100,21 @@ authRouter.post("/login", rateLimit({
     skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }), loginLimiter, validate(loginSchema), login);
+
+authRouter.post(
+  "/launcher-login",
+  rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === "test",
+    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+  }),
+  loginLimiter,
+  validate(launcherLoginSchema),
+  launcherLogin,
+);
 authRouter.post("/logout", rateLimit({
     windowMs: 60_000,
     limit: 60,
