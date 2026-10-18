@@ -60,6 +60,16 @@ globalThis.fetch = async (input, options) => {
     }
     return Response.json(value);
   }
+  if (url === "https://api.itch.io/credentials/info")
+    return Response.json({ scopes: ["profile:me", "profile:owned"] });
+  if (url === "https://api.itch.io/profile")
+    return Response.json({
+      user: {
+        id: 9876543210,
+        username: "oauth-bound-test",
+        url: "https://oauth-bound-test.itch.io",
+      },
+    });
   if (url.includes("/profile/owned-keys")) {
     const page = Number(new URL(url).searchParams.get("page") || 1);
     if (ownedKeysOverride) return Response.json(ownedKeysOverride(page));
