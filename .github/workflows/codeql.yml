@@ -12,13 +12,6 @@ on:
       - ".github/workflows/codeql.yml"
   pull_request:
     branches: [main, Beta]
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "test/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/codeql.yml"
   schedule:
     - cron: "31 4 * * 1"
 
