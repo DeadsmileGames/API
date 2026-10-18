@@ -2,7 +2,7 @@ name: CodeQL security analysis
 
 on:
   push:
-    branches: [main]
+    branches: [main, Beta]
     paths:
       - "src/**"
       - "scripts/**"
@@ -11,7 +11,7 @@ on:
       - "package-lock.json"
       - ".github/workflows/codeql.yml"
   pull_request:
-    branches: [main]
+    branches: [main, Beta]
     paths:
       - "src/**"
       - "scripts/**"
@@ -37,44 +37,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee
         with:
           languages: javascript-typescript
           build-mode: none
-      - uses: github/codeql-action/analyze@v4
-      - name: Report SARIF security findings
-        if: always()
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require("node:fs");
-          const file = "../results/javascript.sarif";
-          if (!fs.existsSync(file)) {
-            console.log("SARIF_RESULT_FILE_NOT_FOUND");
-            process.exit(0);
-          }
-          const sarif = JSON.parse(fs.readFileSync(file, "utf8"));
-          for (const run of sarif.runs || []) {
-            const rules = new Map((run.tool?.driver?.rules || []).map((rule) => [rule.id, rule]));
-            for (const result of run.results || []) {
-              const rule = rules.get(result.ruleId);
-              const severity = Number(result.properties?.["security-severity"] || rule?.properties?.["security-severity"] || 0);
-              const level = result.level || rule?.defaultConfiguration?.level || "warning";
-              if (level === "note") continue;
-              console.log(JSON.stringify({
-                ruleId: result.ruleId,
-                level,
-                severity: severity || null,
-                ruleProperties: rule?.properties || {},
-                resultProperties: result.properties || {},
-                message: result.message?.text || "",
-                locations: (result.locations || []).map((location) => ({
-                  file: location.physicalLocation?.artifactLocation?.uri || null,
-                  line: location.physicalLocation?.region?.startLine || null,
-                  column: location.physicalLocation?.region?.startColumn || null,
-                })),
-              }));
-            }
-          }
-          NODE
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee

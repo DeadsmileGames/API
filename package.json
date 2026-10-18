@@ -7,6 +7,7 @@
     "dev": "node --watch src/app.js",
     "start": "node scripts/migrate.js && node src/app.js",
     "db:migrate": "node scripts/migrate.js",
+    "db:verify": "node scripts/verify-postgres.js",
     "seed:admin": "node scripts/seed-admin.js",
     "db:check-abby": "node scripts/check-abby-integration.js",
     "test": "node scripts/run-tests.js",
