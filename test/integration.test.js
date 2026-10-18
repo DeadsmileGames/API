@@ -34,6 +34,7 @@ process.env.ITCH_TOKEN_ENCRYPTION_KEY = "isolated-test-itch-key-".repeat(2);
 process.env.ITCH_REDIRECT_URI = "https://api.example.test/callback";
 process.env.VERCEL = "1";
 process.env.BREVO_API_KEY = "integration-test-brevo-key";
+process.env.RECAPTCHA_SECRET_KEY = "integration-test-recaptcha-secret";
 process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
 const { pool } = await import("../src/config/database.js");
 const { hashPassword } = await import("../src/utils/password.js");
@@ -47,6 +48,7 @@ globalThis.fetch = async (input, options) => {
   const url = String(input);
   if (url.startsWith(base)) return originalFetch(input, options);
   if (url.startsWith("https://api.brevo.com/")) return Response.json({ messageId: "preorder-email-test" });
+  if (url === "https://www.google.com/recaptcha/api/siteverify") return Response.json({ success: true, hostname: "api.example.test" });
   calls.push(url);
   if (/^https:\/\/(?:storeedgefd\.dsx|displaycatalog)\.mp\.microsoft\.com\//.test(url)) {
     if (storeOffline) throw new Error("provider unavailable");
@@ -130,8 +132,6 @@ function client() {
       language = "en",
       rawBody,
       forwardedFor,
-      authorization,
-      omitCookies = false,
       origin,
       retryCsrf = true,
     } = {}) {
@@ -139,11 +139,13 @@ function client() {
         const result = await this.request("/csrf");
         token = result.body.data.token;
       }
+      if (path === "/auth/login" && body && typeof body === "object" && !("recaptchaToken" in body)) {
+        body = { ...body, recaptchaToken: "integration-test-recaptcha-token" };
+      }
       const response = await fetch(base + path, {
         method,
         headers: {
-          ...(omitCookies ? {} : { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; ") }),
-          ...(authorization ? { Authorization: authorization } : {}),
+          Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
           "Accept-Language": language,
           ...(forwardedFor ? { "X-Vercel-Forwarded-For": forwardedFor } : {}),
           ...(origin ? { Origin: origin } : {}),
@@ -177,8 +179,6 @@ function client() {
           rawBody,
           forwardedFor,
           origin,
-          authorization,
-          omitCookies,
           retryCsrf: false,
         });
       }
@@ -189,9 +189,9 @@ function client() {
       };
     },
     async login(username) {
-      const result = await this.request("/auth/mobile-login", {
+      const result = await this.request("/auth/login", {
         method: "POST",
-        body: { email: `${username}@example.test`, password: "TestPassword123!" },
+        body: { email: `${username}@example.test`, password: "TestPassword123!", recaptchaToken: "integration-test-recaptcha-token" },
       });
       assert.equal(result.status, 200, JSON.stringify(result.body));
     },
@@ -835,13 +835,13 @@ test("unverified accounts do not reveal their verification state to a wrong pass
     [password],
   );
   const pending = client();
-  let result = await pending.request("/auth/mobile-login", {
+  let result = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "pending@example.test", password: "WrongPassword123!" },
   });
   assert.equal(result.status, 401);
   assert.equal(result.body.error.code, "INVALID_CREDENTIALS");
-  result = await pending.request("/auth/mobile-login", {
+  result = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "pending@example.test", password: "TestPassword123!" },
   });
@@ -930,7 +930,7 @@ test("two-factor login persists the session on the first valid code and consumes
   ]);
   const challenge = client();
   try {
-    const login = await challenge.request("/auth/mobile-login", {
+    const login = await challenge.request("/auth/login", {
       method: "POST",
       body: { email: "other@example.test", password: "TestPassword123!" },
     });
@@ -1014,7 +1014,7 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     id,
     "JBSWY3DPEHPK3PXP",
   ]);
-  const challenge = await pending.request("/auth/mobile-login", {
+  const challenge = await pending.request("/auth/login", {
     method: "POST",
     body: { email: "reset-test@example.test", password: "TestPassword123!" },
   });
@@ -1083,7 +1083,7 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
   await pool.query("DELETE FROM user_totp WHERE user_id=$1", [id]);
   assert.equal(
     (
-      await attacker.request("/auth/mobile-login", {
+      await attacker.request("/auth/login", {
         method: "POST",
         body: { email: "reset-test@example.test", password: "NewTestPassword123!" },
       })
@@ -1111,7 +1111,7 @@ test("confirmed email changes revoke login and 2FA sessions, consume their token
   ]);
   assert.equal(
     (
-      await pending.request("/auth/mobile-login", {
+      await pending.request("/auth/login", {
         method: "POST",
         body: { email: "email-change@example.test", password: "TestPassword123!" },
       })
@@ -1269,12 +1269,12 @@ test("live tickets are tied to an active session and revoked sessions cannot rec
   await pool.query("DELETE FROM users WHERE id=$1", [id]);
 });
 
-test("Android login, library, sessions and achievements share the existing account without crossing owners", async () => {
-  const mobileId = "00000000-0000-4000-8000-000000000101";
+test("Account library, sessions and achievements remain isolated by owner", async () => {
+  const accountId = "00000000-0000-4000-8000-000000000101";
   const abbyId = "00000000-0000-4000-8000-000000000102";
   await pool.query(
-    "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'android@example.test','android',$2,now())",
-    [mobileId, password],
+    "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'platform@example.test','platform',$2,now())",
+    [accountId, password],
   );
   await pool.query(
     "INSERT INTO games(id,title,slug,short_description,status,access_type) VALUES($1,'Abby','abbys-restless-heart','Abby','released','free')",
@@ -1284,41 +1284,21 @@ test("Android login, library, sessions and achievements share the existing accou
     "INSERT INTO achievements(game_id,key,title,description,points,hidden) VALUES($1,'first_checkpoint','Checkpoint','Reached a checkpoint',20,false),($1,'no_death_finish','Secret','Finished without deaths',150,true)",
     [abbyId],
   );
-  const mobile = client();
-  await mobile.login("android");
-  const account = (await mobile.request("/auth/me")).body.data;
-  assert.equal(account.id, mobileId);
+  const playerSession = client();
+  await playerSession.login("platform");
+  const account = (await playerSession.request("/auth/me")).body.data;
+  assert.equal(account.id, accountId);
   assert.equal(account.password_hash, undefined);
 
-  const issued = await mobile.request("/auth/mobile-token", { method: "POST", body: {} });
-  assert.equal(issued.status, 200, JSON.stringify(issued.body));
-  assert.equal(issued.body.data.tokenType, "Bearer");
-  assert.equal(issued.body.data.expiresIn, 900);
-  const bearerHeader = `Bearer ${issued.body.data.accessToken}`;
-  const bearer = client();
-  const bearerAccount = await bearer.request("/auth/me", { authorization: bearerHeader, omitCookies: true });
-  assert.equal(bearerAccount.status, 200, JSON.stringify(bearerAccount.body));
-  assert.equal(bearerAccount.body.data.id, mobileId);
-  const bearerLibrary = await bearer.request(`/library/${abbyId}`, {
-    method: "POST",
-    body: {},
-    authorization: bearerHeader,
-  });
-  assert.equal(bearerLibrary.status, 200, JSON.stringify(bearerLibrary.body));
-  assert.equal(bearerLibrary.body.data.inLibrary, true);
-  const bearerSessions = await bearer.request("/account/sessions", { authorization: bearerHeader });
-  assert.equal(bearerSessions.status, 200, JSON.stringify(bearerSessions.body));
-  assert(bearerSessions.body.data.sessions.some((session) => session.isCurrent));
-
-  const game = await mobile.request("/games/abbys-restless-heart");
+  const game = await playerSession.request("/games/abbys-restless-heart");
   assert.equal(game.status, 200);
   assert.equal(game.body.data.id, abbyId);
-  const library = await mobile.request(`/library/${abbyId}`, { method: "POST", body: {} });
+  const library = await playerSession.request(`/library/${abbyId}`, { method: "POST", body: {} });
   assert.equal(library.status, 200);
   assert.equal(library.body.data.inLibrary, true);
-  const started = await mobile.request("/platform/sessions", {
+  const started = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, gameVersion: "0.38", platform: "android" },
+    body: { gameId: abbyId, gameVersion: "0.38", platform: "windows" },
   });
   assert.equal(started.status, 201, JSON.stringify(started.body));
   const sessionId = started.body.data.id;
@@ -1330,29 +1310,29 @@ test("Android login, library, sessions and achievements share the existing accou
     ).rows[0].platform,
     "android",
   );
-  const invalid = await mobile.request("/platform/sessions", {
+  const invalid = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, platform: "android-forged" },
+    body: { gameId: abbyId, platform: "windows-forged" },
   });
   assert.equal(invalid.status, 400);
   const unlockPath = `/platform/achievements/${abbyId}/first_checkpoint/unlock`;
-  const rejected = await mobile.request(unlockPath, {
+  const rejected = await playerSession.request(unlockPath, {
     method: "POST",
     body: { expectedUserId: otherId },
   });
   assert.equal(rejected.status, 409);
   assert.equal(rejected.body.error.code, "ACCOUNT_CHANGED");
-  const first = await mobile.request(unlockPath, {
+  const first = await playerSession.request(unlockPath, {
     method: "POST",
-    body: { expectedUserId: mobileId },
+    body: { expectedUserId: accountId },
   });
   assert.equal(first.status, 200, JSON.stringify(first.body));
-  const repeated = await mobile.request(unlockPath, {
+  const repeated = await playerSession.request(unlockPath, {
     method: "POST",
-    body: { expectedUserId: mobileId },
+    body: { expectedUserId: accountId },
   });
   assert.equal(repeated.body.data.unlocked_at, first.body.data.unlocked_at);
-  const achievements = (await mobile.request(`/platform/achievements/${abbyId}`)).body.data;
+  const achievements = (await playerSession.request(`/platform/achievements/${abbyId}`)).body.data;
   assert(achievements.find((item) => item.key === "first_checkpoint").unlocked_at);
   assert.equal(achievements.find((item) => item.key === "no_death_finish").description, null);
   const another = (await other.request(`/platform/achievements/${abbyId}`)).body.data;
@@ -1362,34 +1342,24 @@ test("Android login, library, sessions and achievements share the existing accou
       .status,
     409,
   );
-  const ended = await mobile.request(`/platform/sessions/${sessionId}/end`, {
+  const ended = await playerSession.request(`/platform/sessions/${sessionId}/end`, {
     method: "POST",
     body: {},
   });
   assert.equal(ended.status, 200);
   assert(ended.body.data.duration_ms >= 0);
   assert.equal(
-    (await mobile.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
+    (await playerSession.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
       .status,
     409,
   );
   assert.equal(
-    (await mobile.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
+    (await playerSession.request(`/library/${paidId}`, { method: "POST", body: {} })).body.error.code,
     "ITCH_NOT_CONNECTED",
   );
-  const bearerLogout = await bearer.request("/auth/logout", {
-    method: "POST",
-    body: {},
-    authorization: bearerHeader,
-  });
-  assert.equal(bearerLogout.status, 200, JSON.stringify(bearerLogout.body));
-  const revokedBearer = await bearer.request("/auth/me", {
-    authorization: bearerHeader,
-    omitCookies: true,
-  });
-  assert.equal(revokedBearer.status, 401, JSON.stringify(revokedBearer.body));
-  assert.equal((await mobile.request("/auth/me")).status, 401);
-  assert.equal((await mobile.request(`/platform/achievements/${abbyId}`)).status, 401);
+  await playerSession.request("/auth/logout", { method: "POST", body: {} });
+  assert.equal((await playerSession.request("/auth/me")).status, 401);
+  assert.equal((await playerSession.request(`/platform/achievements/${abbyId}`)).status, 401);
 });
 
 
