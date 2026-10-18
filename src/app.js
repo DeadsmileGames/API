@@ -154,8 +154,7 @@ export function createApp() {
         new Intl.DateTimeFormat("en-US", { timeZone: requestedTimeZone }).format(new Date(epochMs));
         timeZone = requestedTimeZone;
       } catch {
-        // Unknown time zones fall back to UTC rather than trusting client clock data.
-      }
+            }
     }
     const now = new Date(epochMs);
     const localTime = new Intl.DateTimeFormat(res.locals.locale || "en", {
