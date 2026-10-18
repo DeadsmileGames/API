@@ -1611,7 +1611,6 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     assert.equal(registration.confirmation_expires_at, null);
     assert.equal(/^[0-9]{6}$/.test(registration.reward_code), true);
     assert.equal(registration.code_hash, createHmac("sha256", process.env.DATA_ENCRYPTION_KEY).update("deadsmile:preorder-reward-code:v1:").update(registration.reward_code).digest("hex"));
-    // Simulate an outstanding code created before the HMAC migration.
     await pool.query(
       "UPDATE game_preorders SET code_hash=$3 WHERE game_id=$1 AND email=$2",
       [freeId, "player@example.test", createHash("sha256").update(registration.reward_code).digest("hex")],
@@ -1671,8 +1670,6 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
     const earlyLauncherDownload = await player.request(`/library/${freeId}/install-metadata`, { method: "POST" });
     assert.equal(earlyLauncherDownload.status, 409, JSON.stringify(earlyLauncherDownload.body));
     assert.equal(earlyLauncherDownload.body.error.code, "GAME_NOT_RELEASED");
-    // Keep only the digest after redemption: it identifies later attempts without retaining
-    // the code in readable form or restoring any personal details.
     await pool.query(
       "UPDATE game_preorders SET reward_code=NULL WHERE game_id=$1 AND user_id=$2 AND email=$3",
       [freeId, userId, "player@example.test"],
