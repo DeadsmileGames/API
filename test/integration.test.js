@@ -215,6 +215,23 @@ await player.login("player");
 await other.login("other");
 await admin.login("admin");
 
+test("Express 5 handles CORS preflight on API and root paths", async () => {
+  for (const path of ["/", "/api/games"]) {
+    const response = await originalFetch(`http://127.0.0.1:${server.address().port}${path}`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,x-csrf-token",
+      },
+    });
+    assert.equal(response.status, 204, `preflight failed for ${path}`);
+    assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:5173");
+    assert.match(response.headers.get("access-control-allow-methods") || "", /POST/);
+    assert.match(response.headers.get("access-control-allow-headers") || "", /x-csrf-token/i);
+  }
+});
+
 test("Windows launcher login uses an HttpOnly server session cookie", async () => {
   const launcher = client();
   const result = await launcher.request("/auth/launcher-login", {
