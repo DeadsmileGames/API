@@ -1030,7 +1030,6 @@ test("password reset tokens are consumed once, expire safely and invalidate auth
     (await pool.query("SELECT count(*) FROM user_sessions WHERE sess->>'userId'=$1", [userId]))
       .rows[0].count,
   );
-  // Fetch the CSRF token before the concurrent reset requests share this client.
   await attacker.request("/csrf");
   const results = await Promise.all(
     [1, 2].map(() =>
@@ -1415,7 +1414,6 @@ test("pre-orders are free-only, keep age ratings private, require email confirma
      WHERE id=$1`,
     [freeId, JSON.stringify({ en: 13, "pt-BR": 18, es: 13 })],
   );
-  // Simulate an old paid-game record with preorder flags, so the public API must fail closed.
   await pool.query(
     `UPDATE games
      SET access_type='paid',
