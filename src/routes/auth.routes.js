@@ -17,8 +17,6 @@ import { totpTokenSchema } from "../validators/totp.validators.js";
 import {
   registerSchema,
   loginSchema,
-  mobileLoginSchema,
-  mobileRegisterSchema,
 } from "../validators/auth.validators.js";
 
 import {
@@ -29,11 +27,8 @@ import {
 import {
   register,
   login,
-  mobileLogin,
-  mobileToken,
   logout,
   me,
-  mobileRegister,
   verifyTwoFactor,
   forgotPassword,
   confirmEmail,
@@ -133,42 +128,6 @@ authRouter.post(
   twoFactorAccountLimiter,
   validate(totpTokenSchema),
   verifyTwoFactor,
-);
-authRouter.post("/mobile-login", rateLimit({
-    windowMs: 15 * 60_000,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test",
-    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }), loginLimiter, validate(mobileLoginSchema), mobileLogin);
-authRouter.post(
-  "/mobile-token",
-  rateLimit({
-    windowMs: 60_000,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test",
-    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }),
-  requireAuth,
-  integrationLimiter,
-  mobileToken,
-);
-authRouter.post(
-  "/mobile-register",
-  rateLimit({
-    windowMs: 60 * 60_000,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: () => process.env.NODE_ENV === "test",
-    handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
-  }),
-  registerLimiter,
-  validate(mobileRegisterSchema),
-  mobileRegister,
 );
 authRouter.post(
   "/forgot-password",
