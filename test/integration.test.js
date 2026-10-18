@@ -33,7 +33,6 @@ process.env.ITCH_CLIENT_ID = "test-client";
 process.env.ITCH_TOKEN_ENCRYPTION_KEY = "isolated-test-itch-key-".repeat(2);
 process.env.ITCH_REDIRECT_URI = "https://api.example.test/callback";
 process.env.VERCEL = "1";
-process.env.NODE_ENV = "development";
 process.env.BREVO_API_KEY = "integration-test-brevo-key";
 process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
 const { pool } = await import("../src/config/database.js");
