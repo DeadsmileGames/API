@@ -30,13 +30,14 @@ const TWO_FACTOR_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
 
 function regenerateSession(req) {
+  const csrfToken = req.session?.csrfToken;
   return new Promise((resolve, reject) => {
     req.session.regenerate((err) => {
       if (err) {
         reject(err);
         return;
       }
-
+      if (csrfToken) req.session.csrfToken = csrfToken;
       resolve();
     });
   });
