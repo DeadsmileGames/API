@@ -32,37 +32,37 @@ function mergePreordersIntoItems(items, preorders) {
 
 export const list = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
-  const userId = req.session.userId;
+  const userId = req.auth.userId;
   const [library, preorders] = await Promise.all([getLibrary(userId), getPreorderedLibraryItems(userId)]);
   const items = new Map((library.items || []).map((game) => [String(game.id), game]));
   sendSuccess(res, { ...library, items: mergePreordersIntoItems(items, preorders) });
 });
 
 export const sync = asyncHandler(async (req, res) => {
-  sendSuccess(res, await syncItchLibrary(req.session.userId));
+  sendSuccess(res, await syncItchLibrary(req.auth.userId));
 });
 
 export const verify = asyncHandler(async (req, res) => {
-  sendSuccess(res, await verifyGameOwnership(req.session.userId, req.params.gameId));
+  sendSuccess(res, await verifyGameOwnership(req.auth.userId, req.params.gameId));
 });
 
 export const installMetadata = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
-  sendSuccess(res, await getInstallMetadata(req.session.userId, req.params.gameId));
+  sendSuccess(res, await getInstallMetadata(req.auth.userId, req.params.gameId));
 });
 
 export const catalog = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
-  const userId = req.session.userId;
+  const userId = req.auth.userId;
   const [catalog, preorders] = await Promise.all([getLauncherCatalog(userId), getPreorderedLibraryItems(userId)]);
   const items = new Map((catalog.items || []).map((game) => [String(game.id), game]));
   sendSuccess(res, { ...catalog, items: mergePreordersIntoItems(items, preorders) });
 });
 
 export const add = asyncHandler(async (req, res) => {
-  sendSuccess(res, await addGameToLibrary(req.session.userId, req.params.gameId));
+  sendSuccess(res, await addGameToLibrary(req.auth.userId, req.params.gameId));
 });
 
 export const remove = asyncHandler(async (req, res) => {
-  sendSuccess(res, await removeGameFromLibrary(req.session.userId, req.params.gameId));
+  sendSuccess(res, await removeGameFromLibrary(req.auth.userId, req.params.gameId));
 });

@@ -1,4 +1,6 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
+import { sendError } from "../utils/apiResponse.js";
 import { expectedAccount } from "../middleware/expectedAccount.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { integrationLimiter } from "../middleware/rateLimiters.js";
@@ -19,6 +21,14 @@ import {
 } from "../validators/platform.validators.js";
 
 export const platformRouter = Router();
+platformRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}));
 
 platformRouter.get("/status", controller.status);
 platformRouter.get("/events", validate(eventQuerySchema, "query"), controller.events);

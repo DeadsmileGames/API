@@ -57,6 +57,20 @@ async function sendPreorderConfirmationEmail({ email, firstName, gameTitle, slug
  await sendTransactionalEmail({ to: email, subject: copy.subject, text: copy.text, html });
 }
 
+export async function listAvailablePreorders() {
+ const { rows } = await query(
+  "SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at FROM games WHERE preorder_enabled=true AND access_type='free' AND preorder_starts_at IS NOT NULL AND preorder_ends_at IS NOT NULL AND now() >= preorder_starts_at AND now() < preorder_ends_at ORDER BY preorder_starts_at ASC,title ASC",
+ );
+ return rows.map((game) => ({
+  id: game.id,
+  slug: game.slug,
+  title: game.title,
+  coverImage: game.cover_image,
+  startsAt: game.preorder_starts_at,
+  endsAt: game.preorder_ends_at,
+ }));
+}
+
 export async function getPreorderInfo(slug, locale="en") {
  const { rows } = await query("SELECT id,slug,title,cover_image,preorder_starts_at,preorder_ends_at FROM games WHERE slug=$1 AND preorder_enabled=true AND access_type='free'",[slug]);
  const game=rows[0]; if(!game) throw new AppError(404,"PREORDER_NOT_FOUND");
@@ -94,7 +108,6 @@ export async function getPreorderStatus(slug, userId) {
   hasPreorderRecord: Boolean(preorder),
   attemptsUsed,
   attemptsRemaining: Math.max(0, 2 - attemptsUsed),
-  // Keep the code in storage, but never expose it before the preorder ends.
   rewardCode: rewardRedeemable ? preorder.reward_code : null,
   rewardRedeemable,
   rewardRedeemed: Boolean(preorder?.redeemed_at),
@@ -208,14 +221,9 @@ export async function confirmPreorder(token) {
  const preorder = pending.rows[0];
  if (!preorder) throw new AppError(410, "PREORDER_CONFIRMATION_INVALID");
 
- // Allocate the displayable six-digit code as part of confirming the registration.
- // The digest remains the value used for redemption; the raw value is only returned
- // to the authenticated owner through the preorder status endpoint.
  for (let attempt = 0; attempt < 20; attempt += 1) {
   const code = newCode();
   try {
-   // Check both the current keyed digest and the legacy plain/SHA-256 representations
-   // so migration does not allow the same six-digit code to be assigned twice.
    const collision = await query(
     "SELECT id FROM game_preorders WHERE code_hash IN ($1,$2) OR reward_code=$3 LIMIT 1",
     [codeHash(code), hash(code), code],
@@ -267,8 +275,6 @@ export async function redeemPreorderCode(code, account) {
   const preorder = found.rows[0];
   if (!preorder) throw new AppError(404, "PREORDER_CODE_INVALID");
 
-  // A redeemed code remains identifiable by its digest, never by the raw code.
-  // Its owner may reopen the reward; another account gets an explicit already-redeemed response.
   if (preorder.redeemed_at) {
    if (String(preorder.user_id || "") !== String(account.id)) {
     throw new AppError(409, "PREORDER_CODE_ALREADY_REDEEMED");

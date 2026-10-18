@@ -1,4 +1,6 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
+import { sendError } from "../utils/apiResponse.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { validate } from "../middleware/validate.js";
 import { z } from "zod";
@@ -17,7 +19,14 @@ const gameParamsSchema = z
   .strict();
 
 export const wishlistRouter = Router();
-wishlistRouter.use(requireAuth);
+wishlistRouter.use(rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
+}), requireAuth);
 wishlistRouter.get("/", controller.list);
 wishlistRouter.post("/", validate(gameBodySchema), controller.add);
 wishlistRouter.delete(

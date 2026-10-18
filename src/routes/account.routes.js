@@ -97,7 +97,6 @@ accountRouter.post("/totp/setup", rateLimit({
   }), requireAuth, twoFactorLimiter, totpController.setup);
 accountRouter.post(
   "/totp/enable",
-  requireAuth,
   rateLimit({
     windowMs: 15 * 60_000,
     limit: 10,
@@ -106,13 +105,13 @@ accountRouter.post(
     skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
+  requireAuth,
   twoFactorLimiter,
   validate(totpTokenSchema),
   totpController.enable,
 );
 accountRouter.delete(
   "/totp/disable",
-  requireAuth,
   rateLimit({
     windowMs: 15 * 60_000,
     limit: 10,
@@ -121,6 +120,7 @@ accountRouter.delete(
     skip: () => process.env.NODE_ENV === "test",
     handler: (_req, res) => sendError(res, 429, "RATE_LIMITED"),
   }),
+  requireAuth,
   twoFactorLimiter,
   validate(totpTokenSchema),
   totpController.disable,

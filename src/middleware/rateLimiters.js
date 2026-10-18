@@ -141,3 +141,21 @@ export const searchLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
   handler: rateLimitHandler,
 });
+
+export const apiRequestLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: rateLimitHandler,
+});
+
+export const authenticatedApiLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  handler: rateLimitHandler,
+});

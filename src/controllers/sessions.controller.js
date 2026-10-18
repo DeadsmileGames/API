@@ -5,6 +5,15 @@ import { sendSuccess, sendError } from "../utils/apiResponse.js";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+async function getCurrentDeviceId(req) {
+  if (req.session?.device?.id) return req.session.device.id;
+  const { rows } = await query(
+    "SELECT sess->'device'->>'id' AS id FROM user_sessions WHERE sid = $1 AND sess->>'userId' = $2 AND expire > NOW()",
+    [req.auth.sessionId, String(req.auth.userId)],
+  );
+  return rows[0]?.id || null;
+}
+
 export const listSessions = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "private, no-store");
 
@@ -23,10 +32,10 @@ export const listSessions = asyncHandler(async (req, res) => {
             ORDER BY expire DESC
             LIMIT 50
             `,
-    [String(req.session.userId)],
+    [String(req.auth.userId)],
   );
 
-  const currentDeviceId = req.session.device?.id || null;
+  const currentDeviceId = await getCurrentDeviceId(req);
 
   const sessions = rows.map((row) => ({
     id: row.id,
@@ -49,7 +58,7 @@ export const revokeSession = asyncHandler(async (req, res) => {
     return sendError(res, 400, "INVALID_SESSION_ID");
   }
 
-  if (deviceId === req.session.device?.id) {
+  if (deviceId === await getCurrentDeviceId(req)) {
     return sendError(res, 409, "CURRENT_SESSION");
   }
 
@@ -60,7 +69,7 @@ export const revokeSession = asyncHandler(async (req, res) => {
               AND sess->'device'->>'id' = $2
               AND expire > NOW()
             `,
-    [String(req.session.userId), deviceId],
+    [String(req.auth.userId), deviceId],
   );
 
   if (result.rowCount === 0) {

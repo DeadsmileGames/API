@@ -15,6 +15,7 @@ import { csrfCookie, csrfToken, verifyCsrf } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminBodyLimiter } from "./middleware/bodyLimiter.js";
 import { sendError } from "./utils/apiResponse.js";
+import { apiRequestLimiter } from "./middleware/rateLimiters.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { gamesRouter } from "./routes/games.routes.js";
 import { launcherRouter } from "./routes/launcher.routes.js";
@@ -119,11 +120,12 @@ export function createApp() {
     origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language", "Authorization"],
+    allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language"],
     maxAge: 600,
   };
   app.options("*", cors(corsOptions));
   app.use(cors(corsOptions));
+  app.use("/api", apiRequestLimiter);
 
   app.get("/api/health", rateLimit({
     windowMs: 60_000,
@@ -136,7 +138,7 @@ export function createApp() {
     res.set("Cache-Control", "no-store");
     try {
       await pool.query("SELECT 1");
-      res.status(200).json({ status: "ok", service: "Deadsmile Games API" });
+      res.status(200).json({ status: "ok", service: "Deadsmile Games API", features: { preorders: true } });
     } catch {
       res.status(503).json({ status: "unavailable", service: "Deadsmile Games API" });
     }
@@ -154,7 +156,7 @@ export function createApp() {
         new Intl.DateTimeFormat("en-US", { timeZone: requestedTimeZone }).format(new Date(epochMs));
         timeZone = requestedTimeZone;
       } catch {
-            }
+      }
     }
     const now = new Date(epochMs);
     const localTime = new Intl.DateTimeFormat(res.locals.locale || "en", {
@@ -205,7 +207,6 @@ export function createApp() {
     },
   };
   app.use(session(sessionOptions));
-
   app.use(csrfCookie);
   app.use("/api", verifyCsrf);
 
@@ -216,6 +217,7 @@ export function createApp() {
     }),
   );
   app.get("/api/csrf", csrfToken);
+
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminBodyLimiter, adminRouter);
   app.use("/api/special-thanks", specialThanksRouter);

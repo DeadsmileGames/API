@@ -4,9 +4,7 @@ import { sendError } from "../utils/apiResponse.js";
 export async function requireAuth(req, res, next) {
   res.set("Cache-Control", "private, no-store");
   const userId = req.session?.userId;
-  if (!userId) {
-    return sendError(res, 401, "UNAUTHENTICATED");
-  }
+  if (!userId) return sendError(res, 401, "UNAUTHENTICATED");
 
   try {
     const { rows } = await query(
@@ -22,33 +20,31 @@ export async function requireAuth(req, res, next) {
     }
     if (!user.email_verified_at) {
       req.session.destroy(() => {});
-
       return sendError(res, 403, "EMAIL_NOT_VERIFIED");
     }
-    req.auth = { userId: user.id, role: user.role };
-    if (req.session.role && req.session.role !== user.role) {
-      const previousDevice = req.session.device;
-      const previousCsrfToken = req.session.csrfToken;
 
-      await new Promise((resolve, reject) => {
-        req.session.regenerate((error) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
+    req.auth = { userId: user.id, role: user.role, sessionId: req.sessionID };
+
+    if (req.session?.userId === user.id) {
+      if (req.session.role && req.session.role !== user.role) {
+        const previousDevice = req.session.device;
+        const previousClient = req.session.client;
+        const previousCsrfToken = req.session.csrfToken;
+        await new Promise((resolve, reject) => {
+          req.session.regenerate((error) => {
+            if (error) reject(error);
+            else resolve();
+          });
         });
-      });
-
-      req.session.userId = user.id;
-      req.session.role = user.role;
-      if (previousCsrfToken) req.session.csrfToken = previousCsrfToken;
-
-      if (previousDevice) {
-        req.session.device = previousDevice;
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        if (previousCsrfToken) req.session.csrfToken = previousCsrfToken;
+        if (previousDevice) req.session.device = previousDevice;
+        if (previousClient) req.session.client = previousClient;
+        req.auth.sessionId = req.sessionID;
+      } else if (req.session.role !== user.role) {
+        req.session.role = user.role;
       }
-    } else if (req.session.role !== user.role) {
-      req.session.role = user.role;
     }
     return next();
   } catch (error) {
@@ -58,12 +54,8 @@ export async function requireAuth(req, res, next) {
 
 export function requireRole(role) {
   return (req, res, next) => {
-    if (!req.auth?.userId) {
-      return sendError(res, 401, "UNAUTHENTICATED");
-    }
-    if (req.auth.role !== role) {
-      return sendError(res, 403, "FORBIDDEN");
-    }
+    if (!req.auth?.userId) return sendError(res, 401, "UNAUTHENTICATED");
+    if (req.auth.role !== role) return sendError(res, 403, "FORBIDDEN");
     return next();
   };
 }
