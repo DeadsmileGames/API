@@ -63,21 +63,7 @@ function cspDirectives() {
   return directives;
 }
 
-function sessionCookieOptions() {
-  const options = {
-    httpOnly: true,
-    sameSite: env.cookieSameSite,
-    maxAge: 7 * 24 * 60 * 60 * 1_000,
-    partitioned: env.isProduction && env.cookieSameSite === "none",
-    priority: "high",
-  };
-  if (env.isProduction) {
-    options.secure = true;
-  } else {
-    options.secure = false;
-  }
-  return options;
-}
+
 
 export function createApp() {
   const app = express();
@@ -201,22 +187,31 @@ export function createApp() {
 
   app.use(cookieParser(env.sessionSecret));
   app.use(csrfCookie);
-  app.use(
-    session({
-      store: new PgSession({
-        pool,
-        tableName: "user_sessions",
-        createTableIfMissing: false,
-        pruneSessionInterval: 60 * 60,
-      }),
-      name: "deadsmile.sid",
-      secret: env.sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      rolling: false,
-      cookie: sessionCookieOptions(),
+  const sessionOptions = {
+    store: new PgSession({
+      pool,
+      tableName: "user_sessions",
+      createTableIfMissing: false,
+      pruneSessionInterval: 60 * 60,
     }),
-  );
+    name: "deadsmile.sid",
+    secret: env.sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    rolling: false,
+    cookie: {
+      httpOnly: true,
+      secure: false,
+      sameSite: env.cookieSameSite,
+      maxAge: 7 * 24 * 60 * 60 * 1_000,
+      partitioned: env.isProduction && env.cookieSameSite === "none",
+      priority: "high",
+    },
+  };
+  if (app.get("env") === "production") {
+    sessionOptions.cookie.secure = true;
+  }
+  app.use(session(sessionOptions));
   app.use("/api", verifyCsrf);
 
   app.get("/api/errors", (_req, res) =>
