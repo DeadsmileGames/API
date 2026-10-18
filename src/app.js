@@ -64,14 +64,19 @@ function cspDirectives() {
 }
 
 function sessionCookieOptions() {
-  return {
+  const options = {
     httpOnly: true,
-    secure: "auto",
     sameSite: env.cookieSameSite,
     maxAge: 7 * 24 * 60 * 60 * 1_000,
     partitioned: env.isProduction && env.cookieSameSite === "none",
     priority: "high",
   };
+  if (env.isProduction) {
+    options.secure = true;
+  } else {
+    options.secure = false;
+  }
+  return options;
 }
 
 export function createApp() {
@@ -195,7 +200,6 @@ export function createApp() {
   });
 
   app.use(cookieParser(env.sessionSecret));
-  app.use("/api", verifyCsrf);
   app.use(csrfCookie);
   app.use(
     session({
@@ -213,6 +217,8 @@ export function createApp() {
       cookie: sessionCookieOptions(),
     }),
   );
+  app.use("/api", verifyCsrf);
+
   app.get("/api/errors", (_req, res) =>
     res.json({
       success: true,
