@@ -45,7 +45,7 @@ export const telemetry = asyncHandler(async (req, res) =>
   sendSuccess(res, await service.telemetry(req.auth.userId, req.body), 202),
 );
 export const events = asyncHandler(async (req, res) =>
-  sendSuccess(res, await service.events(req.auth?.userId || req.session?.userId || null, req.query)),
+  sendSuccess(res, await service.events(req.auth?.userId || req.session?.userId || null, req.validatedQuery ?? req.query)),
 );
 export const liveTicket = asyncHandler(async (req, res) =>
   sendSuccess(res, await service.liveTicket(req.auth.userId, req.auth.sessionId)),

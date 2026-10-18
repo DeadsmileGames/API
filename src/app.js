@@ -123,7 +123,7 @@ export function createApp() {
     allowedHeaders: ["Content-Type", "X-CSRF-Token", "Accept-Language"],
     maxAge: 600,
   };
-  app.options("*", cors(corsOptions));
+  app.options("/{*splat}", cors(corsOptions));
   app.use(cors(corsOptions));
   app.use("/api", apiRequestLimiter);
 
