@@ -31,14 +31,6 @@ export const registerSchema = z
   })
   .strict();
 
-export const mobileLoginSchema = z
-  .object({
-    email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
-
-    password: z.string().min(1, "Password is required.").max(128),
-  })
-  .strict();
-
 export const loginSchema = z
   .object({
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
@@ -50,23 +42,5 @@ export const loginSchema = z
       .trim()
       .min(1, "reCAPTCHA verification is required.")
       .max(10_000, "reCAPTCHA token is too long."),
-  })
-  .strict();
-
-export const mobileRegisterSchema = z
-  .object({
-    username: z
-      .string()
-      .trim()
-      .min(3, "Username must be at least 3 characters.")
-      .max(24, "Username must be at most 24 characters.")
-      .regex(
-        /^[a-zA-Z0-9_]+$/,
-        "Username may only contain letters, numbers, and underscores.",
-      ),
-
-    email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
-
-    password: passwordSchema,
   })
   .strict();
