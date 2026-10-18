@@ -200,16 +200,13 @@ export function createApp() {
     rolling: false,
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: env.cookieSameSite,
       maxAge: 7 * 24 * 60 * 60 * 1_000,
       partitioned: env.isProduction && env.cookieSameSite === "none",
       priority: "high",
     },
   };
-  if (app.get("env") === "production") {
-    sessionOptions.cookie.secure = true;
-  }
   app.use(session(sessionOptions));
   app.use(csrfCookie);
   app.use("/api", verifyCsrf);
