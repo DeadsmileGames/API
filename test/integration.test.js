@@ -36,6 +36,7 @@ process.env.VERCEL = "1";
 process.env.BREVO_API_KEY = "integration-test-brevo-key";
 process.env.RECAPTCHA_SECRET_KEY = "integration-test-recaptcha-secret";
 process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
+process.env.REQUIRE_LEGAL_ACCEPTANCE = "true";
 const { pool } = await import("../src/config/database.js");
 const { hashPassword } = await import("../src/utils/password.js");
 const { encryptToken } = await import("../src/utils/tokenCipher.js");
@@ -1904,6 +1905,11 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
     "INSERT INTO users(id,email,username,password_hash,role,email_verified_at) VALUES($1,$2,$3,$4,'user',now())",
     [deletionUserId, "deletioncase@example.test", "deletioncase", password],
   );
+  await pool.query(
+    `INSERT INTO user_legal_acceptances(user_id,terms_version,privacy_version,locale)
+     VALUES($1,'terms-v2026-10-23','privacy-v2026-10-23','en')`,
+    [deletionUserId],
+  );
 
   const deletionClient = client();
   await deletionClient.login("deletioncase");
@@ -1943,6 +1949,11 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
     0,
   );
   assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances WHERE user_id=$1", [deletionUserId])).rows[0].count,
+    0,
+    "legal acceptance evidence must follow the documented account deletion policy",
+  );
+  assert.equal(
     (await pool.query(
       `SELECT count(*)::int AS count FROM game_preorders
        WHERE user_id=$1 OR (user_id IS NULL AND lower(email)='deletioncase@example.test')`,
@@ -1968,4 +1979,123 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   assert(subscriber.unsubscribed_at instanceof Date || Boolean(subscriber.unsubscribed_at));
   assert.equal(subscriber.confirmation_token_hash, null);
   assert.equal(subscriber.unsubscribe_token_hash, null);
+});
+
+test("registration requires explicit current document versions and persists the server timestamp", async () => {
+  const basePayload = {
+    username: "legalacceptance",
+    email: "legalacceptance@example.test",
+    password: "TestPassword123!",
+    recaptchaToken: "integration-test-recaptcha-token",
+  };
+
+  const missingAcceptance = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: basePayload,
+  });
+  assert.equal(missingAcceptance.status, 400);
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM users WHERE email=$1", [basePayload.email])).rows[0].count,
+    0,
+  );
+
+  const outdatedVersion = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: {
+      ...basePayload,
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-22",
+      privacyVersion: "privacy-v2026-10-23",
+    },
+  });
+  assert.equal(outdatedVersion.status, 400);
+
+  const registered = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: {
+      ...basePayload,
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-23",
+      privacyVersion: "privacy-v2026-10-23",
+    },
+  });
+  assert.equal(registered.status, 201, JSON.stringify(registered.body));
+  assert.equal(registered.body.data.verificationRequired, true);
+
+  const record = (await pool.query(
+    `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
+     FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id
+     WHERE u.email=$1`,
+    [basePayload.email],
+  )).rows[0];
+  assert(record);
+  assert.equal(record.terms_version, "terms-v2026-10-23");
+  assert.equal(record.privacy_version, "privacy-v2026-10-23");
+  assert.equal(record.locale, "es");
+  assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
+});
+
+
+test("registration rollout compatibility is opt-in and never stores partial acceptance", async () => {
+  process.env.REQUIRE_LEGAL_ACCEPTANCE = "false";
+  try {
+    const legacyClient = client();
+    const acceptedClient = client();
+    const legacy = await legacyClient.request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "legacyphase",
+        email: "legacyphase@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+      },
+    });
+    assert.equal(legacy.status, 201, JSON.stringify(legacy.body));
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id WHERE u.email=$1", ["legacyphase@example.test"])).rows[0].count,
+      0,
+    );
+
+    const partial = await client().request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "partiallegal",
+        email: "partiallegal@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+        termsAccepted: true,
+      },
+    });
+    assert.equal(partial.status, 400);
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM users WHERE email=$1", ["partiallegal@example.test"])).rows[0].count,
+      0,
+    );
+
+    const compatible = await acceptedClient.request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "compataccepted",
+        email: "compataccepted@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+        termsAccepted: true,
+        privacyAcknowledged: true,
+        termsVersion: "terms-v2026-10-23",
+        privacyVersion: "privacy-v2026-10-23",
+      },
+    });
+    assert.equal(compatible.status, 201, JSON.stringify(compatible.body));
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id WHERE u.email=$1", ["compataccepted@example.test"])).rows[0].count,
+      1,
+    );
+  } finally {
+    process.env.REQUIRE_LEGAL_ACCEPTANCE = "true";
+  }
 });

@@ -351,6 +351,15 @@ CREATE TABLE "users" (
 	"share_achievements" boolean DEFAULT false NOT NULL,
 	CONSTRAINT "users_role_check" CHECK ((role = ANY (ARRAY['user'::text, 'admin'::text])))
 );
+CREATE TABLE "user_legal_acceptances" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"user_id" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	"terms_version" varchar(40) NOT NULL,
+	"privacy_version" varchar(40) NOT NULL,
+	"locale" varchar(10) NOT NULL CHECK ((locale = ANY (ARRAY['en'::character varying, 'pt-BR'::character varying, 'es'::character varying]))),
+	"accepted_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE INDEX "user_legal_acceptances_user_idx" ON "user_legal_acceptances" USING btree ("user_id", "accepted_at" DESC);
 CREATE TABLE "videos" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"title" text NOT NULL,

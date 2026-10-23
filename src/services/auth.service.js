@@ -14,7 +14,7 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
-export async function registerUser({ username, email, password, locale = "en" }) {
+export async function registerUser({ username, email, password, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
   if (PERSONALIZED_PROFILE_HANDLES.has(String(username || "").toLowerCase())) {
     throw new AppError(409, "USERNAME_TAKEN");
   }
@@ -32,12 +32,35 @@ export async function registerUser({ username, email, password, locale = "en" })
     throw new AppError(409, "USERNAME_TAKEN");
   }
 
+  const hasAnyAcceptanceField = [
+    termsAccepted,
+    privacyAcknowledged,
+    termsVersion,
+    privacyVersion,
+  ].some((field) => field !== undefined);
+  const legalAcceptanceRequired = process.env.REQUIRE_LEGAL_ACCEPTANCE !== "false";
+
+  if (
+    (legalAcceptanceRequired || hasAnyAcceptanceField) &&
+    (
+      termsAccepted !== true ||
+      privacyAcknowledged !== true ||
+      termsVersion !== "terms-v2026-10-23" ||
+      privacyVersion !== "privacy-v2026-10-23"
+    )
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR");
+  }
+
   const passwordHash = await hashPassword(password);
 
   const user = await createUser({
     username,
     email,
     passwordHash,
+    legalAcceptance: hasAnyAcceptanceField
+      ? { termsVersion, privacyVersion, locale }
+      : null,
   });
 
   await sendRegistrationEmail(user, locale);

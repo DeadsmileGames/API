@@ -1,4 +1,5 @@
-import { query } from "../config/database.js";
+import { pool, query } from "../config/database.js";
+import { AppError } from "../utils/AppError.js";
 
 const USER_FIELDS = `
   id, email, username, role,
@@ -30,14 +31,44 @@ export async function findUserById(id) {
   return rows[0] || null;
 }
 
-export async function createUser({ username, email, passwordHash }) {
-  const { rows } = await query(
-    `INSERT INTO users (username, email, password_hash, role)
-     VALUES ($1, $2, $3, 'user')
-     RETURNING id, email, username, role, created_at, updated_at, last_login_at`,
-    [username.toLowerCase(), email, passwordHash],
-  );
-  return rows[0];
+export async function createUser({ username, email, passwordHash, legalAcceptance }) {
+  const legalAcceptanceRequired = process.env.REQUIRE_LEGAL_ACCEPTANCE !== "false";
+  if (
+    (legalAcceptanceRequired && !legalAcceptance) ||
+    (legalAcceptance &&
+      (
+        legalAcceptance.termsVersion !== "terms-v2026-10-23" ||
+        legalAcceptance.privacyVersion !== "privacy-v2026-10-23" ||
+        !["en", "pt-BR", "es"].includes(legalAcceptance.locale)
+      ))
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `INSERT INTO users (username, email, password_hash, role)
+       VALUES ($1, $2, $3, 'user')
+       RETURNING id, email, username, role, created_at, updated_at, last_login_at`,
+      [username.toLowerCase(), email, passwordHash],
+    );
+    if (legalAcceptance) {
+      await client.query(
+        `INSERT INTO user_legal_acceptances (user_id, terms_version, privacy_version, locale)
+         VALUES ($1, $2, $3, $4)`,
+        [rows[0].id, legalAcceptance.termsVersion, legalAcceptance.privacyVersion, legalAcceptance.locale],
+      );
+    }
+    await client.query("COMMIT");
+    return rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateLastLogin(userId) {
