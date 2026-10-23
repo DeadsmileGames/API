@@ -31,7 +31,7 @@ export const registerSchema = z
 
     termsAccepted: z.literal(true),
     privacyAcknowledged: z.literal(true),
-    termsVersion: z.literal("2026-10"),
+    termsVersion: z.literal("terms-v2026-10-23"),
     privacyVersion: z.literal("2026-10"),
   })
   .strict();
