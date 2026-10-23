@@ -58,7 +58,7 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      25,
+      26,
     );
     assert.equal(
       (await db.query("SELECT to_regclass('public.special_thanks') AS name")).rows[0].name,
