@@ -28,6 +28,11 @@ export const registerSchema = z
       .trim()
       .min(1, "reCAPTCHA verification is required.")
       .max(10_000, "reCAPTCHA token is too long."),
+
+    termsAccepted: z.literal(true),
+    privacyAcknowledged: z.literal(true),
+    termsVersion: z.literal("2026-10"),
+    privacyVersion: z.literal("2026-10"),
   })
   .strict();
 
