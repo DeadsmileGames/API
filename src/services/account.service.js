@@ -133,6 +133,17 @@ export async function deleteAccount(userId, password) {
           OR sess->>'pendingTwoFactorUserId' = $1`,
       [String(userId)],
     );
+    // Remove preorder data tied to this account, including legacy rows that were not
+    // linked by user_id. Do not touch rows linked to another account.
+    await client.query(
+      `DELETE FROM game_preorders
+       WHERE user_id = $1
+          OR (
+            user_id IS NULL
+            AND lower(email) = (SELECT lower(email) FROM users WHERE id = $1)
+          )`,
+      [userId],
+    );
     // Unsubscribe the matching address and retain only the suppression record needed
     // to prevent further mail. Clear confirmation metadata and both token hashes.
     await client.query(
