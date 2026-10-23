@@ -13,6 +13,7 @@ test("existing database migrates without changing historical checksums or losing
     "utf8",
   );
   await db.exec(schema.split("ALTER TABLE games ADD COLUMN access_type text;")[0]);
+  await db.exec("DROP TABLE IF EXISTS user_legal_acceptances;");
   await db.exec(
     "ALTER TABLE content_events DROP CONSTRAINT content_events_event_type_check; ALTER TABLE content_events ADD CONSTRAINT content_events_event_type_check CHECK (event_type IN ('news.published','game.published','video.published','wishlist.updated'));",
   );
@@ -59,6 +60,16 @@ test("existing database migrates without changing historical checksums or losing
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
       26,
+    );
+    assert.equal(
+      (await db.query("SELECT to_regclass('public.user_legal_acceptances') AS name")).rows[0].name,
+      "user_legal_acceptances",
+    );
+    assert.deepEqual(
+      (await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'user_legal_acceptances' ORDER BY column_name",
+      )).rows.map((row) => row.column_name),
+      ["accepted_at", "id", "locale", "privacy_version", "terms_version", "user_id"],
     );
     assert.equal(
       (await db.query("SELECT to_regclass('public.special_thanks') AS name")).rows[0].name,
