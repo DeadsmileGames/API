@@ -32,7 +32,7 @@ export async function findUserById(id) {
 
 export async function createUser({ username, email, passwordHash, legalAcceptance }) {
   if (
-    legalAcceptance?.termsVersion !== "2026-10" ||
+    legalAcceptance?.termsVersion !== "terms-v2026-10-23" ||
     legalAcceptance?.privacyVersion !== "2026-10" ||
     !["en", "pt-BR", "es"].includes(legalAcceptance?.locale)
   ) {
