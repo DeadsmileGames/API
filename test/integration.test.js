@@ -1969,3 +1969,62 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   assert.equal(subscriber.confirmation_token_hash, null);
   assert.equal(subscriber.unsubscribe_token_hash, null);
 });
+
+test("registration requires explicit current document versions and persists the server timestamp", async () => {
+  const basePayload = {
+    username: "legalacceptance",
+    email: "legalacceptance@example.test",
+    password: "TestPassword123!",
+    recaptchaToken: "integration-test-recaptcha-token",
+  };
+
+  const missingAcceptance = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: basePayload,
+  });
+  assert.equal(missingAcceptance.status, 400);
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM users WHERE email=$1", [basePayload.email])).rows[0].count,
+    0,
+  );
+
+  const outdatedVersion = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: {
+      ...basePayload,
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "2026-09",
+      privacyVersion: "2026-10",
+    },
+  });
+  assert.equal(outdatedVersion.status, 400);
+
+  const registered = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: {
+      ...basePayload,
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "2026-10",
+      privacyVersion: "2026-10",
+    },
+  });
+  assert.equal(registered.status, 201, JSON.stringify(registered.body));
+  assert.equal(registered.body.data.verificationRequired, true);
+
+  const record = (await pool.query(
+    `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
+     FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id
+     WHERE u.email=$1`,
+    [basePayload.email],
+  )).rows[0];
+  assert(record);
+  assert.equal(record.terms_version, "2026-10");
+  assert.equal(record.privacy_version, "2026-10");
+  assert.equal(record.locale, "es");
+  assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
+});
