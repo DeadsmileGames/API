@@ -36,6 +36,7 @@ process.env.VERCEL = "1";
 process.env.BREVO_API_KEY = "integration-test-brevo-key";
 process.env.RECAPTCHA_SECRET_KEY = "integration-test-recaptcha-secret";
 process.env.BREVO_SENDER_EMAIL = "noreply@example.test";
+process.env.REQUIRE_LEGAL_ACCEPTANCE = "true";
 const { pool } = await import("../src/config/database.js");
 const { hashPassword } = await import("../src/utils/password.js");
 const { encryptToken } = await import("../src/utils/tokenCipher.js");
@@ -2037,4 +2038,46 @@ test("registration requires explicit current document versions and persists the 
   assert.equal(record.privacy_version, "privacy-v2026-10-23");
   assert.equal(record.locale, "es");
   assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
+});
+
+
+test("registration rollout compatibility is opt-in and never stores partial acceptance", async () => {
+  process.env.REQUIRE_LEGAL_ACCEPTANCE = "false";
+  try {
+    const legacy = await guest.request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "legacyphase",
+        email: "legacyphase@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+      },
+    });
+    assert.equal(legacy.status, 201, JSON.stringify(legacy.body));
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id WHERE u.email=$1", ["legacyphase@example.test"])).rows[0].count,
+      0,
+    );
+
+    const compatible = await guest.request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "compataccepted",
+        email: "compataccepted@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+        termsAccepted: true,
+        privacyAcknowledged: true,
+        termsVersion: "terms-v2026-10-23",
+        privacyVersion: "privacy-v2026-10-23",
+      },
+    });
+    assert.equal(compatible.status, 201, JSON.stringify(compatible.body));
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id WHERE u.email=$1", ["compataccepted@example.test"])).rows[0].count,
+      1,
+    );
+  } finally {
+    process.env.REQUIRE_LEGAL_ACCEPTANCE = "true";
+  }
 });
