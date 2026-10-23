@@ -2044,7 +2044,9 @@ test("registration requires explicit current document versions and persists the 
 test("registration rollout compatibility is opt-in and never stores partial acceptance", async () => {
   process.env.REQUIRE_LEGAL_ACCEPTANCE = "false";
   try {
-    const legacy = await guest.request("/auth/register", {
+    const legacyClient = client();
+    const acceptedClient = client();
+    const legacy = await legacyClient.request("/auth/register", {
       method: "POST",
       body: {
         username: "legacyphase",
@@ -2059,7 +2061,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
       0,
     );
 
-    const compatible = await guest.request("/auth/register", {
+    const compatible = await acceptedClient.request("/auth/register", {
       method: "POST",
       body: {
         username: "compataccepted",
