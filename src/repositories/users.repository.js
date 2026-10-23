@@ -33,7 +33,7 @@ export async function findUserById(id) {
 export async function createUser({ username, email, passwordHash, legalAcceptance }) {
   if (
     legalAcceptance?.termsVersion !== "terms-v2026-10-23" ||
-    legalAcceptance?.privacyVersion !== "2026-10" ||
+    legalAcceptance?.privacyVersion !== "privacy-v2026-10-23" ||
     !["en", "pt-BR", "es"].includes(legalAcceptance?.locale)
   ) {
     throw new Error("Registration requires the current legal acceptance record.");
