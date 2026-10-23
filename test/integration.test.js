@@ -2061,6 +2061,22 @@ test("registration rollout compatibility is opt-in and never stores partial acce
       0,
     );
 
+    const partial = await client().request("/auth/register", {
+      method: "POST",
+      body: {
+        username: "partiallegal",
+        email: "partiallegal@example.test",
+        password: "TestPassword123!",
+        recaptchaToken: "integration-test-recaptcha-token",
+        termsAccepted: true,
+      },
+    });
+    assert.equal(partial.status, 400);
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS count FROM users WHERE email=$1", ["partiallegal@example.test"])).rows[0].count,
+      0,
+    );
+
     const compatible = await acceptedClient.request("/auth/register", {
       method: "POST",
       body: {
