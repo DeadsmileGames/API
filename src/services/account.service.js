@@ -133,10 +133,15 @@ export async function deleteAccount(userId, password) {
           OR sess->>'pendingTwoFactorUserId' = $1`,
       [String(userId)],
     );
-    // Account deletion also removes the account's newsletter record in the same transaction.
-    // The newsletter is email-based, so match case-insensitively before deleting the user.
+    // Unsubscribe the matching address and retain only the suppression record needed
+    // to prevent further mail. Clear confirmation metadata and both token hashes.
     await client.query(
-      `DELETE FROM newsletter_subscribers
+      `UPDATE newsletter_subscribers
+       SET unsubscribed_at = COALESCE(unsubscribed_at, now()),
+           confirmed_at = NULL,
+           confirmation_sent_at = NULL,
+           confirmation_token_hash = NULL,
+           unsubscribe_token_hash = NULL
        WHERE lower(email) = (SELECT lower(email) FROM users WHERE id = $1)`,
       [userId],
     );
