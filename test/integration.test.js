@@ -1996,8 +1996,8 @@ test("registration requires explicit current document versions and persists the 
       ...basePayload,
       termsAccepted: true,
       privacyAcknowledged: true,
-      termsVersion: "2026-09",
-      privacyVersion: "2026-10",
+      termsVersion: "terms-v2026-10-22",
+      privacyVersion: "privacy-v2026-10-23",
     },
   });
   assert.equal(outdatedVersion.status, 400);
@@ -2009,8 +2009,8 @@ test("registration requires explicit current document versions and persists the 
       ...basePayload,
       termsAccepted: true,
       privacyAcknowledged: true,
-      termsVersion: "2026-10",
-      privacyVersion: "2026-10",
+      termsVersion: "terms-v2026-10-23",
+      privacyVersion: "privacy-v2026-10-23",
     },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.body));
@@ -2023,8 +2023,8 @@ test("registration requires explicit current document versions and persists the 
     [basePayload.email],
   )).rows[0];
   assert(record);
-  assert.equal(record.terms_version, "2026-10");
-  assert.equal(record.privacy_version, "2026-10");
+  assert.equal(record.terms_version, "terms-v2026-10-23");
+  assert.equal(record.privacy_version, "privacy-v2026-10-23");
   assert.equal(record.locale, "es");
   assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
 });
