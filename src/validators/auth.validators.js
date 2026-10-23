@@ -29,12 +29,41 @@ export const registerSchema = z
       .min(1, "reCAPTCHA verification is required.")
       .max(10_000, "reCAPTCHA token is too long."),
 
-    termsAccepted: z.literal(true),
-    privacyAcknowledged: z.literal(true),
-    termsVersion: z.literal("terms-v2026-10-23"),
-    privacyVersion: z.literal("privacy-v2026-10-23"),
+    termsAccepted: z.literal(true).optional(),
+    privacyAcknowledged: z.literal(true).optional(),
+    termsVersion: z.literal("terms-v2026-10-23").optional(),
+    privacyVersion: z.literal("privacy-v2026-10-23").optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const hasAnyAcceptanceField = [
+      value.termsAccepted,
+      value.privacyAcknowledged,
+      value.termsVersion,
+      value.privacyVersion,
+    ].some((field) => field !== undefined);
+
+    if (process.env.REQUIRE_LEGAL_ACCEPTANCE === "false" && !hasAnyAcceptanceField) {
+      return;
+    }
+
+    const requiredFields = [
+      ["termsAccepted", value.termsAccepted, true],
+      ["privacyAcknowledged", value.privacyAcknowledged, true],
+      ["termsVersion", value.termsVersion, "terms-v2026-10-23"],
+      ["privacyVersion", value.privacyVersion, "privacy-v2026-10-23"],
+    ];
+
+    for (const [field, actual, expected] of requiredFields) {
+      if (actual !== expected) {
+        context.addIssue({
+          code: "custom",
+          path: [field],
+          message: "Current legal acceptance is required.",
+        });
+      }
+    }
+  });
 
 export const loginSchema = z
   .object({
