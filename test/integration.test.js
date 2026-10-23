@@ -1898,6 +1898,78 @@ test("pre-order cancellation deletes personal details and preserves the two-per-
 });
 
 
+test("account deletion removes preorder PII and keeps only an unsubscribed newsletter suppression record", async () => {
+  const deletionUserId = "00000000-0000-4000-8000-000000000007";
+  await pool.query(
+    "INSERT INTO users(id,email,username,password_hash,role,email_verified_at) VALUES($1,$2,$3,$4,'user',now())",
+    [deletionUserId, "deletioncase@example.test", "deletioncase", password],
+  );
+
+  const deletionClient = client();
+  await deletionClient.login("deletioncase");
+
+  await pool.query(
+    `INSERT INTO newsletter_subscribers
+      (email, confirmation_token_hash, confirmation_sent_at, confirmed_at, unsubscribe_token_hash)
+     VALUES ($1, 'confirmation-hash', now(), now(), 'legacy-unsubscribe-hash')`,
+    ["deletioncase@example.test"],
+  );
+
+  await pool.query(
+    `INSERT INTO game_preorders(game_id,user_id,first_name,last_name,age,locale,email)
+     VALUES ($1,$2,'Delete','User',25,'en','deletioncase@example.test')`,
+    [freeId, deletionUserId],
+  );
+  await pool.query(
+    `INSERT INTO game_preorders(game_id,user_id,first_name,last_name,age,locale,email)
+     VALUES ($1,NULL,'Legacy','Entry',26,'en','DELETIONCASE@example.test')`,
+    [paidId],
+  );
+  await pool.query(
+    `INSERT INTO game_preorders(game_id,user_id,first_name,last_name,age,locale,email)
+     VALUES ($1,$2,'Other','Account',27,'en','deletioncase@example.test')`,
+    [msId, otherId],
+  );
+
+  const removed = await deletionClient.request("/account", {
+    method: "DELETE",
+    body: { password: "TestPassword123!" },
+  });
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  assert.equal(removed.body.data.deleted, true);
+
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM users WHERE id=$1", [deletionUserId])).rows[0].count,
+    0,
+  );
+  assert.equal(
+    (await pool.query(
+      `SELECT count(*)::int AS count FROM game_preorders
+       WHERE user_id=$1 OR (user_id IS NULL AND lower(email)='deletioncase@example.test')`,
+      [deletionUserId],
+    )).rows[0].count,
+    0,
+  );
+  assert.equal(
+    (await pool.query(
+      "SELECT count(*)::int AS count FROM game_preorders WHERE user_id=$1 AND game_id=$2",
+      [otherId, msId],
+    )).rows[0].count,
+    1,
+    "preorder data associated with another account must remain untouched",
+  );
+
+  const subscriber = (await pool.query(
+    `SELECT email,confirmed_at,unsubscribed_at,confirmation_token_hash,unsubscribe_token_hash
+     FROM newsletter_subscribers WHERE lower(email)='deletioncase@example.test'`,
+  )).rows[0];
+  assert(subscriber);
+  assert.equal(subscriber.confirmed_at, null);
+  assert(subscriber.unsubscribed_at instanceof Date || Boolean(subscriber.unsubscribed_at));
+  assert.equal(subscriber.confirmation_token_hash, null);
+  assert.equal(subscriber.unsubscribe_token_hash, null);
+});
+
 test("registration requires explicit current document versions and persists the server timestamp", async () => {
   const basePayload = {
     username: "legalacceptance",
