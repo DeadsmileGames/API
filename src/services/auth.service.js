@@ -32,11 +32,22 @@ export async function registerUser({ username, email, password, locale = "en", t
     throw new AppError(409, "USERNAME_TAKEN");
   }
 
+  const hasAnyAcceptanceField = [
+    termsAccepted,
+    privacyAcknowledged,
+    termsVersion,
+    privacyVersion,
+  ].some((field) => field !== undefined);
+  const legalAcceptanceRequired = process.env.REQUIRE_LEGAL_ACCEPTANCE !== "false";
+
   if (
-    termsAccepted !== true ||
-    privacyAcknowledged !== true ||
-    termsVersion !== "terms-v2026-10-23" ||
-    privacyVersion !== "privacy-v2026-10-23"
+    (legalAcceptanceRequired || hasAnyAcceptanceField) &&
+    (
+      termsAccepted !== true ||
+      privacyAcknowledged !== true ||
+      termsVersion !== "terms-v2026-10-23" ||
+      privacyVersion !== "privacy-v2026-10-23"
+    )
   ) {
     throw new AppError(400, "VALIDATION_ERROR");
   }
@@ -47,7 +58,9 @@ export async function registerUser({ username, email, password, locale = "en", t
     username,
     email,
     passwordHash,
-    legalAcceptance: { termsVersion, privacyVersion, locale },
+    legalAcceptance: hasAnyAcceptanceField
+      ? { termsVersion, privacyVersion, locale }
+      : null,
   });
 
   await sendRegistrationEmail(user, locale);
