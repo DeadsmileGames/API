@@ -133,6 +133,13 @@ export async function deleteAccount(userId, password) {
           OR sess->>'pendingTwoFactorUserId' = $1`,
       [String(userId)],
     );
+    // Account deletion also removes the account's newsletter record in the same transaction.
+    // The newsletter is email-based, so match case-insensitively before deleting the user.
+    await client.query(
+      `DELETE FROM newsletter_subscribers
+       WHERE lower(email) = (SELECT lower(email) FROM users WHERE id = $1)`,
+      [userId],
+    );
     await client.query("DELETE FROM telemetry_events WHERE user_id = $1", [userId]);
     await client.query("DELETE FROM users WHERE id = $1", [userId]);
     await client.query("COMMIT");
