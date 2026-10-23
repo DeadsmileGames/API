@@ -1904,6 +1904,11 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
     "INSERT INTO users(id,email,username,password_hash,role,email_verified_at) VALUES($1,$2,$3,$4,'user',now())",
     [deletionUserId, "deletioncase@example.test", "deletioncase", password],
   );
+  await pool.query(
+    `INSERT INTO user_legal_acceptances(user_id,terms_version,privacy_version,locale)
+     VALUES($1,'terms-v2026-10-23','privacy-v2026-10-23','en')`,
+    [deletionUserId],
+  );
 
   const deletionClient = client();
   await deletionClient.login("deletioncase");
@@ -1941,6 +1946,11 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   assert.equal(
     (await pool.query("SELECT count(*)::int AS count FROM users WHERE id=$1", [deletionUserId])).rows[0].count,
     0,
+  );
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM user_legal_acceptances WHERE user_id=$1", [deletionUserId])).rows[0].count,
+    0,
+    "legal acceptance evidence must follow the documented account deletion policy",
   );
   assert.equal(
     (await pool.query(
