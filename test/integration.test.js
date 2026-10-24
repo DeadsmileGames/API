@@ -2050,6 +2050,13 @@ test("registration requires explicit current document versions and persists the 
   });
   assert.equal(missingDateOfBirth.status, 400);
 
+  const invalidCalendarDate = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: { ...basePayload, dateOfBirth: "1990-02-31" },
+  });
+  assert.equal(invalidCalendarDate.status, 400);
+
   const underage = await guest.request("/auth/register", {
     method: "POST",
     language: "es",
@@ -2096,12 +2103,17 @@ test("registration requires explicit current document versions and persists the 
   assert.equal(registered.status, 201, JSON.stringify(registered.body));
   assert.equal(registered.body.data.verificationRequired, true);
 
+  const publicProfile = await guest.request("/account/profile/legalacceptance");
+  assert.equal(publicProfile.status, 200, JSON.stringify(publicProfile.body));
+  assert.equal(Object.hasOwn(publicProfile.body.data, "dateOfBirth"), false);
+  assert.equal(Object.hasOwn(publicProfile.body.data, "date_of_birth"), false);
+
   const savedUser = (await pool.query(
     "SELECT date_of_birth FROM users WHERE email=$1",
     [basePayload.email],
   )).rows[0];
   assert(savedUser);
-  assert.equal(savedUser.date_of_birth.toISOString().slice(0, 10), "1990-01-01");
+  assert.equal(String(savedUser.date_of_birth).slice(0, 10), "1990-01-01");
 
   const record = (await pool.query(
     `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
