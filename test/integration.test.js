@@ -2120,7 +2120,7 @@ test("registration requires explicit current document versions and persists the 
     [basePayload.email],
   )).rows[0];
   assert(savedUser);
-  assert.equal(String(savedUser.date_of_birth).slice(0, 10), "1990-01-01");
+  assert.equal(new Date(savedUser.date_of_birth).toISOString().slice(0, 10), "1990-01-01");
 
   const record = (await pool.query(
     `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
