@@ -31,8 +31,8 @@ export const registerSchema = z
 
     termsAccepted: z.literal(true).optional(),
     privacyAcknowledged: z.literal(true).optional(),
-    termsVersion: z.literal("terms-v2026-10-23").optional(),
-    privacyVersion: z.literal("privacy-v2026-10-23").optional(),
+    termsVersion: z.literal("terms-v2026-10-24").optional(),
+    privacyVersion: z.literal("privacy-v2026-10-24").optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -50,8 +50,8 @@ export const registerSchema = z
     const requiredFields = [
       ["termsAccepted", value.termsAccepted, true],
       ["privacyAcknowledged", value.privacyAcknowledged, true],
-      ["termsVersion", value.termsVersion, "terms-v2026-10-23"],
-      ["privacyVersion", value.privacyVersion, "privacy-v2026-10-23"],
+      ["termsVersion", value.termsVersion, "terms-v2026-10-24"],
+      ["privacyVersion", value.privacyVersion, "privacy-v2026-10-24"],
     ];
 
     for (const [field, actual, expected] of requiredFields) {
