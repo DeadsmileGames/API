@@ -59,11 +59,17 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      27,
+      28,
     );
     assert.equal(
       (await db.query("SELECT to_regclass('public.user_legal_acceptances') AS name")).rows[0].name,
       "user_legal_acceptances",
+    );
+    assert.equal(
+      (await db.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'date_of_birth') AS present",
+      )).rows[0].present,
+      true,
     );
     assert.deepEqual(
       (await db.query(
