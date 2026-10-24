@@ -7,6 +7,19 @@ const passwordSchema = z
   .regex(/[A-Za-z]/, "Password must include at least one letter.")
   .regex(/[0-9]/, "Password must include at least one number.");
 
+const dateOfBirthSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date of birth.")
+  .refine((value) => {
+    const date = new Date(value + "T00:00:00.000Z");
+    return (
+      Number.isFinite(date.getTime()) &&
+      date.toISOString().slice(0, 10) === value &&
+      value <= new Date().toISOString().slice(0, 10)
+    );
+  }, "Enter a valid date of birth.");
+
 export const registerSchema = z
   .object({
     username: z
@@ -20,6 +33,7 @@ export const registerSchema = z
       ),
 
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
+    dateOfBirth: dateOfBirthSchema,
 
     password: passwordSchema,
 
