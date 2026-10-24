@@ -1907,7 +1907,7 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   );
   await pool.query(
     `INSERT INTO user_legal_acceptances(user_id,terms_version,privacy_version,locale)
-     VALUES($1,'terms-v2026-10-23','privacy-v2026-10-23','en')`,
+     VALUES($1,'terms-v2026-10-24','privacy-v2026-10-24','en')`,
     [deletionUserId],
   );
 
@@ -2008,7 +2008,7 @@ test("registration requires explicit current document versions and persists the 
       termsAccepted: true,
       privacyAcknowledged: true,
       termsVersion: "terms-v2026-10-22",
-      privacyVersion: "privacy-v2026-10-23",
+      privacyVersion: "privacy-v2026-10-24",
     },
   });
   assert.equal(outdatedVersion.status, 400);
@@ -2020,8 +2020,8 @@ test("registration requires explicit current document versions and persists the 
       ...basePayload,
       termsAccepted: true,
       privacyAcknowledged: true,
-      termsVersion: "terms-v2026-10-23",
-      privacyVersion: "privacy-v2026-10-23",
+      termsVersion: "terms-v2026-10-24",
+      privacyVersion: "privacy-v2026-10-24",
     },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.body));
@@ -2034,8 +2034,8 @@ test("registration requires explicit current document versions and persists the 
     [basePayload.email],
   )).rows[0];
   assert(record);
-  assert.equal(record.terms_version, "terms-v2026-10-23");
-  assert.equal(record.privacy_version, "privacy-v2026-10-23");
+  assert.equal(record.terms_version, "terms-v2026-10-24");
+  assert.equal(record.privacy_version, "privacy-v2026-10-24");
   assert.equal(record.locale, "es");
   assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
 });
@@ -2086,8 +2086,8 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         recaptchaToken: "integration-test-recaptcha-token",
         termsAccepted: true,
         privacyAcknowledged: true,
-        termsVersion: "terms-v2026-10-23",
-        privacyVersion: "privacy-v2026-10-23",
+        termsVersion: "terms-v2026-10-24",
+        privacyVersion: "privacy-v2026-10-24",
       },
     });
     assert.equal(compatible.status, 201, JSON.stringify(compatible.body));
