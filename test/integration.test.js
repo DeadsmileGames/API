@@ -1981,6 +1981,59 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   assert.equal(subscriber.unsubscribe_token_hash, null);
 });
 
+test("newsletter requires explicit consent and stores server-side consent evidence", async () => {
+  const email = "newsletterconsent@example.test";
+  await pool.query("DELETE FROM newsletter_subscribers WHERE email = $1", [email]);
+
+  const missingConsent = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: { email },
+  });
+  assert.equal(missingConsent.status, 400);
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM newsletter_subscribers WHERE email = $1", [email])).rows[0].count,
+    0,
+  );
+
+  const staleConsentVersion = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: {
+      email,
+      consentAccepted: true,
+      consentTextVersion: "newsletter-consent-v2026-10-23",
+    },
+  });
+  assert.equal(staleConsentVersion.status, 400);
+
+  const subscribed = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: {
+      email,
+      consentAccepted: true,
+      consentTextVersion: "newsletter-consent-v2026-10-24",
+    },
+  });
+  assert.equal(subscribed.status, 201, JSON.stringify(subscribed.body));
+
+  const record = (await pool.query(
+    "SELECT consent_given_at, consent_text_version, consent_locale, consent_source, confirmation_sent_at, confirmed_at, unsubscribed_at FROM newsletter_subscribers WHERE email = $1",
+    [email],
+  )).rows[0];
+  assert(record);
+  assert(record.consent_given_at instanceof Date || Boolean(record.consent_given_at));
+  assert.equal(record.consent_text_version, "newsletter-consent-v2026-10-24");
+  assert.equal(record.consent_locale, "pt-BR");
+  assert.equal(record.consent_source, "website-footer");
+  assert(record.confirmation_sent_at instanceof Date || Boolean(record.confirmation_sent_at));
+  assert.equal(record.confirmed_at, null);
+  assert.equal(record.unsubscribed_at, null);
+
+  await pool.query("DELETE FROM newsletter_subscribers WHERE email = $1", [email]);
+});
+
 test("registration requires explicit current document versions and persists the server timestamp", async () => {
   const basePayload = {
     username: "legalacceptance",
