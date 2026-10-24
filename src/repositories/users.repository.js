@@ -31,7 +31,7 @@ export async function findUserById(id) {
   return rows[0] || null;
 }
 
-export async function createUser({ username, email, passwordHash, legalAcceptance }) {
+export async function createUser({ username, email, passwordHash, dateOfBirth, legalAcceptance }) {
   const legalAcceptanceRequired = process.env.REQUIRE_LEGAL_ACCEPTANCE !== "false";
   if (
     (legalAcceptanceRequired && !legalAcceptance) ||
@@ -49,10 +49,10 @@ export async function createUser({ username, email, passwordHash, legalAcceptanc
   try {
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO users (username, email, password_hash, role)
-       VALUES ($1, $2, $3, 'user')
+      `INSERT INTO users (username, email, password_hash, role, date_of_birth)
+       VALUES ($1, $2, $3, 'user', $4)
        RETURNING id, email, username, role, created_at, updated_at, last_login_at`,
-      [username.toLowerCase(), email, passwordHash],
+      [username.toLowerCase(), email, passwordHash, dateOfBirth],
     );
     if (legalAcceptance) {
       await client.query(
