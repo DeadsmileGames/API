@@ -339,6 +339,7 @@ CREATE TABLE "users" (
 	"email" text NOT NULL CONSTRAINT "users_email_key" UNIQUE,
 	"username" text NOT NULL CONSTRAINT "users_username_key" UNIQUE,
 	"password_hash" text NOT NULL,
+	"date_of_birth" date,
 	"role" text DEFAULT 'user' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
