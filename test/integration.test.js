@@ -2039,8 +2039,24 @@ test("registration requires explicit current document versions and persists the 
     username: "legalacceptance",
     email: "legalacceptance@example.test",
     password: "TestPassword123!",
+    dateOfBirth: "1990-01-01",
     recaptchaToken: "integration-test-recaptcha-token",
   };
+
+  const missingDateOfBirth = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: { ...basePayload, dateOfBirth: undefined },
+  });
+  assert.equal(missingDateOfBirth.status, 400);
+
+  const underage = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: { ...basePayload, dateOfBirth: "2018-01-01" },
+  });
+  assert.equal(underage.status, 403);
+  assert.equal(underage.body.error.code, "ACCOUNT_AGE_RESTRICTED");
 
   const missingAcceptance = await guest.request("/auth/register", {
     method: "POST",
@@ -2080,6 +2096,13 @@ test("registration requires explicit current document versions and persists the 
   assert.equal(registered.status, 201, JSON.stringify(registered.body));
   assert.equal(registered.body.data.verificationRequired, true);
 
+  const savedUser = (await pool.query(
+    "SELECT date_of_birth FROM users WHERE email=$1",
+    [basePayload.email],
+  )).rows[0];
+  assert(savedUser);
+  assert.equal(savedUser.date_of_birth.toISOString().slice(0, 10), "1990-01-01");
+
   const record = (await pool.query(
     `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
      FROM user_legal_acceptances a JOIN users u ON u.id=a.user_id
@@ -2105,6 +2128,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "legacyphase",
         email: "legacyphase@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
       },
     });
@@ -2120,6 +2144,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "partiallegal",
         email: "partiallegal@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
         termsAccepted: true,
       },
@@ -2136,6 +2161,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "compataccepted",
         email: "compataccepted@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
         termsAccepted: true,
         privacyAcknowledged: true,
