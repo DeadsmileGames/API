@@ -45,8 +45,8 @@ export async function registerUser({ username, email, password, locale = "en", t
     (
       termsAccepted !== true ||
       privacyAcknowledged !== true ||
-      termsVersion !== "terms-v2026-10-23" ||
-      privacyVersion !== "privacy-v2026-10-23"
+      termsVersion !== "terms-v2026-10-24" ||
+      privacyVersion !== "privacy-v2026-10-24"
     )
   ) {
     throw new AppError(400, "VALIDATION_ERROR");
