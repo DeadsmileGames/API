@@ -846,6 +846,56 @@ test("public profile hides exact last-played time when playtime sharing is disab
   }
 });
 
+test("public profile only exposes achievements when achievement sharing is enabled", async () => {
+  const previous = await pool.query(
+    "SELECT share_achievements FROM users WHERE id=$1",
+    [userId],
+  );
+  const key = `privacy_share_gate_${Date.now()}`;
+  let achievementId;
+  try {
+    const inserted = await pool.query(
+      `INSERT INTO achievements(game_id,key,title,description,hidden,icon_url)
+       VALUES($1,$2,'Privacy gate test','Test-only achievement',false,'https://images.example.test/privacy-gate.png')
+       RETURNING id`,
+      [freeId, key],
+    );
+    achievementId = inserted.rows[0].id;
+    await pool.query(
+      "INSERT INTO user_achievements(user_id,achievement_id) VALUES($1,$2)",
+      [userId, achievementId],
+    );
+
+    await pool.query(
+      "UPDATE users SET share_achievements=false WHERE id=$1",
+      [userId],
+    );
+    let result = await guest.request("/account/profile/player");
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.deepEqual(result.body.data.achievements, []);
+
+    await pool.query(
+      "UPDATE users SET share_achievements=true WHERE id=$1",
+      [userId],
+    );
+    result = await guest.request("/account/profile/player");
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert(result.body.data.achievements.some((item) => item.key === key));
+  } finally {
+    if (achievementId) {
+      await pool.query(
+        "DELETE FROM user_achievements WHERE user_id=$1 AND achievement_id=$2",
+        [userId, achievementId],
+      );
+      await pool.query("DELETE FROM achievements WHERE id=$1", [achievementId]);
+    }
+    await pool.query(
+      "UPDATE users SET share_achievements=$2 WHERE id=$1",
+      [userId, previous.rows[0].share_achievements],
+    );
+  }
+});
+
 test("privacy defaults hide activity and telemetry consent rejects collection", async () => {
   let result = await player.request("/platform/telemetry", {
     method: "POST",
