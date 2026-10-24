@@ -204,7 +204,11 @@ CREATE TABLE "newsletter_subscribers" (
 	"confirmation_token_hash" text,
 	"unsubscribe_token_hash" text,
 	"unsubscribed_at" timestamp with time zone,
-	"confirmation_sent_at" timestamp with time zone
+	"confirmation_sent_at" timestamp with time zone,
+	"consent_given_at" timestamp with time zone,
+	"consent_text_version" text,
+	"consent_locale" text,
+	"consent_source" text
 );
 CREATE TABLE "password_resets" (
 	"id" bigserial PRIMARY KEY,
