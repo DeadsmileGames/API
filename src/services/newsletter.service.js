@@ -29,18 +29,21 @@ function parseUnsubscribeToken(token) {
   return match[1];
 }
 
-export async function subscribe(email, locale = "en") {
+export async function subscribe(email, locale = "en", consentTextVersion) {
   const normalized = email.trim().toLowerCase();
+  const language = ["en", "pt-BR", "es"].includes(locale) ? locale : "en";
   const confirmationToken = crypto.randomBytes(32).toString("hex");
   const subscriber = await repository.upsertNewsletterSubscriber({
     email: normalized,
     confirmationTokenHash: hash(confirmationToken),
+    consentTextVersion,
+    consentLocale: language,
+    consentSource: "website-footer",
   });
 
   if (subscriber.confirmed_at && !subscriber.unsubscribed_at) return { received: true };
 
   const confirmationUrl = `${env.frontendUrl}/newsletter/confirm?token=${encodeURIComponent(confirmationToken)}`;
-  const language = ["en", "pt-BR", "es"].includes(locale) ? locale : "en";
   const copy = {
     en: {
       subject: "Confirm your Deadsmile Games newsletter",
