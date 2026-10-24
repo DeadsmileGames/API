@@ -2060,7 +2060,14 @@ test("registration requires explicit current document versions and persists the 
   const underage = await guest.request("/auth/register", {
     method: "POST",
     language: "es",
-    body: { ...basePayload, dateOfBirth: "2018-01-01" },
+    body: {
+      ...basePayload,
+      dateOfBirth: "2018-01-01",
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-24",
+      privacyVersion: "privacy-v2026-10-24",
+    },
   });
   assert.equal(underage.status, 403);
   assert.equal(underage.body.error.code, "ACCOUNT_AGE_RESTRICTED");
