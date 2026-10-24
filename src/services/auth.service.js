@@ -14,7 +14,19 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
-export async function registerUser({ username, email, password, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
+function meetsMinimumAccountAge(dateOfBirth, now = new Date()) {
+  const [year, month, day] = dateOfBirth.split("-").map(Number);
+  let age = now.getUTCFullYear() - year;
+  const currentMonth = now.getUTCMonth() + 1;
+  const currentDay = now.getUTCDate();
+  if (currentMonth < month || (currentMonth === month && currentDay < day)) age -= 1;
+  return age >= 13;
+}
+
+export async function registerUser({ username, email, password, dateOfBirth, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
+  if (!meetsMinimumAccountAge(dateOfBirth)) {
+    throw new AppError(403, "ACCOUNT_AGE_RESTRICTED");
+  }
   if (PERSONALIZED_PROFILE_HANDLES.has(String(username || "").toLowerCase())) {
     throw new AppError(409, "USERNAME_TAKEN");
   }
@@ -58,6 +70,7 @@ export async function registerUser({ username, email, password, locale = "en", t
     username,
     email,
     passwordHash,
+    dateOfBirth,
     legalAcceptance: hasAnyAcceptanceField
       ? { termsVersion, privacyVersion, locale }
       : null,
