@@ -199,12 +199,27 @@ function client() {
         headers: response.headers,
       };
     },
-    async login(username) {
+    async login(username, { origin, acceptLegalDocuments = true } = {}) {
       const result = await this.request("/auth/login", {
         method: "POST",
+        origin,
         body: { email: `${username}@example.test`, password: "TestPassword123!", recaptchaToken: "integration-test-recaptcha-token" },
       });
       assert.equal(result.status, 200, JSON.stringify(result.body));
+      if (acceptLegalDocuments && result.body?.data?.legalAcceptanceRequired === true) {
+        const accepted = await this.request("/auth/accept-legal-documents", {
+          method: "POST",
+          origin,
+          body: {
+            termsAccepted: true,
+            privacyAcknowledged: true,
+            termsVersion: "terms-v2026-10-25",
+            privacyVersion: "privacy-v2026-10-25",
+          },
+        });
+        assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+      }
+      return result.body?.data;
     },
   };
 }
