@@ -1,10 +1,11 @@
+import { CURRENT_NEWSLETTER_CONSENT_VERSION } from "../constants/legal.js";
 import { z } from "zod";
 
 export const newsletterSchema = z
   .object({
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
     consentAccepted: z.literal(true),
-    consentTextVersion: z.literal("newsletter-consent-v2026-10-24"),
+    consentTextVersion: z.literal(CURRENT_NEWSLETTER_CONSENT_VERSION),
   })
   .strict();
 
