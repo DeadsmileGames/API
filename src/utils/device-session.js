@@ -22,7 +22,7 @@ export function attachDeviceSession(req) {
   }
 
   const isLauncher = origin === "deadsmile-app://launcher";
-  const isWebsite = origin === env.frontendUrl || refererOrigin === env.frontendUrl;
+  const isWebsite = env.frontendOrigins.includes(origin) || env.frontendOrigins.includes(refererOrigin);
 
   req.session.device = {
     id: randomUUID(),
