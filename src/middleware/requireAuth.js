@@ -1,3 +1,4 @@
+import { getLatestLegalAcceptance, isCurrentLegalAcceptance } from "../repositories/users.repository.js";
 import { query } from "../config/database.js";
 import { sendError } from "../utils/apiResponse.js";
 
@@ -23,7 +24,27 @@ export async function requireAuth(req, res, next) {
       return sendError(res, 403, "EMAIL_NOT_VERIFIED");
     }
 
-    req.auth = { userId: user.id, role: user.role, sessionId: req.sessionID };
+    const latestAcceptance = await getLatestLegalAcceptance(user.id);
+    const legalAcceptanceRequired = !isCurrentLegalAcceptance(latestAcceptance);
+    req.auth = {
+      userId: user.id,
+      role: user.role,
+      sessionId: req.sessionID,
+      legalAcceptanceRequired,
+    };
+
+    const route = (req.baseUrl + req.path).replace(/\\/+$/, "") || "/";
+    const legalAcceptanceExempt =
+      (req.method === "GET" && route === "/api/auth/me") ||
+      (req.method === "POST" && route === "/api/auth/accept-legal-documents") ||
+      (req.method === "POST" && route === "/api/auth/logout") ||
+      (req.method === "DELETE" && route === "/api/account") ||
+      route === "/api/account/privacy";
+    const browserSession = req.session?.device?.client !== "launcher";
+
+    if (legalAcceptanceRequired && browserSession && !legalAcceptanceExempt) {
+      return sendError(res, 403, "LEGAL_ACCEPTANCE_REQUIRED");
+    }
 
     if (req.session?.userId === user.id) {
       if (req.session.role && req.session.role !== user.role) {
