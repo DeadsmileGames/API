@@ -263,6 +263,43 @@ test("Windows launcher login uses an HttpOnly server session cookie", async () =
   assert.equal(me.status, 200, JSON.stringify(me.body));
 });
 
+test("website accounts with stale legal acceptance must renew before protected actions", async () => {
+  await pool.query("DELETE FROM user_legal_acceptances WHERE user_id = $1", [otherId]);
+  await pool.query(
+    "INSERT INTO user_legal_acceptances (user_id, terms_version, privacy_version, locale) VALUES ($1, $2, $3, $4)",
+    [otherId, "terms-v2026-10-24", "privacy-v2026-10-24", "en"],
+  );
+
+  const website = client();
+  const origin = "https://deadsmilegames.onrender.com";
+  const login = await website.login("other", { origin, acceptLegalDocuments: false });
+  assert.equal(login.legalAcceptanceRequired, true);
+
+  const me = await website.request("/auth/me", { origin });
+  assert.equal(me.status, 200, JSON.stringify(me.body));
+  assert.equal(me.body.data.legalAcceptanceRequired, true);
+
+  const blocked = await website.request("/account", { origin });
+  assert.equal(blocked.status, 403, JSON.stringify(blocked.body));
+  assert.equal(blocked.body.error.code, "LEGAL_ACCEPTANCE_REQUIRED");
+
+  const accepted = await website.request("/auth/accept-legal-documents", {
+    method: "POST",
+    origin,
+    body: {
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-25",
+      privacyVersion: "privacy-v2026-10-25",
+    },
+  });
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+  assert.equal(accepted.body.data.legalAcceptanceRequired, false);
+
+  const account = await website.request("/account", { origin });
+  assert.equal(account.status, 200, JSON.stringify(account.body));
+});
+
 
 
 
