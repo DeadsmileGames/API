@@ -8,7 +8,7 @@ const passwordSchema = z
   .regex(/[A-Za-z]/, "Password must include at least one letter.")
   .regex(/[0-9]/, "Password must include at least one number.");
 
-const dateOfBirthSchema = z
+export const dateOfBirthSchema = z
   .string()
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date of birth.")
@@ -109,5 +109,6 @@ export const legalAcceptanceSchema = z
     privacyAcknowledged: z.literal(true),
     termsVersion: z.literal(CURRENT_TERMS_VERSION),
     privacyVersion: z.literal(CURRENT_PRIVACY_VERSION),
+    dateOfBirth: dateOfBirthSchema.optional(),
   })
   .strict();
