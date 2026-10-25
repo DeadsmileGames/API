@@ -1,3 +1,4 @@
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "../constants/legal.js";
 import { z } from "zod";
 
 const passwordSchema = z
@@ -45,8 +46,8 @@ export const registerSchema = z
 
     termsAccepted: z.literal(true).optional(),
     privacyAcknowledged: z.literal(true).optional(),
-    termsVersion: z.literal("terms-v2026-10-25").optional(),
-    privacyVersion: z.literal("privacy-v2026-10-25").optional(),
+    termsVersion: z.literal(CURRENT_TERMS_VERSION).optional(),
+    privacyVersion: z.literal(CURRENT_PRIVACY_VERSION).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -64,8 +65,8 @@ export const registerSchema = z
     const requiredFields = [
       ["termsAccepted", value.termsAccepted, true],
       ["privacyAcknowledged", value.privacyAcknowledged, true],
-      ["termsVersion", value.termsVersion, "terms-v2026-10-25"],
-      ["privacyVersion", value.privacyVersion, "privacy-v2026-10-25"],
+      ["termsVersion", value.termsVersion, CURRENT_TERMS_VERSION],
+      ["privacyVersion", value.privacyVersion, CURRENT_PRIVACY_VERSION],
     ];
 
     for (const [field, actual, expected] of requiredFields) {
