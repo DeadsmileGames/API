@@ -101,3 +101,13 @@ export const launcherLoginSchema = z
     password: z.string().min(1, "Password is required.").max(128),
   })
   .strict();
+
+
+export const legalAcceptanceSchema = z
+  .object({
+    termsAccepted: z.literal(true),
+    privacyAcknowledged: z.literal(true),
+    termsVersion: z.literal(CURRENT_TERMS_VERSION),
+    privacyVersion: z.literal(CURRENT_PRIVACY_VERSION),
+  })
+  .strict();
