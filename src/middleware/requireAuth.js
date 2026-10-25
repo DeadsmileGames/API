@@ -40,7 +40,7 @@ export async function requireAuth(req, res, next) {
       (req.method === "POST" && route === "/api/auth/logout") ||
       (req.method === "DELETE" && route === "/api/account") ||
       route === "/api/account/privacy";
-    const browserSession = req.session?.device?.client !== "launcher";
+    const browserSession = req.session?.device?.client === "website";
 
     if (legalAcceptanceRequired && browserSession && !legalAcceptanceExempt) {
       return sendError(res, 403, "LEGAL_ACCEPTANCE_REQUIRED");
