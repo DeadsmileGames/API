@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import { randomUUID } from "node:crypto";
 
 function detectPlatform(userAgent) {
@@ -12,15 +13,21 @@ function detectPlatform(userAgent) {
 
 export function attachDeviceSession(req) {
   const userAgent = String(req.get("user-agent") || "").slice(0, 256);
+  const origin = req.get("origin");
+  let refererOrigin = null;
+  try {
+    refererOrigin = req.get("referer") ? new URL(req.get("referer")).origin : null;
+  } catch {
+    refererOrigin = null;
+  }
 
-  const isLauncher = req.get("origin") === "deadsmile-app://launcher";
+  const isLauncher = origin === "deadsmile-app://launcher";
+  const isWebsite = origin === env.frontendUrl || refererOrigin === env.frontendUrl;
 
   req.session.device = {
     id: randomUUID(),
-    client: isLauncher ? "launcher" : "browser",
-
+    client: isLauncher ? "launcher" : isWebsite ? "website" : "other",
     platform: detectPlatform(userAgent),
-
     createdAt: new Date().toISOString(),
   };
 }
