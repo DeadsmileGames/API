@@ -1,5 +1,5 @@
 import { AppError } from "../utils/AppError.js";
-import { findUserById, findUserByUsername } from "../repositories/users.repository.js";
+import { findUserById, findUserByUsername, getLatestLegalAcceptance, isCurrentLegalAcceptance } from "../repositories/users.repository.js";
 import {
   updateProfile,
   findPublicProfile,
@@ -17,7 +17,11 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 export async function getAccount(userId) {
   const user = await findUserById(userId);
   if (!user) throw new AppError(404, "USER_NOT_FOUND");
-  return sanitizeUser(user);
+  const acceptance = await getLatestLegalAcceptance(userId);
+  return sanitizeUser({
+    ...user,
+    legal_acceptance_required: !isCurrentLegalAcceptance(acceptance),
+  });
 }
 
 export async function updateAccount(userId, payload) {
