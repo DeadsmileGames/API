@@ -37,8 +37,8 @@ export async function createUser({ username, email, passwordHash, dateOfBirth, l
     (legalAcceptanceRequired && !legalAcceptance) ||
     (legalAcceptance &&
       (
-        legalAcceptance.termsVersion !== "terms-v2026-10-24" ||
-        legalAcceptance.privacyVersion !== "privacy-v2026-10-24" ||
+        legalAcceptance.termsVersion !== "terms-v2026-10-25" ||
+        legalAcceptance.privacyVersion !== "privacy-v2026-10-25" ||
         !["en", "pt-BR", "es"].includes(legalAcceptance.locale)
       ))
   ) {
