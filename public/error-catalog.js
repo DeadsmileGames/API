@@ -175,7 +175,8 @@ window.deadsmileErrors = {
     "PREORDER_EMAIL_IN_USE": "That email is already associated with a pre-order for this game.",
     "PREORDER_NOT_ENDED": "This pre-order has not ended yet.",
     "PREORDER_CODE_ALREADY_REDEEMED": "This reward code has already been redeemed by another account.",
-    "ACCOUNT_AGE_RESTRICTED": "The date of birth provided does not meet the minimum age requirement to create an account."
+    "ACCOUNT_AGE_RESTRICTED": "The date of birth provided does not meet the minimum age requirement to create an account.",
+    "LEGAL_ACCEPTANCE_REQUIRED": "Please review and accept the current Terms of Service and Privacy Policy to continue."
   },
   "pt-BR": {
     "INTERNAL_ERROR": "Algo deu errado. Tente novamente mais tarde.",
@@ -353,7 +354,8 @@ window.deadsmileErrors = {
     "PREORDER_EMAIL_IN_USE": "Esse e-mail já está associado a uma pré-venda deste jogo.",
     "PREORDER_NOT_ENDED": "Esta pré-venda ainda não terminou.",
     "PREORDER_CODE_ALREADY_REDEEMED": "Este código de recompensa já foi resgatado por outra conta.",
-    "ACCOUNT_AGE_RESTRICTED": "A data de nascimento informada não atende à idade mínima exigida para criar uma conta."
+    "ACCOUNT_AGE_RESTRICTED": "A data de nascimento informada não atende à idade mínima exigida para criar uma conta.",
+    "LEGAL_ACCEPTANCE_REQUIRED": "Revise e aceite os Termos de Serviço e a Política de Privacidade atuais para continuar."
   },
   "es": {
     "INTERNAL_ERROR": "Algo salió mal. Inténtalo más tarde.",
@@ -531,6 +533,7 @@ window.deadsmileErrors = {
     "PREORDER_EMAIL_IN_USE": "Ese correo ya está asociado a una reserva de este juego.",
     "PREORDER_NOT_ENDED": "Esta reserva aún no ha terminado.",
     "PREORDER_CODE_ALREADY_REDEEMED": "Otra cuenta ya ha canjeado este código de recompensa.",
-    "ACCOUNT_AGE_RESTRICTED": "La fecha de nacimiento indicada no cumple la edad mínima requerida para crear una cuenta."
+    "ACCOUNT_AGE_RESTRICTED": "La fecha de nacimiento indicada no cumple la edad mínima requerida para crear una cuenta.",
+    "LEGAL_ACCEPTANCE_REQUIRED": "Revisa y acepta los Términos del Servicio y la Política de Privacidad actuales para continuar."
   }
 };
