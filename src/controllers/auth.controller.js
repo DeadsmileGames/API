@@ -24,6 +24,7 @@ import { env } from "../config/env.js";
 import { verifyTotpLogin } from "../services/totp.service.js";
 
 import { AppError } from "../utils/AppError.js";
+import { recordLegalAcceptance } from "../repositories/users.repository.js";
 
 const TWO_FACTOR_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
@@ -146,6 +147,19 @@ export const me = asyncHandler(async (req, res) => {
   const user = await getAccount(req.auth.userId);
 
   return sendSuccess(res, user);
+});
+
+export const acceptLegalDocuments = asyncHandler(async (req, res) => {
+  const accepted = await recordLegalAcceptance(req.auth.userId, {
+    termsVersion: req.body.termsVersion,
+    privacyVersion: req.body.privacyVersion,
+    locale: res.locals.locale,
+  });
+  const account = await getAccount(req.auth.userId);
+  return sendSuccess(res, {
+    ...account,
+    legalAcceptanceRecordedAt: accepted.accepted_at,
+  });
 });
 
 export const forgotPassword = asyncHandler(async (req, res) => {

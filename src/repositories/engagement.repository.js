@@ -1,10 +1,17 @@
 import { query } from "../config/database.js";
 
-export async function upsertNewsletterSubscriber({ email, confirmationTokenHash }) {
+export async function upsertNewsletterSubscriber({
+  email,
+  confirmationTokenHash,
+  consentTextVersion,
+  consentLocale,
+  consentSource,
+}) {
   const { rows } = await query(
     `INSERT INTO newsletter_subscribers
-      (email, confirmation_token_hash, confirmation_sent_at, confirmed_at, unsubscribed_at)
-     VALUES ($1, $2, now(), NULL, NULL)
+      (email, confirmation_token_hash, confirmation_sent_at, confirmed_at, unsubscribed_at,
+       consent_given_at, consent_text_version, consent_locale, consent_source)
+     VALUES ($1, $2, now(), NULL, NULL, now(), $3, $4, $5)
      ON CONFLICT (email) DO UPDATE SET
        confirmation_token_hash = CASE
          WHEN newsletter_subscribers.confirmed_at IS NULL OR newsletter_subscribers.unsubscribed_at IS NOT NULL
@@ -23,9 +30,13 @@ export async function upsertNewsletterSubscriber({ email, confirmationTokenHash 
        unsubscribed_at = CASE
          WHEN newsletter_subscribers.unsubscribed_at IS NOT NULL THEN NULL
          ELSE newsletter_subscribers.unsubscribed_at
-       END
+       END,
+       consent_given_at = now(),
+       consent_text_version = EXCLUDED.consent_text_version,
+       consent_locale = EXCLUDED.consent_locale,
+       consent_source = EXCLUDED.consent_source
      RETURNING id, email, confirmed_at, unsubscribed_at`,
-    [email, confirmationTokenHash],
+    [email, confirmationTokenHash, consentTextVersion, consentLocale, consentSource],
   );
   return rows[0];
 }

@@ -199,12 +199,27 @@ function client() {
         headers: response.headers,
       };
     },
-    async login(username) {
+    async login(username, { origin, acceptLegalDocuments = true } = {}) {
       const result = await this.request("/auth/login", {
         method: "POST",
+        origin,
         body: { email: `${username}@example.test`, password: "TestPassword123!", recaptchaToken: "integration-test-recaptcha-token" },
       });
       assert.equal(result.status, 200, JSON.stringify(result.body));
+      if (acceptLegalDocuments && result.body?.data?.legalAcceptanceRequired === true) {
+        const accepted = await this.request("/auth/accept-legal-documents", {
+          method: "POST",
+          origin,
+          body: {
+            termsAccepted: true,
+            privacyAcknowledged: true,
+            termsVersion: "terms-v2026-10-25",
+            privacyVersion: "privacy-v2026-10-25",
+          },
+        });
+        assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+      }
+      return result.body?.data;
     },
   };
 }
@@ -246,6 +261,43 @@ test("Windows launcher login uses an HttpOnly server session cookie", async () =
   );
   const me = await launcher.request("/auth/me");
   assert.equal(me.status, 200, JSON.stringify(me.body));
+});
+
+test("website accounts with stale legal acceptance must renew before protected actions", async () => {
+  await pool.query("DELETE FROM user_legal_acceptances WHERE user_id = $1", [otherId]);
+  await pool.query(
+    "INSERT INTO user_legal_acceptances (user_id, terms_version, privacy_version, locale) VALUES ($1, $2, $3, $4)",
+    [otherId, "terms-v2026-10-24", "privacy-v2026-10-24", "en"],
+  );
+
+  const website = client();
+  const origin = "https://deadsmilegames.onrender.com";
+  const login = await website.login("other", { origin, acceptLegalDocuments: false });
+  assert.equal(login.legalAcceptanceRequired, true);
+
+  const me = await website.request("/auth/me", { origin });
+  assert.equal(me.status, 200, JSON.stringify(me.body));
+  assert.equal(me.body.data.legalAcceptanceRequired, true);
+
+  const blocked = await website.request("/account", { origin });
+  assert.equal(blocked.status, 403, JSON.stringify(blocked.body));
+  assert.equal(blocked.body.error.code, "LEGAL_ACCEPTANCE_REQUIRED");
+
+  const accepted = await website.request("/auth/accept-legal-documents", {
+    method: "POST",
+    origin,
+    body: {
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-25",
+      privacyVersion: "privacy-v2026-10-25",
+    },
+  });
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+  assert.equal(accepted.body.data.legalAcceptanceRequired, false);
+
+  const account = await website.request("/account", { origin });
+  assert.equal(account.status, 200, JSON.stringify(account.body));
 });
 
 
@@ -842,6 +894,56 @@ test("public profile hides exact last-played time when playtime sharing is disab
     await pool.query(
       "UPDATE users SET share_game_activity=$2,share_playtime=$3 WHERE id=$1",
       [userId, previous.rows[0].share_game_activity, previous.rows[0].share_playtime],
+    );
+  }
+});
+
+test("public profile only exposes achievements when achievement sharing is enabled", async () => {
+  const previous = await pool.query(
+    "SELECT share_achievements FROM users WHERE id=$1",
+    [userId],
+  );
+  const key = `privacy_share_gate_${Date.now()}`;
+  let achievementId;
+  try {
+    const inserted = await pool.query(
+      `INSERT INTO achievements(game_id,key,title,description,hidden,icon_url)
+       VALUES($1,$2,'Privacy gate test','Test-only achievement',false,'https://images.example.test/privacy-gate.png')
+       RETURNING id`,
+      [freeId, key],
+    );
+    achievementId = inserted.rows[0].id;
+    await pool.query(
+      "INSERT INTO user_achievements(user_id,achievement_id) VALUES($1,$2)",
+      [userId, achievementId],
+    );
+
+    await pool.query(
+      "UPDATE users SET share_achievements=false WHERE id=$1",
+      [userId],
+    );
+    let result = await guest.request("/account/profile/player");
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.deepEqual(result.body.data.achievements, []);
+
+    await pool.query(
+      "UPDATE users SET share_achievements=true WHERE id=$1",
+      [userId],
+    );
+    result = await guest.request("/account/profile/player");
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert(result.body.data.achievements.some((item) => item.key === key));
+  } finally {
+    if (achievementId) {
+      await pool.query(
+        "DELETE FROM user_achievements WHERE user_id=$1 AND achievement_id=$2",
+        [userId, achievementId],
+      );
+      await pool.query("DELETE FROM achievements WHERE id=$1", [achievementId]);
+    }
+    await pool.query(
+      "UPDATE users SET share_achievements=$2 WHERE id=$1",
+      [userId, previous.rows[0].share_achievements],
     );
   }
 });
@@ -1907,7 +2009,7 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   );
   await pool.query(
     `INSERT INTO user_legal_acceptances(user_id,terms_version,privacy_version,locale)
-     VALUES($1,'terms-v2026-10-23','privacy-v2026-10-23','en')`,
+     VALUES($1,'terms-v2026-10-25','privacy-v2026-10-25','en')`,
     [deletionUserId],
   );
 
@@ -1981,13 +2083,96 @@ test("account deletion removes preorder PII and keeps only an unsubscribed newsl
   assert.equal(subscriber.unsubscribe_token_hash, null);
 });
 
+test("newsletter requires explicit consent and stores server-side consent evidence", async () => {
+  const email = "newsletterconsent@example.test";
+  await pool.query("DELETE FROM newsletter_subscribers WHERE email = $1", [email]);
+
+  const missingConsent = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: { email },
+  });
+  assert.equal(missingConsent.status, 400);
+  assert.equal(
+    (await pool.query("SELECT count(*)::int AS count FROM newsletter_subscribers WHERE email = $1", [email])).rows[0].count,
+    0,
+  );
+
+  const staleConsentVersion = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: {
+      email,
+      consentAccepted: true,
+      consentTextVersion: "newsletter-consent-v2026-10-23",
+    },
+  });
+  assert.equal(staleConsentVersion.status, 400);
+
+  const subscribed = await guest.request("/newsletter", {
+    method: "POST",
+    language: "pt-BR",
+    body: {
+      email,
+      consentAccepted: true,
+      consentTextVersion: "newsletter-consent-v2026-10-24",
+    },
+  });
+  assert.equal(subscribed.status, 201, JSON.stringify(subscribed.body));
+
+  const record = (await pool.query(
+    "SELECT consent_given_at, consent_text_version, consent_locale, consent_source, confirmation_sent_at, confirmed_at, unsubscribed_at FROM newsletter_subscribers WHERE email = $1",
+    [email],
+  )).rows[0];
+  assert(record);
+  assert(record.consent_given_at instanceof Date || Boolean(record.consent_given_at));
+  assert.equal(record.consent_text_version, "newsletter-consent-v2026-10-24");
+  assert.equal(record.consent_locale, "pt-BR");
+  assert.equal(record.consent_source, "website-footer");
+  assert(record.confirmation_sent_at instanceof Date || Boolean(record.confirmation_sent_at));
+  assert.equal(record.confirmed_at, null);
+  assert.equal(record.unsubscribed_at, null);
+
+  await pool.query("DELETE FROM newsletter_subscribers WHERE email = $1", [email]);
+});
+
 test("registration requires explicit current document versions and persists the server timestamp", async () => {
   const basePayload = {
     username: "legalacceptance",
     email: "legalacceptance@example.test",
     password: "TestPassword123!",
+    dateOfBirth: "1990-01-01",
     recaptchaToken: "integration-test-recaptcha-token",
   };
+
+  const missingDateOfBirth = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: { ...basePayload, dateOfBirth: undefined },
+  });
+  assert.equal(missingDateOfBirth.status, 400);
+
+  const invalidCalendarDate = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: { ...basePayload, dateOfBirth: "1990-02-31" },
+  });
+  assert.equal(invalidCalendarDate.status, 400);
+
+  const underage = await guest.request("/auth/register", {
+    method: "POST",
+    language: "es",
+    body: {
+      ...basePayload,
+      dateOfBirth: "2018-01-01",
+      termsAccepted: true,
+      privacyAcknowledged: true,
+      termsVersion: "terms-v2026-10-25",
+      privacyVersion: "privacy-v2026-10-25",
+    },
+  });
+  assert.equal(underage.status, 403);
+  assert.equal(underage.body.error.code, "ACCOUNT_AGE_RESTRICTED");
 
   const missingAcceptance = await guest.request("/auth/register", {
     method: "POST",
@@ -2008,7 +2193,7 @@ test("registration requires explicit current document versions and persists the 
       termsAccepted: true,
       privacyAcknowledged: true,
       termsVersion: "terms-v2026-10-22",
-      privacyVersion: "privacy-v2026-10-23",
+      privacyVersion: "privacy-v2026-10-25",
     },
   });
   assert.equal(outdatedVersion.status, 400);
@@ -2020,12 +2205,24 @@ test("registration requires explicit current document versions and persists the 
       ...basePayload,
       termsAccepted: true,
       privacyAcknowledged: true,
-      termsVersion: "terms-v2026-10-23",
-      privacyVersion: "privacy-v2026-10-23",
+      termsVersion: "terms-v2026-10-25",
+      privacyVersion: "privacy-v2026-10-25",
     },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.body));
   assert.equal(registered.body.data.verificationRequired, true);
+
+  const publicProfile = await guest.request("/account/profile/legalacceptance");
+  assert.equal(publicProfile.status, 200, JSON.stringify(publicProfile.body));
+  assert.equal(Object.hasOwn(publicProfile.body.data, "dateOfBirth"), false);
+  assert.equal(Object.hasOwn(publicProfile.body.data, "date_of_birth"), false);
+
+  const savedUser = (await pool.query(
+    "SELECT date_of_birth FROM users WHERE email=$1",
+    [basePayload.email],
+  )).rows[0];
+  assert(savedUser);
+  assert.equal(new Date(savedUser.date_of_birth).toISOString().slice(0, 10), "1990-01-01");
 
   const record = (await pool.query(
     `SELECT a.terms_version,a.privacy_version,a.locale,a.accepted_at,u.email
@@ -2034,8 +2231,8 @@ test("registration requires explicit current document versions and persists the 
     [basePayload.email],
   )).rows[0];
   assert(record);
-  assert.equal(record.terms_version, "terms-v2026-10-23");
-  assert.equal(record.privacy_version, "privacy-v2026-10-23");
+  assert.equal(record.terms_version, "terms-v2026-10-25");
+  assert.equal(record.privacy_version, "privacy-v2026-10-25");
   assert.equal(record.locale, "es");
   assert(record.accepted_at instanceof Date || Boolean(record.accepted_at));
 });
@@ -2052,6 +2249,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "legacyphase",
         email: "legacyphase@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
       },
     });
@@ -2067,6 +2265,7 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "partiallegal",
         email: "partiallegal@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
         termsAccepted: true,
       },
@@ -2083,11 +2282,12 @@ test("registration rollout compatibility is opt-in and never stores partial acce
         username: "compataccepted",
         email: "compataccepted@example.test",
         password: "TestPassword123!",
+        dateOfBirth: "1990-01-01",
         recaptchaToken: "integration-test-recaptcha-token",
         termsAccepted: true,
         privacyAcknowledged: true,
-        termsVersion: "terms-v2026-10-23",
-        privacyVersion: "privacy-v2026-10-23",
+        termsVersion: "terms-v2026-10-25",
+        privacyVersion: "privacy-v2026-10-25",
       },
     });
     assert.equal(compatible.status, 201, JSON.stringify(compatible.body));

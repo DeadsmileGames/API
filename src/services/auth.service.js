@@ -1,3 +1,5 @@
+import { meetsMinimumAge } from "../utils/age.js";
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "../constants/legal.js";
 import { AppError } from "../utils/AppError.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
 import {
@@ -6,6 +8,8 @@ import {
   findUserById,
   findUserByUsername,
   updateLastLogin,
+  getLatestLegalAcceptance,
+  isCurrentLegalAcceptance,
 } from "../repositories/users.repository.js";
 import { findTotpByUserId } from "../repositories/totp.repository.js";
 import { sendRegistrationEmail } from "./account-email.service.js";
@@ -14,7 +18,11 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
-export async function registerUser({ username, email, password, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
+
+export async function registerUser({ username, email, password, dateOfBirth, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
+  if (!meetsMinimumAge(dateOfBirth)) {
+    throw new AppError(403, "ACCOUNT_AGE_RESTRICTED");
+  }
   if (PERSONALIZED_PROFILE_HANDLES.has(String(username || "").toLowerCase())) {
     throw new AppError(409, "USERNAME_TAKEN");
   }
@@ -45,8 +53,8 @@ export async function registerUser({ username, email, password, locale = "en", t
     (
       termsAccepted !== true ||
       privacyAcknowledged !== true ||
-      termsVersion !== "terms-v2026-10-23" ||
-      privacyVersion !== "privacy-v2026-10-23"
+      termsVersion !== CURRENT_TERMS_VERSION ||
+      privacyVersion !== CURRENT_PRIVACY_VERSION
     )
   ) {
     throw new AppError(400, "VALIDATION_ERROR");
@@ -58,6 +66,7 @@ export async function registerUser({ username, email, password, locale = "en", t
     username,
     email,
     passwordHash,
+    dateOfBirth,
     legalAcceptance: hasAnyAcceptanceField
       ? { termsVersion, privacyVersion, locale }
       : null,
@@ -95,7 +104,11 @@ export async function authenticateUser({ email, password }) {
   }
 
   await updateLastLogin(user.id);
-  return sanitizeUser(user);
+  const acceptance = await getLatestLegalAcceptance(user.id);
+  return sanitizeUser({
+    ...user,
+    legal_acceptance_required: !isCurrentLegalAcceptance(acceptance),
+  });
 }
 
 export async function completeTwoFactorLogin(userId) {
@@ -105,7 +118,12 @@ export async function completeTwoFactorLogin(userId) {
 
   await updateLastLogin(userId);
   const updatedUser = await findUserById(userId);
-  return sanitizeUser(updatedUser || user);
+  const account = updatedUser || user;
+  const acceptance = await getLatestLegalAcceptance(userId);
+  return sanitizeUser({
+    ...account,
+    legal_acceptance_required: !isCurrentLegalAcceptance(acceptance),
+  });
 }
 
 export function sanitizeUser(user) {
@@ -129,5 +147,6 @@ export function sanitizeUser(user) {
     createdAt: user.created_at,
     updatedAt: user.updated_at,
     lastLoginAt: user.last_login_at,
+    legalAcceptanceRequired: Boolean(user.legal_acceptance_required),
   };
 }

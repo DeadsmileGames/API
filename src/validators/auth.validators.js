@@ -1,3 +1,4 @@
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "../constants/legal.js";
 import { z } from "zod";
 
 const passwordSchema = z
@@ -6,6 +7,19 @@ const passwordSchema = z
   .max(128, "Password is too long.")
   .regex(/[A-Za-z]/, "Password must include at least one letter.")
   .regex(/[0-9]/, "Password must include at least one number.");
+
+export const dateOfBirthSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date of birth.")
+  .refine((value) => {
+    const date = new Date(value + "T00:00:00.000Z");
+    return (
+      Number.isFinite(date.getTime()) &&
+      date.toISOString().slice(0, 10) === value &&
+      value <= new Date().toISOString().slice(0, 10)
+    );
+  }, "Enter a valid date of birth.");
 
 export const registerSchema = z
   .object({
@@ -20,6 +34,7 @@ export const registerSchema = z
       ),
 
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
+    dateOfBirth: dateOfBirthSchema,
 
     password: passwordSchema,
 
@@ -31,8 +46,8 @@ export const registerSchema = z
 
     termsAccepted: z.literal(true).optional(),
     privacyAcknowledged: z.literal(true).optional(),
-    termsVersion: z.literal("terms-v2026-10-23").optional(),
-    privacyVersion: z.literal("privacy-v2026-10-23").optional(),
+    termsVersion: z.literal(CURRENT_TERMS_VERSION).optional(),
+    privacyVersion: z.literal(CURRENT_PRIVACY_VERSION).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -50,8 +65,8 @@ export const registerSchema = z
     const requiredFields = [
       ["termsAccepted", value.termsAccepted, true],
       ["privacyAcknowledged", value.privacyAcknowledged, true],
-      ["termsVersion", value.termsVersion, "terms-v2026-10-23"],
-      ["privacyVersion", value.privacyVersion, "privacy-v2026-10-23"],
+      ["termsVersion", value.termsVersion, CURRENT_TERMS_VERSION],
+      ["privacyVersion", value.privacyVersion, CURRENT_PRIVACY_VERSION],
     ];
 
     for (const [field, actual, expected] of requiredFields) {
@@ -84,5 +99,16 @@ export const launcherLoginSchema = z
   .object({
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
     password: z.string().min(1, "Password is required.").max(128),
+  })
+  .strict();
+
+
+export const legalAcceptanceSchema = z
+  .object({
+    termsAccepted: z.literal(true),
+    privacyAcknowledged: z.literal(true),
+    termsVersion: z.literal(CURRENT_TERMS_VERSION),
+    privacyVersion: z.literal(CURRENT_PRIVACY_VERSION),
+    dateOfBirth: dateOfBirthSchema.optional(),
   })
   .strict();

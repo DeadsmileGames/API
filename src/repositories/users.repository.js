@@ -1,3 +1,4 @@
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION, SUPPORTED_LEGAL_LOCALES } from "../constants/legal.js";
 import { pool, query } from "../config/database.js";
 import { AppError } from "../utils/AppError.js";
 
@@ -31,15 +32,15 @@ export async function findUserById(id) {
   return rows[0] || null;
 }
 
-export async function createUser({ username, email, passwordHash, legalAcceptance }) {
+export async function createUser({ username, email, passwordHash, dateOfBirth, legalAcceptance }) {
   const legalAcceptanceRequired = process.env.REQUIRE_LEGAL_ACCEPTANCE !== "false";
   if (
     (legalAcceptanceRequired && !legalAcceptance) ||
     (legalAcceptance &&
       (
-        legalAcceptance.termsVersion !== "terms-v2026-10-23" ||
-        legalAcceptance.privacyVersion !== "privacy-v2026-10-23" ||
-        !["en", "pt-BR", "es"].includes(legalAcceptance.locale)
+        legalAcceptance.termsVersion !== CURRENT_TERMS_VERSION ||
+        legalAcceptance.privacyVersion !== CURRENT_PRIVACY_VERSION ||
+        !SUPPORTED_LEGAL_LOCALES.includes(legalAcceptance.locale)
       ))
   ) {
     throw new AppError(400, "VALIDATION_ERROR");
@@ -49,10 +50,10 @@ export async function createUser({ username, email, passwordHash, legalAcceptanc
   try {
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO users (username, email, password_hash, role)
-       VALUES ($1, $2, $3, 'user')
+      `INSERT INTO users (username, email, password_hash, role, date_of_birth)
+       VALUES ($1, $2, $3, 'user', $4)
        RETURNING id, email, username, role, created_at, updated_at, last_login_at`,
-      [username.toLowerCase(), email, passwordHash],
+      [username.toLowerCase(), email, passwordHash, dateOfBirth],
     );
     if (legalAcceptance) {
       await client.query(
@@ -85,6 +86,44 @@ export async function upsertAdminUser({ username, email, passwordHash }) {
            email_verified_at = COALESCE(users.email_verified_at, now())
      RETURNING id, email, username, role`,
     [username.toLowerCase(), email, passwordHash],
+  );
+  return rows[0];
+}
+
+export async function getLatestLegalAcceptance(userId) {
+  const { rows } = await query(
+    `SELECT terms_version, privacy_version, locale, accepted_at
+     FROM user_legal_acceptances
+     WHERE user_id = $1
+     ORDER BY accepted_at DESC, id DESC
+     LIMIT 1`,
+    [userId],
+  );
+  return rows[0] || null;
+}
+
+export function isCurrentLegalAcceptance(acceptance) {
+  return Boolean(
+    acceptance &&
+    acceptance.terms_version === CURRENT_TERMS_VERSION &&
+    acceptance.privacy_version === CURRENT_PRIVACY_VERSION
+  );
+}
+
+export async function recordLegalAcceptance(userId, { termsVersion, privacyVersion, locale }) {
+  if (
+    termsVersion !== CURRENT_TERMS_VERSION ||
+    privacyVersion !== CURRENT_PRIVACY_VERSION ||
+    !SUPPORTED_LEGAL_LOCALES.includes(locale)
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR");
+  }
+
+  const { rows } = await query(
+    `INSERT INTO user_legal_acceptances (user_id, terms_version, privacy_version, locale)
+     VALUES ($1, $2, $3, $4)
+     RETURNING terms_version, privacy_version, locale, accepted_at`,
+    [userId, termsVersion, privacyVersion, locale],
   );
   return rows[0];
 }

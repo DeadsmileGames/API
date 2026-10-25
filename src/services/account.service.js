@@ -1,5 +1,5 @@
 import { AppError } from "../utils/AppError.js";
-import { findUserById, findUserByUsername } from "../repositories/users.repository.js";
+import { findUserById, findUserByUsername, getLatestLegalAcceptance, isCurrentLegalAcceptance } from "../repositories/users.repository.js";
 import {
   updateProfile,
   findPublicProfile,
@@ -17,7 +17,11 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 export async function getAccount(userId) {
   const user = await findUserById(userId);
   if (!user) throw new AppError(404, "USER_NOT_FOUND");
-  return sanitizeUser(user);
+  const acceptance = await getLatestLegalAcceptance(userId);
+  return sanitizeUser({
+    ...user,
+    legal_acceptance_required: !isCurrentLegalAcceptance(acceptance),
+  });
 }
 
 export async function updateAccount(userId, payload) {
@@ -144,15 +148,19 @@ export async function deleteAccount(userId, password) {
           )`,
       [userId],
     );
-    // Unsubscribe the matching address and retain only the suppression record needed
-    // to prevent further mail. Clear confirmation metadata and both token hashes.
+    // Retain only the address and unsubscribe timestamp needed for mail suppression.
+    // Consent evidence, confirmation metadata and tokens are cleared with the account.
     await client.query(
       `UPDATE newsletter_subscribers
        SET unsubscribed_at = COALESCE(unsubscribed_at, now()),
            confirmed_at = NULL,
            confirmation_sent_at = NULL,
            confirmation_token_hash = NULL,
-           unsubscribe_token_hash = NULL
+           unsubscribe_token_hash = NULL,
+           consent_given_at = NULL,
+           consent_text_version = NULL,
+           consent_locale = NULL,
+           consent_source = NULL
        WHERE lower(email) = (SELECT lower(email) FROM users WHERE id = $1)`,
       [userId],
     );
