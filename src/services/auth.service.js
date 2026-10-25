@@ -1,3 +1,4 @@
+import { meetsMinimumAge } from "../utils/age.js";
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "../constants/legal.js";
 import { AppError } from "../utils/AppError.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
@@ -17,17 +18,9 @@ const PERSONALIZED_PROFILE_HANDLES = new Set(["deadsmilegames", "luxjson"]);
 
 const decoyHashPromise = hashPassword(`decoy-${Math.random()}-${Date.now()}`);
 
-function meetsMinimumAccountAge(dateOfBirth, now = new Date()) {
-  const [year, month, day] = dateOfBirth.split("-").map(Number);
-  let age = now.getUTCFullYear() - year;
-  const currentMonth = now.getUTCMonth() + 1;
-  const currentDay = now.getUTCDate();
-  if (currentMonth < month || (currentMonth === month && currentDay < day)) age -= 1;
-  return age >= 13;
-}
 
 export async function registerUser({ username, email, password, dateOfBirth, locale = "en", termsAccepted, privacyAcknowledged, termsVersion, privacyVersion }) {
-  if (!meetsMinimumAccountAge(dateOfBirth)) {
+  if (!meetsMinimumAge(dateOfBirth)) {
     throw new AppError(403, "ACCOUNT_AGE_RESTRICTED");
   }
   if (PERSONALIZED_PROFILE_HANDLES.has(String(username || "").toLowerCase())) {
