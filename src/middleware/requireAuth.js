@@ -33,7 +33,7 @@ export async function requireAuth(req, res, next) {
       legalAcceptanceRequired,
     };
 
-    const route = (req.baseUrl + req.path).replace(/\\/+$/, "") || "/";
+    const route = (req.baseUrl + req.path).replace(/\/+$/, "") || "/";
     const legalAcceptanceExempt =
       (req.method === "GET" && route === "/api/auth/me") ||
       (req.method === "POST" && route === "/api/auth/accept-legal-documents") ||
