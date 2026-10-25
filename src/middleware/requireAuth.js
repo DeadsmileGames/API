@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import { getLatestLegalAcceptance, isCurrentLegalAcceptance } from "../repositories/users.repository.js";
 import { query } from "../config/database.js";
 import { sendError } from "../utils/apiResponse.js";
@@ -34,13 +35,22 @@ export async function requireAuth(req, res, next) {
     };
 
     const route = (req.baseUrl + req.path).replace(/\/+$/, "") || "/";
+    const origin = req.get("origin");
+    let refererOrigin = null;
+    try {
+      refererOrigin = req.get("referer") ? new URL(req.get("referer")).origin : null;
+    } catch {
+      refererOrigin = null;
+    }
+    const websiteRequest = env.frontendOrigins.includes(origin) || env.frontendOrigins.includes(refererOrigin);
+    if (websiteRequest && req.session.device) req.session.device.isWebsite = true;
     const legalAcceptanceExempt =
       (req.method === "GET" && route === "/api/auth/me") ||
       (req.method === "POST" && route === "/api/auth/accept-legal-documents") ||
       (req.method === "POST" && route === "/api/auth/logout") ||
       (req.method === "DELETE" && route === "/api/account") ||
       route === "/api/account/privacy";
-    const browserSession = req.session?.device?.isWebsite === true;
+    const browserSession = req.session?.device?.isWebsite === true || websiteRequest;
 
     if (legalAcceptanceRequired && browserSession && !legalAcceptanceExempt) {
       return sendError(res, 403, "LEGAL_ACCEPTANCE_REQUIRED");
