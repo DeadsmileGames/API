@@ -26,7 +26,8 @@ export function attachDeviceSession(req) {
 
   req.session.device = {
     id: randomUUID(),
-    client: isLauncher ? "launcher" : isWebsite ? "website" : "other",
+    client: isLauncher ? "launcher" : isWebsite ? "browser" : "other",
+    isWebsite,
     platform: detectPlatform(userAgent),
     createdAt: new Date().toISOString(),
   };
