@@ -47,3 +47,7 @@ export function hasCompleteNotificationCopy() {
       ),
   );
 }
+
+export function publicationNotificationText({ title, preview, url, unsubscribeLabel, unsubscribeUrl }) {
+  return [title, preview, url, `${unsubscribeLabel}: ${unsubscribeUrl}`].join("\n\n");
+}

@@ -6,7 +6,7 @@ import * as repository from "../repositories/engagement.repository.js";
 import { signalRealtimeEvent } from "../realtime/hub.js";
 import { escapeHtml } from "../utils/html.js";
 import { safeAbsoluteUrl } from "../utils/url.js";
-import { notificationCopyFor } from "../utils/notificationCopy.js";
+import { notificationCopyFor, publicationNotificationText } from "../utils/notificationCopy.js";
 
 const expo = new Expo(env.expoAccessToken ? { accessToken: env.expoAccessToken } : {});
 
@@ -50,7 +50,13 @@ async function deliverEmail(subscriber, view) {
     ? `<img src="${escapeHtml(view.image)}" alt="" style="display:block;width:100%;max-height:300px;object-fit:cover;border-radius:16px;margin:0 0 24px;">`
     : "";
   const html = `<div style="font-family:Arial,sans-serif;background:#0b0b0b;color:#f5f1e8;padding:32px;max-width:620px;margin:auto;border-radius:18px;">${imageHtml}<h1 style="font-size:28px;line-height:1.15;margin:0 0 12px;">${escapeHtml(title)}</h1><p style="color:#b9b6af;line-height:1.6;margin:0 0 24px;">${escapeHtml(preview)}</p><a href="${escapeHtml(view.url)}" style="display:inline-block;background:#f5f1e8;color:#0b0b0b;padding:13px 20px;border-radius:999px;font-weight:700;text-decoration:none;">${escapeHtml(copy.viewOnSite)}</a><p style="color:#6f6d68;font-size:12px;margin:30px 0 0;">${escapeHtml(copy.newsletterNotice)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:#a9a69f;">${escapeHtml(copy.unsubscribe)}</a></p></div>`;
-  const text = `${title}\\n\\n${preview}\\n\\n${view.url}\\n\\n${copy.unsubscribe}: ${unsubscribeUrl}`;
+  const text = publicationNotificationText({
+    title,
+    preview,
+    url: view.url,
+    unsubscribeLabel: copy.unsubscribe,
+    unsubscribeUrl,
+  });
   return sendTransactionalEmail({
     to: subscriber.email,
     subject: title,
