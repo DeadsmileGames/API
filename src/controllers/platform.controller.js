@@ -50,9 +50,14 @@ export const events = asyncHandler(async (req, res) =>
 export const liveTicket = asyncHandler(async (req, res) =>
   sendSuccess(res, await service.liveTicket(req.auth.userId, req.auth.sessionId)),
 );
-export const pushSubscription = asyncHandler(async (req, res) =>
-  sendSuccess(res, await service.savePushSubscription(req.auth.userId, req.body), 201),
-);
+export const pushSubscription = asyncHandler(async (req, res) => {
+  const locale = req.body.locale || res.locals.locale || "en";
+  sendSuccess(
+    res,
+    await service.savePushSubscription(req.auth.userId, { ...req.body, locale }),
+    201,
+  );
+});
 export const removePushSubscription = asyncHandler(async (req, res) =>
   sendSuccess(
     res,

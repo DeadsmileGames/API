@@ -78,7 +78,7 @@ export async function unsubscribeNewsletterLegacy(token) {
 
 export async function listConfirmedSubscribers() {
   const { rows } = await query(
-    `SELECT id, email
+    `SELECT id, email, consent_locale
      FROM newsletter_subscribers
      WHERE confirmed_at IS NOT NULL AND unsubscribed_at IS NULL
      ORDER BY id`,
@@ -86,18 +86,19 @@ export async function listConfirmedSubscribers() {
   return rows;
 }
 
-export async function savePushSubscription({ userId, token, platform, deviceId }) {
+export async function savePushSubscription({ userId, token, platform, deviceId, locale = "en" }) {
   const { rows } = await query(
-    `INSERT INTO push_subscriptions (user_id, expo_push_token, platform, device_id)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO push_subscriptions (user_id, expo_push_token, platform, device_id, locale)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (expo_push_token) DO UPDATE SET
        user_id = EXCLUDED.user_id,
        platform = EXCLUDED.platform,
        device_id = EXCLUDED.device_id,
+       locale = EXCLUDED.locale,
        enabled = true,
        updated_at = now()
-     RETURNING id, platform, device_id, enabled, updated_at`,
-    [userId, token, platform, deviceId || null],
+     RETURNING id, platform, device_id, locale, enabled, updated_at`,
+    [userId, token, platform, deviceId || null, locale],
   );
   return rows[0];
 }
@@ -122,9 +123,9 @@ export async function disablePushTokens(tokens) {
 
 export async function listPushTokens() {
   const { rows } = await query(
-    `SELECT expo_push_token FROM push_subscriptions WHERE enabled = true ORDER BY id`,
+    `SELECT expo_push_token, locale FROM push_subscriptions WHERE enabled = true ORDER BY id`,
   );
-  return rows.map((row) => row.expo_push_token);
+  return rows.map((row) => ({ token: row.expo_push_token, locale: row.locale || "en" }));
 }
 
 export async function createEvent({
