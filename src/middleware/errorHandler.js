@@ -2,7 +2,9 @@ import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 import { sendError } from "../utils/apiResponse.js";
 
-export function errorHandler(err, req, res, _next) {
+export function errorHandler(err, req, res, next) {
+  if (res.headersSent) return next(err);
+
   if (err instanceof AppError) {
     return sendError(res, err.status, err.code);
   }
