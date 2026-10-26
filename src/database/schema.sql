@@ -238,6 +238,7 @@ CREATE TABLE "push_subscriptions" (
 	"expo_push_token" text NOT NULL CONSTRAINT "push_subscriptions_expo_push_token_key" UNIQUE,
 	"platform" text NOT NULL,
 	"device_id" text,
+	"locale" text DEFAULT 'en' NOT NULL CHECK ((locale = ANY (ARRAY['en'::text, 'pt-BR'::text, 'es'::text]))),
 	"enabled" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,

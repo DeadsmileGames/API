@@ -15,6 +15,7 @@ export const pushSubscriptionSchema = z
     token: z.string().trim().min(20).max(220),
     platform: z.enum(["android", "ios"]),
     deviceId: z.string().trim().max(160).optional(),
+    locale: z.enum(["en", "pt-BR", "es"]).optional(),
   })
   .strict();
 
