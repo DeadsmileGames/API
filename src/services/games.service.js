@@ -9,7 +9,7 @@ import {
 
 import { toClientGame } from "../utils/clientGame.js";
 import { getMicrosoftProduct } from "./microsoft-store.service.js";
-import { verifyGameOwnership, addGameToLibrary } from "./itch-integration.service.js";
+import { checkGameOwnership, verifyGameOwnership, addGameToLibrary } from "./itch-integration.service.js";
 import { isHttpsUrl } from "../utils/url.js";
 import { isGameDownloadUnlocked } from "../utils/gameRelease.js";
 import { getItchPrice, gameOffers } from "./game-commerce.service.js";
@@ -76,20 +76,36 @@ export async function getGameDetails(slug, locale = "en") {
   };
 }
 
-export async function getGameDownload(slug, userId) {
+async function downloadableGame(slug) {
   const game = await findGameBySlug(slug);
   if (!game) throw new AppError(404, "GAME_NOT_FOUND");
   if (!isGameDownloadUnlocked(game)) {
     throw new AppError(409, "GAME_NOT_RELEASED");
   }
+  if (!isHttpsUrl(game.download_url)) {
+    throw new AppError(409, "GAME_RELEASE_NOT_CONFIGURED");
+  }
+  return game;
+}
+
+export async function getGameDownload(slug, userId) {
+  const game = await downloadableGame(slug);
   if (game.access_type !== "free") {
     if (!userId) throw new AppError(401, "UNAUTHENTICATED");
-    if (!(await verifyGameOwnership(userId, game.id)).owned)
+    if (!(await checkGameOwnership(userId, game.id)).owned)
       throw new AppError(403, "GAME_NOT_OWNED");
   }
-  if (!isHttpsUrl(game.download_url))
-    throw new AppError(409, "GAME_RELEASE_NOT_CONFIGURED");
-  if (userId && game.access_type === "free") await addGameToLibrary(userId, game.id);
+  return { downloadUrl: game.download_url };
+}
+
+export async function prepareGameDownload(slug, userId) {
+  if (!userId) throw new AppError(401, "UNAUTHENTICATED");
+  const game = await downloadableGame(slug);
+  if (game.access_type === "free") {
+    await addGameToLibrary(userId, game.id);
+  } else if (!(await verifyGameOwnership(userId, game.id)).owned) {
+    throw new AppError(403, "GAME_NOT_OWNED");
+  }
   return { downloadUrl: game.download_url };
 }
 

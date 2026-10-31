@@ -33,7 +33,10 @@ test("existing database migrates without changing historical checksums or losing
   await db.exec(`INSERT INTO users (id,email,username,password_hash) VALUES ('00000000-0000-4000-8000-000000000001','test@example.test','tester','hash');
     INSERT INTO games (id,title,slug,short_description,status,purchase_url) VALUES
     ('00000000-0000-4000-8000-000000000002','Free','free','free','released',null),
-    ('00000000-0000-4000-8000-000000000003','Paid','paid','paid','released','https://studio.itch.io/paid/purchase');
+    ('00000000-0000-4000-8000-000000000003','Paid','paid','paid','released','https://studio.itch.io/paid/purchase'),
+    ('00000000-0000-4000-8000-000000000004','Abby''s Restless Heart','abbys-restless-heart','Legacy game','released',null);
+    INSERT INTO achievements (game_id,key,title,description,points,hidden) VALUES
+    ('00000000-0000-4000-8000-000000000004','finish_story','Restless no more','Reach the end of Abby''s journey.',100,false);
     INSERT INTO cloud_saves (user_id,game_id,slot,payload,sha256) VALUES ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','default','original-save','${"0".repeat(64)}');`);
   const socket = new PGLiteSocketServer({ db, port: 0, host: "127.0.0.1" });
   await socket.start();
@@ -44,6 +47,7 @@ test("existing database migrates without changing historical checksums or losing
     await import("../scripts/migrate.js");
     const games = await db.query("SELECT slug,access_type FROM games ORDER BY slug");
     assert.deepEqual(games.rows, [
+      { slug: "abbys-restless-heart", access_type: "free" },
       { slug: "free", access_type: "free" },
       { slug: "paid", access_type: "paid" },
     ]);
@@ -59,7 +63,7 @@ test("existing database migrates without changing historical checksums or losing
     );
     assert.equal(
       (await db.query("SELECT count(*) AS count FROM schema_migrations")).rows[0].count,
-      29,
+      30,
     );
     assert.equal(
       (
@@ -88,6 +92,14 @@ test("existing database migrates without changing historical checksums or losing
     assert.equal(
       (await db.query("SELECT to_regclass('public.special_thanks') AS name")).rows[0].name,
       "special_thanks",
+    );
+    assert.equal(
+      (await db.query("SELECT title FROM games WHERE id='00000000-0000-4000-8000-000000000004'")).rows[0].title,
+      "Averna",
+    );
+    assert.equal(
+      (await db.query("SELECT description FROM achievements WHERE game_id='00000000-0000-4000-8000-000000000004' AND key='finish_story'")).rows[0].description,
+      "Reach the end of Averna's journey.",
     );
     assert.deepEqual(
       (await db.query(

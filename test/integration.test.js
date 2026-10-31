@@ -456,12 +456,33 @@ test("website downloads use the database link for free games and recheck paid ow
       (await other.request("/games/paid/download")).body.error.code,
       "ITCH_NOT_CONNECTED",
     );
+    assert.equal((await player.request(`/library/${paidId}`, { method: "POST" })).status, 200);
+    const beforeRead = await pool.query(
+      "SELECT revoked_at, last_verified_at FROM user_game_entitlements WHERE user_id=$1 AND game_id=$2",
+      [userId, paidId],
+    );
     assert.equal((await player.request("/games/paid/download")).status, 200);
+    const afterRead = await pool.query(
+      "SELECT revoked_at, last_verified_at FROM user_game_entitlements WHERE user_id=$1 AND game_id=$2",
+      [userId, paidId],
+    );
+    assert.deepEqual(afterRead.rows, beforeRead.rows);
+    const preparedPaid = await player.request("/games/paid/download", { method: "POST" });
+    assert.equal(preparedPaid.status, 200);
     revoked = true;
+    const beforeDeniedRead = await pool.query(
+      "SELECT revoked_at, last_verified_at FROM user_game_entitlements WHERE user_id=$1 AND game_id=$2",
+      [userId, paidId],
+    );
     const denied = await player.request("/games/paid/download", { language: "pt-BR" });
     assert.equal(denied.status, 403);
     assert.equal(denied.body.error.code, "GAME_NOT_OWNED");
     assert.equal(denied.body.error.locale, "pt-BR");
+    const afterDeniedRead = await pool.query(
+      "SELECT revoked_at, last_verified_at FROM user_game_entitlements WHERE user_id=$1 AND game_id=$2",
+      [userId, paidId],
+    );
+    assert.deepEqual(afterDeniedRead.rows, beforeDeniedRead.rows);
   } finally {
     revoked = false;
     await pool.query("UPDATE games SET download_url=null WHERE id=ANY($1::uuid[])", [
@@ -1202,8 +1223,9 @@ test("Store outages return labelled stale metadata and never create a launcher d
   storeOffline = false;
 });
 
-test("free website download registers library membership and disconnecting itch preserves it", async () => {
+test("free website download GET is read-only and POST prepares the game in the library", async () => {
   await pool.query("DELETE FROM api_rate_limits WHERE scope='integration'");
+  assert(!(await player.request("/library")).body.data.items.some((game) => game.id === msId));
   await pool.query("UPDATE games SET download_url=$2 WHERE id=$1", [
     msId,
     "https://downloads.example.test/free.zip",
@@ -1212,6 +1234,10 @@ test("free website download registers library membership and disconnecting itch 
     const response = await player.request("/games/store/download");
     assert.equal(response.status, 200);
     assert.equal(response.body.data.downloadUrl, "https://downloads.example.test/free.zip");
+    assert(!(await player.request("/library")).body.data.items.some((game) => game.id === msId));
+    const prepared = await player.request("/games/store/download", { method: "POST" });
+    assert.equal(prepared.status, 200);
+    assert.equal(prepared.body.data.downloadUrl, "https://downloads.example.test/free.zip");
     const free = (await player.request("/library")).body.data.items.find(
       (game) => game.id === msId,
     );
@@ -1588,20 +1614,47 @@ test("live tickets are tied to an active session and revoked sessions cannot rec
   await pool.query("DELETE FROM users WHERE id=$1", [id]);
 });
 
-test("Account library, sessions and achievements remain isolated by owner", async () => {
+
+test("special thanks is public to read, admin-only to mutate, and records the creator", async () => {
+  const created = await admin.request("/admin/special-thanks", {
+    method: "POST",
+    body: { name: "Averna security review" },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const entry = created.body.data;
+  const stored = await pool.query(
+    "SELECT created_by FROM special_thanks WHERE id = $1",
+    [entry.id],
+  );
+  assert.equal(stored.rows[0]?.created_by, adminId);
+  const publicList = await guest.request("/special-thanks");
+  assert.equal(publicList.status, 200);
+  assert(publicList.body.data.some((item) => item.id === entry.id));
+  const forbidden = await player.request("/admin/special-thanks", {
+    method: "POST",
+    body: { name: "Unauthorized entry" },
+  });
+  assert.equal(forbidden.status, 403);
+  const removed = await admin.request(`/admin/special-thanks/${entry.id}`, {
+    method: "DELETE",
+  });
+  assert.equal(removed.status, 200);
+});
+
+test("Averna library, sessions and achievements remain isolated by owner", async () => {
   const accountId = "00000000-0000-4000-8000-000000000101";
-  const abbyId = "00000000-0000-4000-8000-000000000102";
+  const avernaId = "00000000-0000-4000-8000-000000000102";
   await pool.query(
     "INSERT INTO users(id,email,username,password_hash,email_verified_at) VALUES($1,'platform@example.test','platform',$2,now())",
     [accountId, password],
   );
   await pool.query(
-    "INSERT INTO games(id,title,slug,short_description,status,access_type) VALUES($1,'Abby','abbys-restless-heart','Abby','released','free')",
-    [abbyId],
+    "INSERT INTO games(id,title,slug,short_description,status,access_type) VALUES($1,'Averna','abbys-restless-heart','Averna','released','free')",
+    [avernaId],
   );
   await pool.query(
     "INSERT INTO achievements(game_id,key,title,description,points,hidden) VALUES($1,'first_checkpoint','Checkpoint','Reached a checkpoint',20,false),($1,'no_death_finish','Secret','Finished without deaths',150,true)",
-    [abbyId],
+    [avernaId],
   );
   const playerSession = client();
   await playerSession.login("platform");
@@ -1611,13 +1664,13 @@ test("Account library, sessions and achievements remain isolated by owner", asyn
 
   const game = await playerSession.request("/games/abbys-restless-heart");
   assert.equal(game.status, 200);
-  assert.equal(game.body.data.id, abbyId);
-  const library = await playerSession.request(`/library/${abbyId}`, { method: "POST", body: {} });
+  assert.equal(game.body.data.id, avernaId);
+  const library = await playerSession.request(`/library/${avernaId}`, { method: "POST", body: {} });
   assert.equal(library.status, 200);
   assert.equal(library.body.data.inLibrary, true);
   const started = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, gameVersion: "0.38", platform: "windows" },
+    body: { gameId: avernaId, gameVersion: "0.38", platform: "windows" },
   });
   assert.equal(started.status, 201, JSON.stringify(started.body));
   const sessionId = started.body.data.id;
@@ -1631,10 +1684,10 @@ test("Account library, sessions and achievements remain isolated by owner", asyn
   );
   const invalid = await playerSession.request("/platform/sessions", {
     method: "POST",
-    body: { gameId: abbyId, platform: "windows-forged" },
+    body: { gameId: avernaId, platform: "windows-forged" },
   });
   assert.equal(invalid.status, 400);
-  const unlockPath = `/platform/achievements/${abbyId}/first_checkpoint/unlock`;
+  const unlockPath = `/platform/achievements/${avernaId}/first_checkpoint/unlock`;
   const rejected = await playerSession.request(unlockPath, {
     method: "POST",
     body: { expectedUserId: otherId },
@@ -1651,10 +1704,10 @@ test("Account library, sessions and achievements remain isolated by owner", asyn
     body: { expectedUserId: accountId },
   });
   assert.equal(repeated.body.data.unlocked_at, first.body.data.unlocked_at);
-  const achievements = (await playerSession.request(`/platform/achievements/${abbyId}`)).body.data;
+  const achievements = (await playerSession.request(`/platform/achievements/${avernaId}`)).body.data;
   assert(achievements.find((item) => item.key === "first_checkpoint").unlocked_at);
   assert.equal(achievements.find((item) => item.key === "no_death_finish").description, null);
-  const another = (await other.request(`/platform/achievements/${abbyId}`)).body.data;
+  const another = (await other.request(`/platform/achievements/${avernaId}`)).body.data;
   assert.equal(another.find((item) => item.key === "first_checkpoint").unlocked_at, null);
   assert.equal(
     (await other.request(`/platform/sessions/${sessionId}/end`, { method: "POST", body: {} }))
@@ -1678,7 +1731,7 @@ test("Account library, sessions and achievements remain isolated by owner", asyn
   );
   await playerSession.request("/auth/logout", { method: "POST", body: {} });
   assert.equal((await playerSession.request("/auth/me")).status, 401);
-  assert.equal((await playerSession.request(`/platform/achievements/${abbyId}`)).status, 401);
+  assert.equal((await playerSession.request(`/platform/achievements/${avernaId}`)).status, 401);
 });
 
 
