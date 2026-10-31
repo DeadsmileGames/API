@@ -21,7 +21,7 @@ export const create = asyncHandler(async (req, res) => {
       `INSERT INTO special_thanks (name, created_by)
        VALUES ($1, $2)
        RETURNING id, name, created_at`,
-      [name, req.user?.id || null],
+      [name, req.auth.userId],
     );
     sendSuccess(res, rows[0], 201);
   } catch (error) {

@@ -374,12 +374,12 @@ export async function disconnectItch(userId) {
   return { connected: false };
 }
 
-export async function verifyGameOwnership(userId, gameId) {
+async function inspectGameOwnership(userId, gameId) {
   const game = await findItchGame(gameId);
   if (!game) throw new AppError(404, "GAME_NOT_FOUND");
   if (game.status !== "released") throw new AppError(409, "GAME_NOT_RELEASED");
   if (game.access_type === "free") {
-    return { owned: true, status: "owned", accessType: "free", gameId };
+    return { game, result: { owned: true, status: "owned", accessType: "free", gameId } };
   }
   requireConfigured();
   const account = await findItchAccount(userId);
@@ -387,18 +387,37 @@ export async function verifyGameOwnership(userId, gameId) {
   if (!game.itch_game_id || !game.purchase_url)
     throw new AppError(409, "ITCH_GAME_NOT_CONFIGURED");
   const result = ownershipFor(game, await ownedKeysFor(account, [game.itch_game_id]));
-  if (result.owned)
-    await grantEntitlement({
-      userId,
-      gameId,
-      externalReference: result.reference,
-      acquiredAt: result.acquiredAt,
-    });
-  else await revokeEntitlement(userId, gameId);
-  await touchItchAccount(userId);
+  return { game, result };
+}
+
+export async function checkGameOwnership(userId, gameId) {
+  const { game, result } = await inspectGameOwnership(userId, gameId);
   return {
     owned: result.owned,
     status: result.owned ? "owned" : "not_owned",
+    accessType: game.access_type,
+    gameId,
+    purchaseUrl: game.purchase_url,
+  };
+}
+
+export async function verifyGameOwnership(userId, gameId) {
+  const { game, result } = await inspectGameOwnership(userId, gameId);
+  if (game.access_type !== "free") {
+    if (result.owned)
+      await grantEntitlement({
+        userId,
+        gameId,
+        externalReference: result.reference,
+        acquiredAt: result.acquiredAt,
+      });
+    else await revokeEntitlement(userId, gameId);
+    await touchItchAccount(userId);
+  }
+  return {
+    owned: result.owned,
+    status: result.owned ? "owned" : "not_owned",
+    ...(game.access_type === "free" ? { accessType: "free" } : {}),
     gameId,
     purchaseUrl: game.purchase_url,
   };

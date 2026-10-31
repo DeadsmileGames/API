@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validate } from "../middleware/validate.js";
 import { listGamesSchema, gameSlugSchema } from "../validators/games.validators.js";
 import { contentListSchema } from "../validators/content.validators.js";
-import { list, details, download, latestNews } from "../controllers/games.controller.js";
+import { list, details, download, prepareDownload, latestNews } from "../controllers/games.controller.js";
 import { downloadLimiter } from "../middleware/rateLimiters.js";
 
 export const gamesRouter = Router();
@@ -13,6 +13,12 @@ gamesRouter.get(
   downloadLimiter,
   validate(gameSlugSchema, "params"),
   download,
+);
+gamesRouter.post(
+  "/:slug/download",
+  downloadLimiter,
+  validate(gameSlugSchema, "params"),
+  prepareDownload,
 );
 gamesRouter.get(
   "/:slug/latest",

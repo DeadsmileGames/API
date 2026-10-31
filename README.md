@@ -72,4 +72,4 @@ A migração `014_android_game_sessions.sql` acrescenta `android` às plataforma
 
 O jogo utiliza o login móvel já existente, CSRF, duas etapas, biblioteca, sessões de partida e conquistas. Acesso gratuito é registrado sem itch.io; acesso pago continua exigindo comprovação. O teste de integração cobre login Android, inscrição na biblioteca, plataforma, desbloqueio idempotente, isolamento entre contas e recusa de acesso pago sem compra. Não foi feita uma chamada ao seu banco de produção.
 
-Para conferir o cadastro de Abby e as cinco conquistas, execute `npm run db:check-abby`. Para atualizar os fallbacks offline do Android após editar o catálogo mestre: `python caminho-do-projeto-android/scripts/sync-api-errors.py src/utils/errorCatalog.json`.
+Para conferir o cadastro de Averna e as cinco conquistas, execute `npm run db:check-averna`. Para atualizar os fallbacks offline do Android após editar o catálogo mestre: `python caminho-do-projeto-android/scripts/sync-api-errors.py src/utils/errorCatalog.json`.
